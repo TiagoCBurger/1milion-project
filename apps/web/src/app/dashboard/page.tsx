@@ -53,21 +53,21 @@ export default async function DashboardPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {workspaces.map((ws) => (
             <Link
-              key={ws.id as string}
+              key={ws.id}
               href={`/dashboard/${ws.slug}`}
               className="rounded-lg border bg-white p-5 hover:shadow-md transition"
             >
-              <h3 className="font-semibold">{ws.name as string}</h3>
+              <h3 className="font-semibold">{ws.name}</h3>
               {ws.meta_business_name ? (
                 <p className="mt-1 text-sm text-green-600">
-                  Connected: {ws.meta_business_name as string}
+                  Connected: {ws.meta_business_name}
                 </p>
               ) : (
                 <p className="mt-1 text-sm text-amber-600">
                   Not connected
                 </p>
               )}
-              <p className="mt-2 text-xs text-gray-400 uppercase">{ws.role as string}</p>
+              <p className="mt-2 text-xs text-gray-400 uppercase">{ws.role}</p>
             </Link>
           ))}
         </div>
