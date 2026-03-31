@@ -13,10 +13,16 @@ export default async function DashboardPage() {
     .select("role, workspace:workspaces(id, name, slug, meta_business_id, meta_business_name)")
     .eq("user_id", user.id);
 
-  const workspaces = memberships?.map((m) => ({
-    ...(m.workspace as Record<string, unknown>),
-    role: m.role,
-  })) ?? [];
+  const workspaces = memberships?.map((m) => {
+    const ws = m.workspace as unknown as {
+      id: string;
+      name: string;
+      slug: string;
+      meta_business_id: string | null;
+      meta_business_name: string | null;
+    };
+    return { ...ws, role: m.role };
+  }) ?? [];
 
   return (
     <div>
