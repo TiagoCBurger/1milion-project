@@ -32,9 +32,13 @@ export function Footer() {
         </nav>
       </div>
 
-      <div className="mx-auto mt-8 max-w-6xl text-center text-xs text-gray-400">
-        &copy; {new Date().getFullYear()} VibeFly. All rights
-        reserved.
+      <div className="mx-auto mt-8 max-w-6xl border-t border-gray-100 pt-6 text-center text-xs text-gray-400">
+        <p>
+          &copy; {new Date().getFullYear()} VibeFly. All rights reserved.
+        </p>
+        <p className="mt-2">
+          CNPJ: 61.750.788/0001-48 &mdash; 61.750.788 TIAGO CASAS BURGER
+        </p>
       </div>
     </footer>
   );

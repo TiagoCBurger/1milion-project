@@ -136,3 +136,8 @@ These Terms, together with the Privacy Policy, constitute the entire agreement b
 If you have questions about these Terms of Service, please contact us:
 
 **Email:** [legal@vibefly.io](mailto:legal@vibefly.io)
+
+---
+
+**CNPJ:** 61.750.788/0001-48
+**Nome Empresarial:** 61.750.788 TIAGO CASAS BURGER

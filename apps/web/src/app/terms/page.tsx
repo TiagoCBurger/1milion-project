@@ -415,6 +415,9 @@ export default function TermsOfService() {
           <Link href="/" className="hover:underline">
             VibeFly
           </Link>
+          <p className="mt-2 text-xs">
+            CNPJ: 61.750.788/0001-48 &mdash; 61.750.788 TIAGO CASAS BURGER
+          </p>
         </div>
       </div>
     </main>

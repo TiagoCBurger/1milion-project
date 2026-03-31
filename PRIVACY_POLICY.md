@@ -121,3 +121,8 @@ We may update this Privacy Policy from time to time. When we make material chang
 If you have questions about this Privacy Policy or wish to exercise your data rights, please contact us:
 
 **Email:** [privacy@vibefly.io](mailto:privacy@vibefly.io)
+
+---
+
+**CNPJ:** 61.750.788/0001-48
+**Nome Empresarial:** 61.750.788 TIAGO CASAS BURGER
