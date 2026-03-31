@@ -1,0 +1,27 @@
+{
+  "name": "meta-ads-cloud",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "dev:web": "turbo dev --filter=@meta-ads-cloud/web",
+    "dev:worker": "turbo dev --filter=@meta-ads-cloud/mcp-worker",
+    "build:web": "turbo build --filter=@meta-ads-cloud/web",
+    "dev:landing": "turbo dev --filter=@meta-ads-cloud/landing",
+    "build:landing": "turbo build --filter=@meta-ads-cloud/landing",
+    "build:worker": "turbo build --filter=@meta-ads-cloud/mcp-worker",
+    "test": "turbo test",
+    "test:worker": "turbo test --filter=@meta-ads-cloud/mcp-worker",
+    "test:shared": "turbo test --filter=@meta-ads-cloud/shared"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  }
+}
