@@ -1,4 +1,4 @@
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.metaadsmcp.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.vibefly.io";
 
 export function Footer() {
   return (
@@ -6,10 +6,10 @@ export function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 sm:flex-row">
         <div>
           <span className="text-lg font-bold tracking-tight">
-            <span className="text-primary">Meta Ads</span> MCP Cloud
+            <span className="text-primary">Vibe</span>Fly
           </span>
           <p className="mt-1 text-sm text-gray-500">
-            AI-powered Meta Ads management via MCP.
+            AI-powered Meta Ads management via MCP. By VibeFly.
           </p>
         </div>
 
@@ -21,7 +21,7 @@ export function Footer() {
             Terms
           </a>
           <a
-            href="mailto:support@metaadsmcp.com"
+            href="mailto:support@vibefly.io"
             className="hover:text-gray-900 transition"
           >
             Contact
@@ -33,7 +33,7 @@ export function Footer() {
       </div>
 
       <div className="mx-auto mt-8 max-w-6xl text-center text-xs text-gray-400">
-        &copy; {new Date().getFullYear()} Meta Ads MCP Cloud. All rights
+        &copy; {new Date().getFullYear()} VibeFly. All rights
         reserved.
       </div>
     </footer>

@@ -54,7 +54,7 @@ importers:
 
   apps/mcp-worker:
     dependencies:
-      '@meta-ads-cloud/shared':
+      '@vibefly/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@modelcontextprotocol/sdk':

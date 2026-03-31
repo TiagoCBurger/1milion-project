@@ -4,7 +4,7 @@
 
 ## 1. Introduction
 
-Meta Ads MCP Cloud ("we", "us", or "our") provides a software-as-a-service platform that enables users to connect their Meta (Facebook) advertising accounts to AI tools via the Model Context Protocol (MCP). This Privacy Policy explains how we collect, use, store, and protect your personal information when you use our website and services.
+VibeFly ("we", "us", or "our") provides a software-as-a-service platform that enables users to connect their Meta (Facebook) advertising accounts to AI tools via the Model Context Protocol (MCP). This Privacy Policy explains how we collect, use, store, and protect your personal information when you use our website and services.
 
 By creating an account or using our services, you agree to the practices described in this policy. If you do not agree, please do not use our services.
 
@@ -120,4 +120,4 @@ We may update this Privacy Policy from time to time. When we make material chang
 
 If you have questions about this Privacy Policy or wish to exercise your data rights, please contact us:
 
-**Email:** [privacy@metaadsmcp.com](mailto:privacy@metaadsmcp.com)
+**Email:** [privacy@vibefly.io](mailto:privacy@vibefly.io)

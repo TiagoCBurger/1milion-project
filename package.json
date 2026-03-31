@@ -1,20 +1,20 @@
 {
-  "name": "meta-ads-cloud",
+  "name": "vibefly",
   "private": true,
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "type-check": "turbo type-check",
-    "dev:web": "turbo dev --filter=@meta-ads-cloud/web",
-    "dev:worker": "turbo dev --filter=@meta-ads-cloud/mcp-worker",
-    "build:web": "turbo build --filter=@meta-ads-cloud/web",
-    "dev:landing": "turbo dev --filter=@meta-ads-cloud/landing",
-    "build:landing": "turbo build --filter=@meta-ads-cloud/landing",
-    "build:worker": "turbo build --filter=@meta-ads-cloud/mcp-worker",
+    "dev:web": "turbo dev --filter=@vibefly/web",
+    "dev:worker": "turbo dev --filter=@vibefly/mcp-worker",
+    "build:web": "turbo build --filter=@vibefly/web",
+    "dev:landing": "turbo dev --filter=@vibefly/landing",
+    "build:landing": "turbo build --filter=@vibefly/landing",
+    "build:worker": "turbo build --filter=@vibefly/mcp-worker",
     "test": "turbo test",
-    "test:worker": "turbo test --filter=@meta-ads-cloud/mcp-worker",
-    "test:shared": "turbo test --filter=@meta-ads-cloud/shared"
+    "test:worker": "turbo test --filter=@vibefly/mcp-worker",
+    "test:shared": "turbo test --filter=@vibefly/shared"
   },
   "devDependencies": {
     "turbo": "^2.4.0",

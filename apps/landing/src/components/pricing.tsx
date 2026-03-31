@@ -1,4 +1,4 @@
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.metaadsmcp.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.vibefly.io";
 
 const plans = [
   {
@@ -46,7 +46,7 @@ const plans = [
       "Custom SLA",
     ],
     cta: "Contact Sales",
-    href: "mailto:sales@metaadsmcp.com",
+    href: "mailto:sales@vibefly.io",
     highlighted: false,
   },
 ];

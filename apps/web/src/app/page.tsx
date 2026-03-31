@@ -5,7 +5,7 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center justify-center p-8">
       <div className="max-w-2xl text-center">
         <h1 className="text-5xl font-bold tracking-tight">
-          Meta Ads MCP Cloud
+          VibeFly
         </h1>
         <p className="mt-4 text-xl text-gray-600">
           Connect your Meta Ads account to any AI tool via MCP.

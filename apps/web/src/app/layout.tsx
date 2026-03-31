@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Meta Ads MCP Cloud",
+  title: "VibeFly",
   description: "Connect your Meta Ads to any AI tool via MCP",
 };
 

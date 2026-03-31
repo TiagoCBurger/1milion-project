@@ -38,7 +38,7 @@ export default {
     if (request.method === "GET") {
       // SSE streaming not supported on Workers — return server info
       return new Response(
-        JSON.stringify({ name: "meta-ads-cloud", version: "1.0.0", status: "ok" }),
+        JSON.stringify({ name: "vibefly", version: "1.0.0", status: "ok" }),
         { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       );
     }
@@ -139,7 +139,7 @@ function buildServer(
   workspace: WorkspaceContext
 ): McpServer {
   const server = new McpServer({
-    name: "meta-ads-cloud",
+    name: "vibefly",
     version: "1.0.0",
   });
 

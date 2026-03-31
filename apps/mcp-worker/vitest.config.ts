@@ -8,7 +8,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@meta-ads-cloud/shared": "../../packages/shared/src/index.ts",
+      "@vibefly/shared": "../../packages/shared/src/index.ts",
     },
   },
 });

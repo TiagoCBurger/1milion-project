@@ -1,4 +1,4 @@
-import { META_GRAPH_BASE_URL, META_API_VERSION } from "@meta-ads-cloud/shared";
+import { META_GRAPH_BASE_URL, META_API_VERSION } from "@vibefly/shared";
 
 const BASE_URL = `${META_GRAPH_BASE_URL}/${META_API_VERSION}`;
 

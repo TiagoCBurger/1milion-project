@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Meta Ads MCP Cloud",
-  description: "Privacy Policy for Meta Ads MCP Cloud",
+  title: "Privacy Policy | VibeFly",
+  description: "Privacy Policy for VibeFly",
 };
 
 export default function PrivacyPolicy() {
@@ -29,7 +29,7 @@ export default function PrivacyPolicy() {
               1. Introduction
             </h2>
             <p className="mt-3">
-              Meta Ads MCP Cloud (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides a
+              VibeFly (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides a
               software-as-a-service platform that enables users to connect their
               Meta (Facebook) advertising accounts to AI tools via the Model
               Context Protocol (MCP). This Privacy Policy explains how we
@@ -363,10 +363,10 @@ export default function PrivacyPolicy() {
             <p className="mt-3">
               <strong>Email:</strong>{" "}
               <a
-                href="mailto:privacy@metaadsmcp.com"
+                href="mailto:privacy@vibefly.io"
                 className="text-blue-600 hover:underline"
               >
-                privacy@metaadsmcp.com
+                privacy@vibefly.io
               </a>
             </p>
           </section>
@@ -374,7 +374,7 @@ export default function PrivacyPolicy() {
 
         <div className="mt-16 border-t pt-8 text-center text-sm text-gray-400">
           <Link href="/" className="hover:underline">
-            Meta Ads MCP Cloud
+            VibeFly
           </Link>
         </div>
       </div>

@@ -1,11 +1,11 @@
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.metaadsmcp.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.vibefly.io";
 
 export function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <a href="/" className="text-xl font-bold tracking-tight">
-          <span className="text-primary">Meta Ads</span> MCP Cloud
+          <span className="text-primary">Vibe</span>Fly
         </a>
 
         <nav className="hidden items-center gap-8 text-sm font-medium text-gray-600 md:flex">

@@ -4,7 +4,7 @@ import { registerAllTools } from "../../tools";
 import {
   FREE_TIER_TOOLS,
   TIER_LIMITS,
-} from "@meta-ads-cloud/shared";
+} from "@vibefly/shared";
 
 /**
  * Cross-check tier enforcement:

@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Meta Ads MCP Cloud — AI-Powered Meta Ads Management",
+  title: "VibeFly — Manage Meta Ads with AI",
   description:
     "Connect your Meta Ads account to Claude, Cursor, and any AI tool via MCP. Manage campaigns, analyze performance, and optimize ads with natural language.",
   openGraph: {
-    title: "Meta Ads MCP Cloud",
+    title: "VibeFly",
     description:
       "Connect your Meta Ads to any AI tool via MCP. Manage campaigns with natural language.",
     type: "website",
