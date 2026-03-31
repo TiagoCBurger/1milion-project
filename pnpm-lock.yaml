@@ -54,12 +54,12 @@ importers:
 
   apps/mcp-worker:
     dependencies:
-      '@vibefly/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@modelcontextprotocol/sdk':
         specifier: ^1.28.0
         version: 1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
+      '@vibefly/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       agents:
         specifier: ^0.8.7
         version: 0.8.7(@babel/core@7.29.0)(@babel/runtime@7.29.2)(@cloudflare/workers-types@4.20260329.1)(ai@6.0.141(zod@3.25.76))(react@19.2.4)(rolldown@1.0.0-rc.12(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1))(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@20.19.37)(esbuild@0.27.3)(jiti@2.6.1))(zod@3.25.76)
@@ -75,7 +75,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.2
-        version: 4.1.2(@opentelemetry/api@1.9.0)(@types/node@20.19.37)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@20.19.37)(esbuild@0.27.3)(jiti@2.6.1))
+        version: 4.1.2(@opentelemetry/api@1.9.0)(@types/node@20.19.37)(vite@8.0.3(@types/node@20.19.37)(esbuild@0.27.3)(jiti@2.6.1))
       wrangler:
         specifier: ^4.0.0
         version: 4.78.0(@cloudflare/workers-types@4.20260329.1)
@@ -88,6 +88,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.101.0
         version: 2.101.0
+      '@vibefly/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       next:
         specifier: 16.2.1
         version: 16.2.1(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -130,7 +133,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.2
-        version: 4.1.2(@opentelemetry/api@1.9.0)(@types/node@20.19.37)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@20.19.37)(esbuild@0.27.3)(jiti@2.6.1))
+        version: 4.1.2(@opentelemetry/api@1.9.0)(@types/node@20.19.37)(vite@8.0.3(@types/node@20.19.37)(esbuild@0.27.3)(jiti@2.6.1))
 
 packages:
 
@@ -4200,7 +4203,7 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
-  '@vitest/mocker@4.1.2(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@20.19.37)(esbuild@0.27.3)(jiti@2.6.1))':
+  '@vitest/mocker@4.1.2(vite@8.0.3(@types/node@20.19.37)(esbuild@0.27.3)(jiti@2.6.1))':
     dependencies:
       '@vitest/spy': 4.1.2
       estree-walker: 3.0.3
@@ -6246,10 +6249,10 @@ snapshots:
       - '@emnapi/core'
       - '@emnapi/runtime'
 
-  vitest@4.1.2(@opentelemetry/api@1.9.0)(@types/node@20.19.37)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@20.19.37)(esbuild@0.27.3)(jiti@2.6.1)):
+  vitest@4.1.2(@opentelemetry/api@1.9.0)(@types/node@20.19.37)(vite@8.0.3(@types/node@20.19.37)(esbuild@0.27.3)(jiti@2.6.1)):
     dependencies:
       '@vitest/expect': 4.1.2
-      '@vitest/mocker': 4.1.2(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@20.19.37)(esbuild@0.27.3)(jiti@2.6.1))
+      '@vitest/mocker': 4.1.2(vite@8.0.3(@types/node@20.19.37)(esbuild@0.27.3)(jiti@2.6.1))
       '@vitest/pretty-format': 4.1.2
       '@vitest/runner': 4.1.2
       '@vitest/snapshot': 4.1.2

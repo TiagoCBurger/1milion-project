@@ -82,6 +82,20 @@ export const META_API_VERSION = "v24.0";
 export const META_GRAPH_BASE_URL = "https://graph.facebook.com";
 
 // ============================================================
+// Meta OAuth
+// ============================================================
+
+export const META_OAUTH_SCOPES = [
+  "ads_management",
+  "ads_read",
+  "business_management",
+  "pages_read_engagement",
+  "read_insights",
+] as const;
+
+export const META_OAUTH_BASE_URL = "https://www.facebook.com";
+
+// ============================================================
 // API key format
 // ============================================================
 

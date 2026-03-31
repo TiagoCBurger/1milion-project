@@ -128,3 +128,23 @@ export interface GenerateApiKeyResponse {
   key_prefix: string;
   name: string;
 }
+
+// ============================================================
+// Meta OAuth types
+// ============================================================
+
+export interface OAuthTokenExchangeResult {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export interface MetaTokenInspection {
+  userId: string;
+  userName: string;
+  scopes: string[];
+  expiresAt: string | null;
+  tokenType: "short_lived" | "long_lived";
+  bmId: string | null;
+  bmName: string | null;
+}
