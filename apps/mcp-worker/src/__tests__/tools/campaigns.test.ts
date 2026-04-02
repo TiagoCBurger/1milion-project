@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { registerCampaignsTools } from "../../tools/campaigns";
-import { createToolCapture, parseToolResult } from "../helpers";
+import { createToolCapture, parseToolResult, createMockEnv } from "../helpers";
 
 vi.mock("../../meta-api", async () => {
   const actual = await vi.importActual<typeof import("../../meta-api")>("../../meta-api");
@@ -23,7 +23,7 @@ describe("Campaign Tools", () => {
       vi.clearAllMocks();
       const capture = createToolCapture();
       callTool = capture.callTool;
-      registerCampaignsTools(capture.server, TOKEN, "pro");
+      registerCampaignsTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
     });
 
     it("returns campaigns list", async () => {
@@ -114,7 +114,7 @@ describe("Campaign Tools", () => {
       vi.clearAllMocks();
       const capture = createToolCapture();
       callTool = capture.callTool;
-      registerCampaignsTools(capture.server, TOKEN, "pro");
+      registerCampaignsTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
     });
 
     it("fetches campaign by ID with detail fields", async () => {
@@ -145,7 +145,7 @@ describe("Campaign Tools", () => {
   describe("create_campaign (tier gating)", () => {
     it("blocks free tier users", async () => {
       const capture = createToolCapture();
-      registerCampaignsTools(capture.server, TOKEN, "free");
+      registerCampaignsTools({ server: capture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
 
       const result = await capture.callTool("create_campaign", {
         account_id: "act_123",
@@ -167,7 +167,7 @@ describe("Campaign Tools", () => {
 
     it("allows pro tier to create campaign", async () => {
       const capture = createToolCapture();
-      registerCampaignsTools(capture.server, TOKEN, "pro");
+      registerCampaignsTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
       (metaApiPost as any).mockResolvedValue({ id: "camp_new" });
 
@@ -194,7 +194,7 @@ describe("Campaign Tools", () => {
   describe("update_campaign", () => {
     it("blocks free tier", async () => {
       const capture = createToolCapture();
-      registerCampaignsTools(capture.server, TOKEN, "free");
+      registerCampaignsTools({ server: capture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
 
       const result = await capture.callTool("update_campaign", {
         campaign_id: "camp_1",
@@ -206,7 +206,7 @@ describe("Campaign Tools", () => {
 
     it("returns error when no fields provided", async () => {
       const capture = createToolCapture();
-      registerCampaignsTools(capture.server, TOKEN, "pro");
+      registerCampaignsTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
       const result = await capture.callTool("update_campaign", {
         campaign_id: "camp_1",
@@ -219,7 +219,7 @@ describe("Campaign Tools", () => {
 
     it("updates campaign with correct params", async () => {
       const capture = createToolCapture();
-      registerCampaignsTools(capture.server, TOKEN, "pro");
+      registerCampaignsTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
       (metaApiPost as any).mockResolvedValue({ success: true });
 

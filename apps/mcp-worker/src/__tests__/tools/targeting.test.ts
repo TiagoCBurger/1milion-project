@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { registerTargetingTools } from "../../tools/targeting";
-import { createToolCapture, parseToolResult } from "../helpers";
+import { createToolCapture, parseToolResult, createMockEnv } from "../helpers";
 
 vi.mock("../../meta-api", async () => {
   const actual = await vi.importActual<typeof import("../../meta-api")>("../../meta-api");
@@ -21,7 +21,7 @@ describe("Targeting Tools", () => {
     vi.clearAllMocks();
     const capture = createToolCapture();
     callTool = capture.callTool;
-    registerTargetingTools(capture.server, TOKEN, "pro");
+    registerTargetingTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
   });
 
   describe("search_interests", () => {

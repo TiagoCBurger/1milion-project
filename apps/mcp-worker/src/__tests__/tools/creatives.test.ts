@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { registerCreativeTools } from "../../tools/creatives";
-import { createToolCapture, parseToolResult } from "../helpers";
+import { createToolCapture, parseToolResult, createMockEnv } from "../helpers";
 
 vi.mock("../../meta-api", async () => {
   const actual = await vi.importActual<typeof import("../../meta-api")>("../../meta-api");
@@ -22,7 +22,7 @@ describe("Creative Tools", () => {
     vi.clearAllMocks();
     const capture = createToolCapture();
     callTool = capture.callTool;
-    registerCreativeTools(capture.server, TOKEN, "pro");
+    registerCreativeTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
   });
 
   describe("get_ad_creatives", () => {
@@ -134,7 +134,7 @@ describe("Creative Tools", () => {
   describe("upload_ad_image (tier gating)", () => {
     it("blocks non-pro tier", async () => {
       const freeCapture = createToolCapture();
-      registerCreativeTools(freeCapture.server, TOKEN, "free");
+      registerCreativeTools({ server: freeCapture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
 
       const result = await freeCapture.callTool("upload_ad_image", {
         account_id: "act_123",
@@ -148,7 +148,7 @@ describe("Creative Tools", () => {
   describe("create_ad_creative (tier gating)", () => {
     it("blocks non-pro tier", async () => {
       const freeCapture = createToolCapture();
-      registerCreativeTools(freeCapture.server, TOKEN, "free");
+      registerCreativeTools({ server: freeCapture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
 
       const result = await freeCapture.callTool("create_ad_creative", {
         account_id: "act_123",

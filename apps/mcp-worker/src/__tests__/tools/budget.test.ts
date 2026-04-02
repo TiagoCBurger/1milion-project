@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { registerBudgetTools } from "../../tools/budget";
-import { createToolCapture, parseToolResult } from "../helpers";
+import { createToolCapture, parseToolResult, createMockEnv } from "../helpers";
 
 vi.mock("../../meta-api", async () => {
   const actual = await vi.importActual<typeof import("../../meta-api")>("../../meta-api");
@@ -18,7 +18,7 @@ describe("Budget Tools", () => {
   describe("create_budget_schedule", () => {
     it("blocks non-pro tier", async () => {
       const capture = createToolCapture();
-      registerBudgetTools(capture.server, TOKEN, "free");
+      registerBudgetTools({ server: capture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
 
       const result = await capture.callTool("create_budget_schedule", {
         campaign_id: "camp_1",
@@ -35,7 +35,7 @@ describe("Budget Tools", () => {
 
     it("validates budget_value_type", async () => {
       const capture = createToolCapture();
-      registerBudgetTools(capture.server, TOKEN, "pro");
+      registerBudgetTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
       const result = await capture.callTool("create_budget_schedule", {
         campaign_id: "camp_1",
@@ -52,7 +52,7 @@ describe("Budget Tools", () => {
 
     it("creates budget schedule for pro tier", async () => {
       const capture = createToolCapture();
-      registerBudgetTools(capture.server, TOKEN, "pro");
+      registerBudgetTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
       (metaApiPost as any).mockResolvedValue({ id: "bs_1" });
 
@@ -80,7 +80,7 @@ describe("Budget Tools", () => {
 
     it("creates multiplier budget schedule", async () => {
       const capture = createToolCapture();
-      registerBudgetTools(capture.server, TOKEN, "pro");
+      registerBudgetTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
       (metaApiPost as any).mockResolvedValue({ id: "bs_2" });
 

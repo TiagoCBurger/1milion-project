@@ -1,4 +1,11 @@
 {
   "git.detectSubmodules": false,
-  "git.detectSubmodulesLimit": 1
+  "git.detectSubmodulesLimit": 1,
+  "files.exclude": {
+    "**/.git": false,
+    "**/.gitignore": false,
+    "**/.claude": false,
+    "**/.vscode": false,
+    "**/.turbo": false
+  }
 }

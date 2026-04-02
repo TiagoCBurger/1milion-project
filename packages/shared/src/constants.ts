@@ -34,6 +34,39 @@ export const TIER_LIMITS: Record<
 };
 
 // ============================================================
+// Upload limits per tier
+// ============================================================
+
+export const UPLOAD_LIMITS: Record<
+  SubscriptionTier,
+  {
+    images_per_day: number;
+    videos_per_day: number;
+    max_image_bytes: number;
+    max_video_bytes: number;
+  }
+> = {
+  free: {
+    images_per_day: 0,
+    videos_per_day: 0,
+    max_image_bytes: 0,
+    max_video_bytes: 0,
+  },
+  pro: {
+    images_per_day: 50,
+    videos_per_day: 10,
+    max_image_bytes: 30 * 1024 * 1024,
+    max_video_bytes: 500 * 1024 * 1024,
+  },
+  enterprise: {
+    images_per_day: Infinity,
+    videos_per_day: 100,
+    max_image_bytes: 30 * 1024 * 1024,
+    max_video_bytes: 2 * 1024 * 1024 * 1024,
+  },
+};
+
+// ============================================================
 // Free tier: read-only tools only
 // ============================================================
 
@@ -89,8 +122,8 @@ export const META_OAUTH_SCOPES = [
   "ads_management",
   "ads_read",
   "business_management",
+  "pages_manage_ads",
   "pages_read_engagement",
-  "read_insights",
 ] as const;
 
 export const META_OAUTH_BASE_URL = "https://www.facebook.com";

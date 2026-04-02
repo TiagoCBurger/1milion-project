@@ -1,12 +1,10 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { metaApiGet, ensureActPrefix, textResult } from "../meta-api";
+import type { ToolContext } from "./index";
+import { isAccountAllowed, accountBlockedResult } from "./index";
 
-export function registerTargetingTools(
-  server: McpServer,
-  token: string,
-  tier: string,
-): void {
+export function registerTargetingTools(ctx: ToolContext): void {
+  const { server, token, allowedAccounts } = ctx;
   // ── search_interests ─────────────────────────────────────────────────
   server.tool(
     "search_interests",
@@ -86,6 +84,9 @@ export function registerTargetingTools(
         ),
     },
     async (args) => {
+      if (!isAccountAllowed(args.account_id, allowedAccounts)) {
+        return accountBlockedResult(args.account_id);
+      }
       const accountId = ensureActPrefix(args.account_id);
 
       let targetingSpec: unknown;

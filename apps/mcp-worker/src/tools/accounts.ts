@@ -1,11 +1,12 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   metaApiGet,
   ensureActPrefix,
   textResult,
   centsToAmount,
 } from "../meta-api";
+import type { ToolContext } from "./index";
+import { isAccountAllowed, accountBlockedResult } from "./index";
 
 const ACCOUNT_FIELDS =
   "id,name,account_id,account_status,amount_spent,balance,currency,age,business_city,business_country_code";
@@ -49,11 +50,8 @@ function normalizeMonetary(acc: AdAccount): AdAccount {
   return acc;
 }
 
-export function registerAccountsTools(
-  server: McpServer,
-  token: string,
-  tier: string,
-): void {
+export function registerAccountsTools(ctx: ToolContext): void {
+  const { server, token, tier, allowedAccounts } = ctx;
   // ── get_ad_accounts ──────────────────────────────────────────────────
   server.tool(
     "get_ad_accounts",
@@ -78,7 +76,16 @@ export function registerAccountsTools(
         return textResult(data, true);
       }
 
-      const accounts = ((data as any).data ?? []) as AdAccount[];
+      let accounts = ((data as any).data ?? []) as AdAccount[];
+
+      // Filter by allowed accounts if restricted
+      if (allowedAccounts && allowedAccounts.length > 0) {
+        accounts = accounts.filter((acc) => {
+          const id = (acc.account_id as string) || (acc.id as string) || "";
+          return isAccountAllowed(id, allowedAccounts);
+        });
+      }
+
       const normalized = accounts.map(normalizeMonetary);
 
       return textResult({
@@ -101,6 +108,9 @@ export function registerAccountsTools(
         ),
     },
     async (args) => {
+      if (!isAccountAllowed(args.account_id, allowedAccounts)) {
+        return accountBlockedResult(args.account_id);
+      }
       const accountId = ensureActPrefix(args.account_id);
 
       const data = await metaApiGet(accountId, token, {
@@ -169,6 +179,9 @@ export function registerAccountsTools(
         });
       }
 
+      if (!isAccountAllowed(args.account_id, allowedAccounts)) {
+        return accountBlockedResult(args.account_id);
+      }
       // For ad accounts: fetch both the user's pages and the account's owned pages
       const rawAccountId = args.account_id.replace(/^act_/, "");
       const accountId = ensureActPrefix(args.account_id);

@@ -33,6 +33,12 @@ export async function POST(
     .update({ is_valid: false, updated_at: new Date().toISOString() })
     .eq("workspace_id", workspaceId);
 
+  // Clear BMs and ad accounts (ad_accounts cascade-deleted via business_managers FK)
+  await supabase
+    .from("business_managers")
+    .delete()
+    .eq("workspace_id", workspaceId);
+
   // Clear BM info from workspace
   await supabase
     .from("workspaces")

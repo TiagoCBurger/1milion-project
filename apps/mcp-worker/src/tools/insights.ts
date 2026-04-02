@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { metaApiGet, textResult } from "../meta-api";
+import type { ToolContext } from "./index";
 
 const INSIGHT_FIELDS = [
   "account_id",
@@ -58,11 +58,8 @@ function compactInsights(data: Record<string, unknown>): Record<string, unknown>
   return data;
 }
 
-export function registerInsightTools(
-  server: McpServer,
-  token: string,
-  tier: string,
-): void {
+export function registerInsightTools(ctx: ToolContext): void {
+  const { server, token } = ctx;
   server.tool(
     "get_insights",
     "Get performance insights (metrics, KPIs) for a Meta Ads object (account, campaign, adset, or ad). Supports date presets, custom time ranges, breakdowns, and pagination.",

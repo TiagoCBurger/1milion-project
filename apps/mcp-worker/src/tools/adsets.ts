@@ -1,8 +1,10 @@
 import { z } from "zod";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { metaApiGet, metaApiPost, ensureActPrefix, textResult } from "../meta-api";
+import type { ToolContext } from "./index";
+import { isAccountAllowed, accountBlockedResult } from "./index";
 
-export function registerAdsetTools(server: McpServer, token: string, tier: string) {
+export function registerAdsetTools(ctx: ToolContext) {
+  const { server, token, tier, allowedAccounts } = ctx;
   // ---------------------------------------------------------------
   // get_adsets
   // ---------------------------------------------------------------
@@ -23,6 +25,9 @@ export function registerAdsetTools(server: McpServer, token: string, tier: strin
         .describe("If provided, only return ad sets for this campaign"),
     },
     async ({ account_id, limit, campaign_id }) => {
+      if (!isAccountAllowed(account_id, allowedAccounts)) {
+        return accountBlockedResult(account_id);
+      }
       const actId = ensureActPrefix(account_id);
       const endpoint = campaign_id ? `${campaign_id}/adsets` : `${actId}/adsets`;
       const fields = [
@@ -143,6 +148,10 @@ export function registerAdsetTools(server: McpServer, token: string, tier: strin
         .describe("Frequency control specs as a JSON string (e.g. [{event:'IMPRESSIONS', interval_days:7, max_frequency:2}])"),
     },
     async (args) => {
+      if (!isAccountAllowed(args.account_id, allowedAccounts)) {
+        return accountBlockedResult(args.account_id);
+      }
+
       if (tier === "free") {
         return textResult("create_adset requires a Pro or Enterprise subscription. Upgrade at https://yourdomain.com/pricing", true);
       }

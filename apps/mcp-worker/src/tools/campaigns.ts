@@ -1,11 +1,12 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   metaApiGet,
   metaApiPost,
   ensureActPrefix,
   textResult,
 } from "../meta-api";
+import type { ToolContext } from "./index";
+import { isAccountAllowed, accountBlockedResult } from "./index";
 
 const CAMPAIGN_FIELDS =
   "id,name,objective,status,daily_budget,lifetime_budget,buying_type,start_time,stop_time,created_time,updated_time,bid_strategy,special_ad_categories";
@@ -13,11 +14,8 @@ const CAMPAIGN_FIELDS =
 const CAMPAIGN_DETAIL_FIELDS =
   "id,name,objective,status,daily_budget,lifetime_budget,buying_type,start_time,stop_time,created_time,updated_time,bid_strategy,special_ad_categories,special_ad_category_country,budget_remaining,configured_status";
 
-export function registerCampaignsTools(
-  server: McpServer,
-  token: string,
-  tier: string,
-): void {
+export function registerCampaignsTools(ctx: ToolContext): void {
+  const { server, token, tier, allowedAccounts } = ctx;
   // ── get_campaigns ────────────────────────────────────────────────────
   server.tool(
     "get_campaigns",
@@ -48,6 +46,9 @@ export function registerCampaignsTools(
         .describe("Pagination cursor returned from a previous request."),
     },
     async (args) => {
+      if (!isAccountAllowed(args.account_id, allowedAccounts)) {
+        return accountBlockedResult(args.account_id);
+      }
       const accountId = ensureActPrefix(args.account_id);
       const params: Record<string, unknown> = {
         fields: CAMPAIGN_FIELDS,
@@ -161,6 +162,10 @@ export function registerCampaignsTools(
         ),
     },
     async (args) => {
+      if (!isAccountAllowed(args.account_id, allowedAccounts)) {
+        return accountBlockedResult(args.account_id);
+      }
+
       // Tier gate
       if (tier === "free") {
         return textResult(

@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
       return redirectError(slug, "store_failed");
     }
 
-    // 5. Update workspace with BM info
+    // 5. Update workspace with primary BM info
     if (inspection.bmId) {
       await supabase
         .from("workspaces")
@@ -110,7 +110,21 @@ export async function GET(request: NextRequest) {
         .eq("id", workspaceId);
     }
 
-    // 6. Auto-generate API key if none exists
+    // 6. Sync all BMs and their ad accounts
+    if (inspection.businessManagers.length > 0) {
+      const { error: syncError } = await supabase.rpc(
+        "sync_business_managers",
+        {
+          p_workspace_id: workspaceId,
+          p_business_managers: inspection.businessManagers,
+        }
+      );
+      if (syncError) {
+        console.error("sync BMs error:", syncError);
+      }
+    }
+
+    // 7. Auto-generate API key if none exists
     const { data: existingKeys } = await supabase
       .from("api_keys")
       .select("id")

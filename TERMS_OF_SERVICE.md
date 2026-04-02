@@ -135,7 +135,7 @@ These Terms, together with the Privacy Policy, constitute the entire agreement b
 
 If you have questions about these Terms of Service, please contact us:
 
-**Email:** [legal@vibefly.io](mailto:legal@vibefly.io)
+**Email:** [contato@vibefly.app](mailto:contato@vibefly.app)
 
 ---
 

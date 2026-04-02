@@ -65,10 +65,10 @@ export default function DataDeletion() {
             </p>
             <p className="mt-3">
               <a
-                href="mailto:privacy@vibefly.io"
+                href="mailto:contato@vibefly.app"
                 className="text-blue-600 hover:underline font-medium"
               >
-                privacy@vibefly.io
+                contato@vibefly.app
               </a>
             </p>
             <p className="mt-3">
@@ -149,10 +149,10 @@ export default function DataDeletion() {
             <p className="mt-3">
               <strong>Email:</strong>{" "}
               <a
-                href="mailto:privacy@vibefly.io"
+                href="mailto:contato@vibefly.app"
                 className="text-blue-600 hover:underline"
               >
-                privacy@vibefly.io
+                contato@vibefly.app
               </a>
             </p>
           </section>

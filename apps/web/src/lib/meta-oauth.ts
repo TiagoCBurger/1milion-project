@@ -4,7 +4,12 @@ import {
   META_OAUTH_BASE_URL,
   META_OAUTH_SCOPES,
 } from "@vibefly/shared";
-import type { MetaTokenInspection, OAuthTokenExchangeResult } from "@vibefly/shared";
+import type {
+  MetaTokenInspection,
+  MetaBusinessManagerInfo,
+  MetaAdAccountInfo,
+  OAuthTokenExchangeResult,
+} from "@vibefly/shared";
 
 const GRAPH_URL = `${META_GRAPH_BASE_URL}/${META_API_VERSION}`;
 
@@ -104,18 +109,31 @@ export async function validateAndInspectToken(token: string): Promise<MetaTokenI
     }
   }
 
-  // 3. Get Business Manager info
+  // 3. Get all Business Managers
   const bmRes = await fetch(
-    `${GRAPH_URL}/me/businesses?fields=id,name&access_token=${encodeURIComponent(token)}`
+    `${GRAPH_URL}/me/businesses?fields=id,name&limit=100&access_token=${encodeURIComponent(token)}`
   );
   let bmId: string | null = null;
   let bmName: string | null = null;
+  const businessManagers: MetaBusinessManagerInfo[] = [];
 
   if (bmRes.ok) {
     const bmData = await bmRes.json();
-    if (bmData.data?.length > 0) {
-      bmId = bmData.data[0].id;
-      bmName = bmData.data[0].name;
+    const bms = bmData.data || [];
+
+    if (bms.length > 0) {
+      // Keep first BM for backwards compatibility
+      bmId = bms[0].id;
+      bmName = bms[0].name;
+
+      // Fetch ad accounts for each BM in parallel
+      const bmWithAccounts = await Promise.all(
+        bms.map(async (bm: { id: string; name: string }) => {
+          const adAccounts = await fetchBmAdAccounts(token, bm.id);
+          return { id: bm.id, name: bm.name, ad_accounts: adAccounts };
+        })
+      );
+      businessManagers.push(...bmWithAccounts);
     }
   }
 
@@ -127,5 +145,27 @@ export async function validateAndInspectToken(token: string): Promise<MetaTokenI
     tokenType,
     bmId,
     bmName,
+    businessManagers,
   };
+}
+
+/**
+ * Fetch all ad accounts owned by a Business Manager.
+ */
+async function fetchBmAdAccounts(
+  token: string,
+  bmId: string
+): Promise<MetaAdAccountInfo[]> {
+  const res = await fetch(
+    `${GRAPH_URL}/${bmId}/owned_ad_accounts?fields=id,name,account_status,currency&limit=100&access_token=${encodeURIComponent(token)}`
+  );
+  if (!res.ok) return [];
+
+  const data = await res.json();
+  return (data.data || []).map((acc: Record<string, unknown>) => ({
+    id: acc.id as string,
+    name: (acc.name as string) || "",
+    account_status: acc.account_status as number,
+    currency: (acc.currency as string) || "",
+  }));
 }

@@ -46,7 +46,7 @@ const plans = [
       "Custom SLA",
     ],
     cta: "Contact Sales",
-    href: "mailto:sales@vibefly.io",
+    href: "mailto:contato@vibefly.app",
     highlighted: false,
   },
 ];

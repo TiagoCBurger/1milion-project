@@ -76,8 +76,14 @@ export function createMockEnv(overrides?: Partial<Env>): Env {
   return {
     RATE_LIMIT_KV: createMockKV(),
     CACHE_KV: createMockKV(),
+    OAUTH_KV: createMockKV(),
+    CREATIVES_R2: {} as R2Bucket,
     SUPABASE_URL: "https://test.supabase.co",
     SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
+    R2_PUBLIC_URL: "https://pub-test.r2.dev",
+    OAUTH_SIGNING_SECRET: "test-oauth-signing-secret",
+    MCP_SERVER_URL: "http://localhost:8787",
+    WEB_APP_URL: "http://localhost:3000",
     ...overrides,
   };
 }

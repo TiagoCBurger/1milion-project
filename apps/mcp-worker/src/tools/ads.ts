@@ -1,8 +1,10 @@
 import { z } from "zod";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { metaApiGet, metaApiPost, ensureActPrefix, textResult } from "../meta-api";
+import type { ToolContext } from "./index";
+import { isAccountAllowed, accountBlockedResult } from "./index";
 
-export function registerAdTools(server: McpServer, token: string, tier: string) {
+export function registerAdTools(ctx: ToolContext) {
+  const { server, token, tier, allowedAccounts } = ctx;
   // ---------------------------------------------------------------
   // get_ads
   // ---------------------------------------------------------------
@@ -27,6 +29,9 @@ export function registerAdTools(server: McpServer, token: string, tier: string) 
         .describe("If provided, only return ads for this ad set (takes priority over campaign_id)"),
     },
     async ({ account_id, limit, campaign_id, adset_id }) => {
+      if (!isAccountAllowed(account_id, allowedAccounts)) {
+        return accountBlockedResult(account_id);
+      }
       const actId = ensureActPrefix(account_id);
 
       let endpoint: string;
@@ -99,6 +104,10 @@ export function registerAdTools(server: McpServer, token: string, tier: string) 
         .describe("Tracking specs as an array of objects"),
     },
     async (args) => {
+      if (!isAccountAllowed(args.account_id, allowedAccounts)) {
+        return accountBlockedResult(args.account_id);
+      }
+
       if (tier === "free") {
         return textResult("create_ad requires a Pro or Enterprise subscription. Upgrade at https://yourdomain.com/pricing", true);
       }

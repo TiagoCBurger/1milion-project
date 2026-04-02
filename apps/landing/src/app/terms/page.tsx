@@ -402,10 +402,10 @@ export default function TermsOfService() {
             <p className="mt-3">
               <strong>Email:</strong>{" "}
               <a
-                href="mailto:legal@vibefly.io"
+                href="mailto:contato@vibefly.app"
                 className="text-blue-600 hover:underline"
               >
-                legal@vibefly.io
+                contato@vibefly.app
               </a>
             </p>
           </section>

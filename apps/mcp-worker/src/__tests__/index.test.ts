@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createMockEnv } from "./helpers";
 
 /**
  * Tests for the main Worker handler: extractApiKey, health check,
@@ -94,7 +95,7 @@ function jsonRpcError(
 describe("jsonRpcError", () => {
   it("returns valid JSON-RPC error format", async () => {
     const response = jsonRpcError(-32600, "Invalid API key", null);
-    const body = await response.json();
+    const body = await response.json() as any;
 
     expect(body.jsonrpc).toBe("2.0");
     expect(body.id).toBeNull();
@@ -114,7 +115,7 @@ describe("jsonRpcError", () => {
 
   it("preserves request id", async () => {
     const response = jsonRpcError(-32600, "error", 42);
-    const body = await response.json();
+    const body = await response.json() as any;
     expect(body.id).toBe(42);
   });
 });
@@ -187,7 +188,13 @@ describe("buildServer", () => {
       },
     };
 
-    registerAllTools(fakeServer as any, "test_token", "pro");
+    registerAllTools({
+      server: fakeServer as any,
+      token: "test_token",
+      tier: "pro",
+      env: createMockEnv(),
+      workspaceId: "test-workspace",
+    });
 
     // Should have all 35 tools registered
     expect(toolNames.length).toBeGreaterThanOrEqual(30);

@@ -1,12 +1,9 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { metaApiPost, textResult } from "../meta-api";
+import type { ToolContext } from "./index";
 
-export function registerBudgetTools(
-  server: McpServer,
-  token: string,
-  tier: string,
-): void {
+export function registerBudgetTools(ctx: ToolContext): void {
+  const { server, token, tier } = ctx;
   server.tool(
     "create_budget_schedule",
     "Create a budget schedule for a campaign to automatically adjust budget at specific times. PRO tier only.",

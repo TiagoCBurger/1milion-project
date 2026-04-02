@@ -1,10 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
-import { validateApiKey, getMetaToken } from "./auth";
+import { validateApiKey, getMetaToken, verifyOAuthAccessToken } from "./auth";
 import { checkRateLimit } from "./rate-limit";
 import { logUsage } from "./usage";
 import { registerAllTools } from "./tools";
+import { routeOAuth } from "./oauth/router";
 import type { Env, WorkspaceContext } from "./types";
 
 export default {
@@ -30,6 +31,12 @@ export default {
     }
 
     // -------------------------------------------------------
+    // OAuth endpoints (/.well-known/*, /authorize, /token, etc.)
+    // -------------------------------------------------------
+    const oauthResponse = await routeOAuth(request, url, env);
+    if (oauthResponse) return oauthResponse;
+
+    // -------------------------------------------------------
     // Only handle POST /mcp (stateless HTTP transport)
     // -------------------------------------------------------
     if (url.pathname !== "/mcp") {
@@ -51,23 +58,29 @@ export default {
     }
 
     // -------------------------------------------------------
-    // 1. Extract API key
+    // 1. Authenticate (API key or OAuth token)
     // -------------------------------------------------------
-    const apiKey = extractApiKey(request, url);
-    if (!apiKey) {
-      return jsonRpcError(
-        -32600,
-        "Missing or invalid API key. Use header 'Authorization: Bearer mads_...' or query param '?key=mads_...'",
-        null
-      );
-    }
-
-    // -------------------------------------------------------
-    // 2. Validate API key → workspace context
-    // -------------------------------------------------------
-    const workspace = await validateApiKey(apiKey, env);
+    const workspace = await authenticateRequest(request, url, env);
     if (!workspace) {
-      return jsonRpcError(-32600, "Invalid or expired API key", null);
+      // Return 401 with WWW-Authenticate for OAuth discovery
+      return new Response(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: null,
+          error: {
+            code: -32600,
+            message: "Unauthorized. Use API key or OAuth to authenticate.",
+          },
+        }),
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "WWW-Authenticate": `Bearer resource_metadata="${env.MCP_SERVER_URL}/.well-known/oauth-protected-resource"`,
+          },
+        }
+      );
     }
 
     // -------------------------------------------------------
@@ -93,7 +106,7 @@ export default {
     // -------------------------------------------------------
     const startTime = Date.now();
 
-    const server = buildServer(metaToken, workspace);
+    const server = buildServer(metaToken, workspace, env);
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // stateless
     });
@@ -136,7 +149,8 @@ export default {
 
 function buildServer(
   metaToken: string | null,
-  workspace: WorkspaceContext
+  workspace: WorkspaceContext,
+  env: Env
 ): McpServer {
   const server = new McpServer({
     name: "vibefly",
@@ -166,7 +180,7 @@ function buildServer(
     return server;
   }
 
-  registerAllTools(server, metaToken, workspace.tier);
+  registerAllTools({ server, token: metaToken, tier: workspace.tier, env, workspaceId: workspace.workspaceId, allowedAccounts: workspace.allowedAccounts });
   return server;
 }
 
@@ -174,15 +188,29 @@ function buildServer(
 // Helpers
 // ============================================================
 
-function extractApiKey(request: Request, url: URL): string | null {
+async function authenticateRequest(
+  request: Request,
+  url: URL,
+  env: Env
+): Promise<WorkspaceContext | null> {
   const authHeader = request.headers.get("Authorization");
+
+  // API key via header
   if (authHeader?.startsWith("Bearer mads_")) {
-    return authHeader.slice(7);
+    return validateApiKey(authHeader.slice(7), env);
   }
+
+  // OAuth access token via header
+  if (authHeader?.startsWith("Bearer ")) {
+    return verifyOAuthAccessToken(authHeader.slice(7), env);
+  }
+
+  // API key via query param
   const keyParam = url.searchParams.get("key");
   if (keyParam?.startsWith("mads_")) {
-    return keyParam;
+    return validateApiKey(keyParam, env);
   }
+
   return null;
 }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { registerAccountsTools } from "../../tools/accounts";
-import { createToolCapture, parseToolResult } from "../helpers";
+import { createToolCapture, parseToolResult, createMockEnv } from "../helpers";
 
 // Mock the Meta API module
 vi.mock("../../meta-api", async () => {
@@ -23,7 +23,7 @@ describe("Account Tools", () => {
     vi.clearAllMocks();
     const capture = createToolCapture();
     callTool = capture.callTool;
-    registerAccountsTools(capture.server, TOKEN, "pro");
+    registerAccountsTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
   });
 
   describe("get_ad_accounts", () => {

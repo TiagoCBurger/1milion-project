@@ -53,3 +53,31 @@ export async function checkRateLimit(
 
   return { limited: false };
 }
+
+/**
+ * Checks daily upload limits for a workspace.
+ */
+export async function checkUploadLimit(
+  workspaceId: string,
+  type: "images" | "videos",
+  limit: number,
+  env: Env
+): Promise<{ allowed: boolean; current: number }> {
+  if (limit === Infinity) return { allowed: true, current: 0 };
+
+  const dayWindow = new Date().toISOString().slice(0, 10);
+  const key = `upload:${workspaceId}:${type}:${dayWindow}`;
+
+  const countStr = await env.RATE_LIMIT_KV.get(key);
+  const count = countStr ? parseInt(countStr, 10) : 0;
+
+  if (count >= limit) {
+    return { allowed: false, current: count };
+  }
+
+  await env.RATE_LIMIT_KV.put(key, String(count + 1), {
+    expirationTtl: 90_000,
+  });
+
+  return { allowed: true, current: count + 1 };
+}

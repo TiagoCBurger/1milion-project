@@ -1,12 +1,10 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { metaApiGet, ensureActPrefix, textResult } from "../meta-api";
+import type { ToolContext } from "./index";
+import { isAccountAllowed, accountBlockedResult } from "./index";
 
-export function registerSearchTools(
-  server: McpServer,
-  token: string,
-  tier: string,
-): void {
+export function registerSearchTools(ctx: ToolContext): void {
+  const { server, token, allowedAccounts } = ctx;
   // ── search ───────────────────────────────────────────────────────────
   server.tool(
     "search",
@@ -40,7 +38,9 @@ export function registerSearchTools(
       }>;
       for (const acc of accounts) {
         if (acc.name && acc.name.toLowerCase().includes(query)) {
-          results.push({ type: "ad_account", ...acc });
+          if (isAccountAllowed(acc.id || "", allowedAccounts)) {
+            results.push({ type: "ad_account", ...acc });
+          }
         }
       }
 
@@ -102,6 +102,9 @@ export function registerSearchTools(
         ),
     },
     async (args) => {
+      if (!isAccountAllowed(args.account_id, allowedAccounts)) {
+        return accountBlockedResult(args.account_id);
+      }
       const accountId = ensureActPrefix(args.account_id);
 
       const data = await metaApiGet(`${accountId}/promote_pages`, token, {

@@ -87,6 +87,25 @@ export interface UsageLog {
   created_at: string;
 }
 
+export interface BusinessManager {
+  id: string;
+  workspace_id: string;
+  meta_bm_id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface AdAccount {
+  id: string;
+  business_manager_id: string;
+  workspace_id: string;
+  meta_account_id: string;
+  name: string;
+  account_status: number | null;
+  currency: string | null;
+  created_at: string;
+}
+
 // ============================================================
 // API response types
 // ============================================================
@@ -139,6 +158,19 @@ export interface OAuthTokenExchangeResult {
   expires_in: number;
 }
 
+export interface MetaAdAccountInfo {
+  id: string;
+  name: string;
+  account_status: number;
+  currency: string;
+}
+
+export interface MetaBusinessManagerInfo {
+  id: string;
+  name: string;
+  ad_accounts: MetaAdAccountInfo[];
+}
+
 export interface MetaTokenInspection {
   userId: string;
   userName: string;
@@ -147,4 +179,5 @@ export interface MetaTokenInspection {
   tokenType: "short_lived" | "long_lived";
   bmId: string | null;
   bmName: string | null;
+  businessManagers: MetaBusinessManagerInfo[];
 }

@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Env } from "../types";
 import { registerAccountsTools } from "./accounts";
 import { registerCampaignsTools } from "./campaigns";
 import { registerAdsetTools } from "./adsets";
@@ -10,26 +11,59 @@ import { registerLibraryTools } from "./library";
 import { registerBudgetTools } from "./budget";
 import { registerSearchTools } from "./search";
 
+export interface ToolContext {
+  server: McpServer;
+  token: string;
+  tier: string;
+  env: Env;
+  workspaceId: string;
+  allowedAccounts?: string[];
+}
+
+/**
+ * Checks if an account ID is in the allowed list.
+ * If allowedAccounts is undefined or empty, all accounts are allowed.
+ * Handles both "act_123" and "123" formats.
+ */
+export function isAccountAllowed(
+  accountId: string,
+  allowedAccounts?: string[]
+): boolean {
+  if (!allowedAccounts || allowedAccounts.length === 0) return true;
+  const raw = accountId.replace(/^act_/, "");
+  return allowedAccounts.some((a) => a.replace(/^act_/, "") === raw);
+}
+
+/**
+ * Returns a blocked error response if the account is not allowed.
+ */
+export function accountBlockedResult(accountId: string) {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify({
+          error: "Access denied",
+          message: `This connection does not have access to ad account ${accountId}. Ask the workspace admin to grant access via the dashboard.`,
+        }),
+      },
+    ],
+    isError: true,
+  };
+}
+
 /**
  * Register all Meta Ads tools on the MCP server.
- *
- * @param server  - McpServer instance (created per request)
- * @param token   - Decrypted Meta access token for this workspace
- * @param tier    - Subscription tier ("free" | "pro" | "enterprise")
  */
-export function registerAllTools(
-  server: McpServer,
-  token: string,
-  tier: string
-): void {
-  registerAccountsTools(server, token, tier);
-  registerCampaignsTools(server, token, tier);
-  registerAdsetTools(server, token, tier);
-  registerAdTools(server, token, tier);
-  registerCreativeTools(server, token, tier);
-  registerInsightTools(server, token, tier);
-  registerTargetingTools(server, token, tier);
-  registerLibraryTools(server, token, tier);
-  registerBudgetTools(server, token, tier);
-  registerSearchTools(server, token, tier);
+export function registerAllTools(ctx: ToolContext): void {
+  registerAccountsTools(ctx);
+  registerCampaignsTools(ctx);
+  registerAdsetTools(ctx);
+  registerAdTools(ctx);
+  registerCreativeTools(ctx);
+  registerInsightTools(ctx);
+  registerTargetingTools(ctx);
+  registerLibraryTools(ctx);
+  registerBudgetTools(ctx);
+  registerSearchTools(ctx);
 }

@@ -7,31 +7,34 @@
 
 ## 1. Facebook App — Criação e Configuração Básica
 
-- [ ] Criar conta de desenvolvedor em developers.facebook.com
-- [ ] Criar Facebook App do tipo **Business**
-- [ ] Vincular o App a um **Meta Business Manager** verificado
-- [ ] Preencher **App Display Name** (VibeFly)
-- [ ] Preencher **App Contact Email** (email oficial da empresa)
-- [ ] Preencher **App Icon** (logo VibeFly 1024x1024)
-- [ ] Configurar **App Domains** (domínio de produção + localhost para dev)
-- [ ] Definir **Privacy Policy URL** → `https://seudominio.com/privacy`
-- [ ] Definir **Terms of Service URL** → `https://seudominio.com/terms`
-- [ ] Definir **Data Deletion Request URL** ou **Data Deletion Instructions URL**
-- [ ] Anotar e armazenar com segurança o **App ID** e **App Secret**
+- [X] Criar conta de desenvolvedor em developers.facebook.com
+- [X] Criar Facebook App do tipo **Business**
+- [X] Vincular o App a um **Meta Business Manager** verificado
+- [X] Preencher **App Display Name** (VibeFly)
+- [X] Preencher **App Contact Email** (email oficial da empresa)
+- [X] Criar **email corporativo** dedicado → `contato@vibefly.app`
+- [X] Atualizar email corporativo na **Privacy Policy** e **Terms of Service**
+- [X] Atualizar email corporativo no **Facebook App Settings** (App Contact Email)
+- [X] Preencher **App Icon** (logo VibeFly 1024x1024)
+- [X] Configurar **App Domains** (`vibefly.app` — localhost não precisa, é automático em dev mode)
+- [X] Definir **Privacy Policy URL** → `https://www.vibefly.app/terms`
+- [X] Definir **Terms of Service URL** → `https://www.vibefly.app/privacy`
+- [X] Definir **Data Deletion Request URL** → `https://www.vibefly.app/data-deletion`
+- [X] Anotar e armazenar com segurança o **App ID** (`1330746402408443`) e **App Secret**
 
 ---
 
 ## 2. Facebook Login — Configuração OAuth
 
-- [ ] Adicionar produto **Facebook Login for Business** ao App
-- [ ] Configurar **Valid OAuth Redirect URIs**:
-  - [ ] URI de produção: `https://seudominio.com/api/auth/facebook/callback`
-  - [ ] URI de desenvolvimento: `http://localhost:3000/api/auth/facebook/callback`
-- [ ] Habilitar **Client OAuth Login**: Yes
-- [ ] Habilitar **Web OAuth Login**: Yes
-- [ ] Desabilitar **Embedded Browser OAuth Login** (não necessário)
-- [ ] Habilitar **Enforce HTTPS**: Yes (exceto localhost)
-- [ ] Confirmar que **Login com SDK JavaScript** está desabilitado (usamos server-side)
+- [X] Adicionar produto **Facebook Login for Business** ao App
+- [X] Configurar **Valid OAuth Redirect URIs**:
+  - [X] URI de produção: `https://www.vibefly.app/api/auth/facebook/callback`
+  - [X] URI de desenvolvimento: automático em dev mode (localhost não precisa ser adicionado)
+- [X] Habilitar **Client OAuth Login**: Yes
+- [X] Habilitar **Web OAuth Login**: Yes
+- [X] Desabilitar **Embedded Browser OAuth Login**: Não (desabilitado)
+- [X] Habilitar **Enforce HTTPS**: Sim
+- [X] Confirmar que **Login com SDK JavaScript** está desabilitado: Não (desabilitado)
 
 ---
 
@@ -41,16 +44,17 @@
 
 | Permissão | Justificativa de Uso | Status |
 |---|---|---|
-| `public_profile` | Identificar o usuário conectado | [ ] Padrão (não precisa review) |
-| `ads_read` | Ler campanhas, ad sets, ads e insights | [ ] Pendente App Review |
-| `ads_management` | Criar e gerenciar campanhas, ad sets, ads | [ ] Pendente App Review |
+| `public_profile` | Identificar o usuário conectado | [X] Padrão (não precisa review) |
+| `ads_read` | Ler campanhas, ad sets, ads, creatives e targeting | [ ] Pendente App Review |
+| `ads_management` | Criar e gerenciar campanhas, ad sets, ads, upload de imagens | [ ] Pendente App Review |
 | `business_management` | Acessar Business Managers e contas de anúncio | [ ] Pendente App Review |
+| `pages_manage_ads` | Criar ad creatives com object_story_spec (publicar como Page post) | [ ] Pendente App Review |
 | `pages_read_engagement` | Ler páginas vinculadas a contas de anúncio | [ ] Pendente App Review |
-| `read_insights` | Acessar métricas e relatórios de performance | [ ] Pendente App Review |
+| ~~`read_insights`~~ | ~~Removido — scope deprecado pela Meta. `ads_read` já cobre insights~~ | N/A |
 
 ### Para cada permissão acima:
 
-- [ ] Documentar o caso de uso específico dentro do VibeFly
+- [X] Documentar o caso de uso específico dentro do VibeFly → ver [`permission-use-cases.md`](permission-use-cases.md)
 - [ ] Gravar **screencast** (vídeo de 2-5 min) demonstrando como a permissão é usada
 - [ ] Preparar descrição textual detalhada para o formulário de review
 - [ ] Identificar quais telas/funcionalidades dependem de cada permissão
@@ -59,21 +63,21 @@
 
 ## 4. Business Verification (Verificação da Empresa)
 
-- [ ] Acessar **Meta Business Suite > Settings > Business Verification**
-- [ ] Informar dados da empresa:
-  - [ ] Razão social
-  - [ ] CNPJ
-  - [ ] Endereço comercial
-  - [ ] Telefone comercial
-  - [ ] Website oficial
-- [ ] Enviar documentos comprobatórios (pelo menos 2):
-  - [ ] Contrato Social / Cartão CNPJ
-  - [ ] Conta de serviço público em nome da empresa
-  - [ ] Extrato bancário empresarial
-  - [ ] Certidão de constituição
-- [ ] Verificar domínio do website via DNS TXT record ou meta tag HTML
-- [ ] Aguardar aprovação (prazo: 2-10 dias úteis)
-- [ ] Confirmar status **Verified** no Business Manager
+- [X] Acessar **Meta Business Suite > Settings > Business Verification**
+- [X] Informar dados da empresa:
+  - [X] Razão social
+  - [X] CNPJ
+  - [X] Endereço comercial
+  - [X] Telefone comercial
+  - [X] Website oficial
+- [X] Enviar documentos comprobatórios (pelo menos 2):
+  - [X] Contrato Social / Cartão CNPJ
+  - [X] Conta de serviço público em nome da empresa
+  - [X] Extrato bancário empresarial
+  - [X] Certidão de constituição
+- [X] Verificar domínio do website via DNS TXT record ou meta tag HTML
+- [X] Aguardar aprovação (prazo: 2-10 dias úteis)
+- [X] Confirmar status **Verified** no Business Manager
 
 ---
 
@@ -81,11 +85,11 @@
 
 ### Pré-requisitos
 
-- [ ] Business Verification concluída e aprovada
-- [ ] Privacy Policy publicada e acessível
-- [ ] Terms of Service publicados e acessíveis
-- [ ] Data Deletion URL configurada e funcional
-- [ ] App testado completamente em modo desenvolvimento
+- [X] Business Verification concluída e aprovada
+- [X] Privacy Policy publicada e acessível
+- [X] Terms of Service publicados e acessíveis
+- [X] Data Deletion URL configurada e funcional
+- [X] App testado completamente em modo desenvolvimento
 - [ ] Todos os screencasts gravados e prontos
 
 ### Processo de Submissão
@@ -184,7 +188,7 @@
 
 > A Meta exige que o app ofereça uma forma de deletar os dados do usuário.
 
-- [ ] Implementar **Data Deletion Callback URL** ou **Data Deletion Instructions URL**
+- [X] Implementar **Data Deletion Callback URL** ou **Data Deletion Instructions URL**
 - [ ] Opção A — Callback automático:
   - [ ] Criar endpoint `POST /api/meta/data-deletion`
   - [ ] Receber `signed_request` da Meta

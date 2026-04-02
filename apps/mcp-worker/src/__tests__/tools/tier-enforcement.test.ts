@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { createToolCapture, parseToolResult } from "../helpers";
+import { createToolCapture, parseToolResult, createMockEnv } from "../helpers";
 import { registerAllTools } from "../../tools";
 import {
   FREE_TIER_TOOLS,
@@ -33,6 +33,7 @@ const WRITE_TOOLS = new Set([
   "create_ad",
   "update_ad",
   "upload_ad_image",
+  "upload_ad_video",
   "create_ad_creative",
   "update_ad_creative",
   "create_budget_schedule",
@@ -47,7 +48,7 @@ describe("Tier Enforcement", () => {
 
   it("all registered tools are in FREE_TIER_TOOLS or WRITE_TOOLS", () => {
     const capture = createToolCapture();
-    registerAllTools(capture.server, "test_token", "pro");
+    registerAllTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
     // Get all registered tool names via the capture's internal handler map
     const allTools = new Set<string>();
@@ -60,7 +61,7 @@ describe("Tier Enforcement", () => {
         names.push(name);
       },
     };
-    registerAllTools(nameCapture as any, "tok", "pro");
+    registerAllTools({ server: nameCapture as any, token: "tok", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
     for (const name of names) {
       expect(
@@ -73,7 +74,7 @@ describe("Tier Enforcement", () => {
     for (const toolName of WRITE_TOOLS) {
       vi.clearAllMocks();
       const capture = createToolCapture();
-      registerAllTools(capture.server, "test_token", "free");
+      registerAllTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
 
       // Build a minimal valid args object for each tool
       const args = getMinimalArgs(toolName);
@@ -89,7 +90,7 @@ describe("Tier Enforcement", () => {
     for (const toolName of WRITE_TOOLS) {
       vi.clearAllMocks();
       const capture = createToolCapture();
-      registerAllTools(capture.server, "test_token", "pro");
+      registerAllTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
       const args = getMinimalArgs(toolName);
       const result = await capture.callTool(toolName, args);
@@ -106,7 +107,7 @@ describe("Tier Enforcement", () => {
     for (const toolName of FREE_TIER_TOOLS) {
       vi.clearAllMocks();
       const capture = createToolCapture();
-      registerAllTools(capture.server, "test_token", "free");
+      registerAllTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
 
       const args = getMinimalArgs(toolName);
       const result = await capture.callTool(toolName, args);

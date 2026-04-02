@@ -21,7 +21,7 @@ export function Footer() {
             Terms
           </a>
           <a
-            href="mailto:support@vibefly.io"
+            href="mailto:contato@vibefly.app"
             className="hover:text-gray-900 transition"
           >
             Contact

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { metaApiGet, textResult } from "../meta-api";
+import type { ToolContext } from "./index";
 
 const ADS_ARCHIVE_FIELDS = [
   "ad_creation_time",
@@ -22,11 +22,8 @@ const ADS_ARCHIVE_FIELDS = [
   "spend",
 ].join(",");
 
-export function registerLibraryTools(
-  server: McpServer,
-  token: string,
-  tier: string,
-): void {
+export function registerLibraryTools(ctx: ToolContext): void {
+  const { server, token } = ctx;
   server.tool(
     "search_ads_archive",
     "Search the Meta Ad Library (public ads archive) for ads matching given search terms. Useful for competitor research and ad transparency.",

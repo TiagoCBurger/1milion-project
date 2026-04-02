@@ -120,7 +120,7 @@ We may update this Privacy Policy from time to time. When we make material chang
 
 If you have questions about this Privacy Policy or wish to exercise your data rights, please contact us:
 
-**Email:** [privacy@vibefly.io](mailto:privacy@vibefly.io)
+**Email:** [contato@vibefly.app](mailto:contato@vibefly.app)
 
 ---
 

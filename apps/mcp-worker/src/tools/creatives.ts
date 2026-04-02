@@ -1,6 +1,11 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { metaApiGet, metaApiPost, ensureActPrefix, textResult } from "../meta-api";
+import { uploadToR2, estimateBase64Size } from "../r2";
+import { checkUploadLimit } from "../rate-limit";
+import { UPLOAD_LIMITS } from "@vibefly/shared";
+import type { ToolContext } from "./index";
+import { isAccountAllowed, accountBlockedResult } from "./index";
+import type { SubscriptionTier } from "@vibefly/shared";
 
 const CREATIVE_LIST_FIELDS =
   "id,name,status,thumbnail_url,image_url,image_hash,object_story_spec,object_type,body,title,effective_object_story_id,asset_feed_spec,url_tags,product_set_id";
@@ -11,11 +16,9 @@ const CREATIVE_DETAIL_FIELDS =
 const VIDEO_FIELDS =
   "source,title,description,length,picture,thumbnails,created_time";
 
-export function registerCreativeTools(
-  server: McpServer,
-  token: string,
-  tier: string,
-): void {
+export function registerCreativeTools(ctx: ToolContext): void {
+  const { server, token, tier, env, workspaceId, allowedAccounts } = ctx;
+
   // ── get_ad_creatives ────────────────────────────────────────────────
   server.tool(
     "get_ad_creatives",
@@ -90,7 +93,6 @@ export function registerCreativeTools(
         full_image_url: null,
       };
 
-      // If we have both image_hash and account_id, fetch the full-resolution URL
       if (imageHash && accountId) {
         const imagesData = await metaApiGet(
           `act_${accountId}/adimages`,
@@ -136,7 +138,6 @@ export function registerCreativeTools(
         );
       }
 
-      // If only ad_id provided, extract video_id from the creative
       if (!resolvedVideoId && args.ad_id) {
         const creativeData = await metaApiGet(
           `${args.ad_id}/adcreatives`,
@@ -150,14 +151,12 @@ export function registerCreativeTools(
 
         const creatives = ((creativeData as any).data ?? []) as any[];
         for (const c of creatives) {
-          // Check object_story_spec.video_data.video_id
           const videoData = c.object_story_spec?.video_data;
           if (videoData?.video_id) {
             resolvedVideoId = videoData.video_id;
             break;
           }
 
-          // Check asset_feed_spec.videos
           const videos = c.asset_feed_spec?.videos;
           if (Array.isArray(videos) && videos.length > 0) {
             resolvedVideoId = videos[0].video_id;
@@ -173,7 +172,6 @@ export function registerCreativeTools(
         }
       }
 
-      // Fetch video details
       const videoData = await metaApiGet(resolvedVideoId!, token, {
         fields: VIDEO_FIELDS,
       });
@@ -193,38 +191,83 @@ export function registerCreativeTools(
     },
   );
 
-  // ── upload_ad_image (PRO TIER ONLY) ─────────────────────────────────
+  // ── upload_ad_image (PRO+ TIER ONLY) ──────────────────────────────
   server.tool(
     "upload_ad_image",
-    "Upload an image to a Meta ad account from a URL. Requires Pro tier.",
+    "Upload an image to a Meta ad account from a URL or base64 data. Returns the image hash for use in creatives. Requires Pro tier.",
     {
       account_id: z
         .string()
         .describe("The ad account ID (with or without act_ prefix)."),
       image_url: z
         .string()
-        .describe("The public URL of the image to upload."),
+        .optional()
+        .describe("Public URL of the image. Provide this OR image_base64."),
+      image_base64: z
+        .string()
+        .optional()
+        .describe("Base64-encoded image data (with or without data URI prefix). Provide this OR image_url."),
       name: z
         .string()
         .optional()
         .describe("Optional name for the uploaded image."),
     },
     async (args) => {
-      if (tier !== "pro") {
+      if (!isAccountAllowed(args.account_id, allowedAccounts)) {
+        return accountBlockedResult(args.account_id);
+      }
+
+      if (tier === "free") {
         return textResult(
-          { error: "upload_ad_image requires a Pro tier subscription." },
+          { error: "upload_ad_image requires a Pro or Enterprise subscription. Upgrade at https://vibefly.app/pricing" },
+          true,
+        );
+      }
+
+      if (!args.image_url && !args.image_base64) {
+        return textResult(
+          { error: "Provide either image_url or image_base64." },
+          true,
+        );
+      }
+
+      const limits = UPLOAD_LIMITS[tier as SubscriptionTier];
+      const uploadCheck = await checkUploadLimit(workspaceId, "images", limits.images_per_day, env);
+      if (!uploadCheck.allowed) {
+        return textResult(
+          { error: `Daily image upload limit reached (${limits.images_per_day}/day). Upgrade your plan for more uploads.` },
           true,
         );
       }
 
       const accountId = ensureActPrefix(args.account_id);
+      let imageUrl = args.image_url;
+      let r2Key: string | null = null;
 
-      const params: Record<string, unknown> = {
-        url: args.image_url,
-      };
-      if (args.name) {
-        params.name = args.name;
+      // If base64, upload to R2 first to get a public URL
+      if (args.image_base64) {
+        const estimatedSize = estimateBase64Size(args.image_base64);
+        if (estimatedSize > limits.max_image_bytes) {
+          return textResult(
+            { error: `Image exceeds max size (${Math.round(limits.max_image_bytes / 1024 / 1024)}MB).` },
+            true,
+          );
+        }
+
+        const r2Result = await uploadToR2(
+          env,
+          workspaceId,
+          "images",
+          args.name ?? "upload",
+          args.image_base64,
+        );
+
+        imageUrl = r2Result.publicUrl;
+        r2Key = r2Result.key;
       }
+
+      const params: Record<string, unknown> = { url: imageUrl };
+      if (args.name) params.name = args.name;
 
       const data = await metaApiPost(`${accountId}/adimages`, token, params);
 
@@ -232,11 +275,108 @@ export function registerCreativeTools(
         return textResult(data, true);
       }
 
-      return textResult(data);
+      return textResult({ ...data as object, r2_key: r2Key });
     },
   );
 
-  // ── create_ad_creative (PRO TIER ONLY) ──────────────────────────────
+  // ── upload_ad_video (PRO+ TIER ONLY) ──────────────────────────────
+  server.tool(
+    "upload_ad_video",
+    "Upload a video to a Meta ad account from a URL or base64 data. Returns video_id (processing is async on Meta's side). Requires Pro tier.",
+    {
+      account_id: z
+        .string()
+        .describe("The ad account ID (with or without act_ prefix)."),
+      video_url: z
+        .string()
+        .optional()
+        .describe("Public URL of the video file. Provide this OR video_base64."),
+      video_base64: z
+        .string()
+        .optional()
+        .describe("Base64-encoded video data. Provide this OR video_url."),
+      title: z
+        .string()
+        .optional()
+        .describe("Title for the video."),
+      description: z
+        .string()
+        .optional()
+        .describe("Description for the video."),
+    },
+    async (args) => {
+      if (!isAccountAllowed(args.account_id, allowedAccounts)) {
+        return accountBlockedResult(args.account_id);
+      }
+
+      if (tier === "free") {
+        return textResult(
+          { error: "upload_ad_video requires a Pro or Enterprise subscription. Upgrade at https://vibefly.app/pricing" },
+          true,
+        );
+      }
+
+      if (!args.video_url && !args.video_base64) {
+        return textResult(
+          { error: "Provide either video_url or video_base64." },
+          true,
+        );
+      }
+
+      const limits = UPLOAD_LIMITS[tier as SubscriptionTier];
+      const uploadCheck = await checkUploadLimit(workspaceId, "videos", limits.videos_per_day, env);
+      if (!uploadCheck.allowed) {
+        return textResult(
+          { error: `Daily video upload limit reached (${limits.videos_per_day}/day). Upgrade your plan for more uploads.` },
+          true,
+        );
+      }
+
+      const accountId = ensureActPrefix(args.account_id);
+      let fileUrl = args.video_url;
+      let r2Key: string | null = null;
+
+      // If base64, upload to R2 first to get a public URL
+      if (args.video_base64) {
+        const estimatedSize = estimateBase64Size(args.video_base64);
+        if (estimatedSize > limits.max_video_bytes) {
+          return textResult(
+            { error: `Video exceeds max size (${Math.round(limits.max_video_bytes / 1024 / 1024)}MB).` },
+            true,
+          );
+        }
+
+        const r2Result = await uploadToR2(
+          env,
+          workspaceId,
+          "videos",
+          args.title ?? "video",
+          args.video_base64,
+        );
+
+        fileUrl = r2Result.publicUrl;
+        r2Key = r2Result.key;
+      }
+
+      const params: Record<string, unknown> = { file_url: fileUrl };
+      if (args.title) params.title = args.title;
+      if (args.description) params.description = args.description;
+
+      const data = await metaApiPost(`${accountId}/advideos`, token, params);
+
+      if ((data as any).error) {
+        return textResult(data, true);
+      }
+
+      return textResult({
+        ...data as object,
+        r2_key: r2Key,
+        note: "Video processing is asynchronous. Use get_ad_video with the returned video_id to check status.",
+      });
+    },
+  );
+
+  // ── create_ad_creative (PRO+ TIER ONLY) ───────────────────────────
   server.tool(
     "create_ad_creative",
     "Create a new ad creative with image or video. Requires Pro tier.",
@@ -289,22 +429,24 @@ export function registerCreativeTools(
         .describe("Instagram account ID for Instagram ad placement."),
     },
     async (args) => {
-      if (tier !== "pro") {
+      if (!isAccountAllowed(args.account_id, allowedAccounts)) {
+        return accountBlockedResult(args.account_id);
+      }
+
+      if (tier === "free") {
         return textResult(
-          { error: "create_ad_creative requires a Pro tier subscription." },
+          { error: "create_ad_creative requires a Pro or Enterprise subscription. Upgrade at https://vibefly.app/pricing" },
           true,
         );
       }
 
       const accountId = ensureActPrefix(args.account_id);
 
-      // Build object_story_spec based on media type
       const objectStorySpec: Record<string, unknown> = {
         page_id: args.page_id,
       };
 
       if (args.video_id) {
-        // Video creative
         const videoData: Record<string, unknown> = {
           video_id: args.video_id,
         };
@@ -319,7 +461,6 @@ export function registerCreativeTools(
         }
         objectStorySpec.video_data = videoData;
       } else if (args.image_hash) {
-        // Image creative
         const linkData: Record<string, unknown> = {
           image_hash: args.image_hash,
         };
@@ -360,7 +501,7 @@ export function registerCreativeTools(
     },
   );
 
-  // ── update_ad_creative (PRO TIER ONLY) ──────────────────────────────
+  // ── update_ad_creative (PRO+ TIER ONLY) ───────────────────────────
   server.tool(
     "update_ad_creative",
     "Update an ad creative. Note: Meta API only reliably allows updating the name. To change content, create a new creative.",
@@ -374,9 +515,9 @@ export function registerCreativeTools(
         .describe("New name for the ad creative."),
     },
     async (args) => {
-      if (tier !== "pro") {
+      if (tier === "free") {
         return textResult(
-          { error: "update_ad_creative requires a Pro tier subscription." },
+          { error: "update_ad_creative requires a Pro or Enterprise subscription. Upgrade at https://vibefly.app/pricing" },
           true,
         );
       }

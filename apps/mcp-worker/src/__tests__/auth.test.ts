@@ -132,6 +132,7 @@ describe("getMetaToken", () => {
     (globalThis.fetch as any).mockResolvedValue({
       ok: false,
       status: 404,
+      text: async () => "Not found",
     });
 
     const result = await getMetaToken("ws-nonexistent", env);
