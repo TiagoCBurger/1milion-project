@@ -41,9 +41,10 @@ export async function validateApiKey(
   const rows = (await response.json()) as Array<{
     workspace_id: string;
     api_key_id: string;
-    tier: "free" | "pro" | "enterprise";
-    requests_per_minute: number;
+    tier: "free" | "pro" | "max" | "enterprise";
+    requests_per_hour: number;
     requests_per_day: number;
+    max_mcp_connections: number;
   }>;
 
   if (!rows || rows.length === 0) {
@@ -55,8 +56,9 @@ export async function validateApiKey(
     workspaceId: row.workspace_id,
     apiKeyId: row.api_key_id,
     tier: row.tier,
-    requestsPerMinute: row.requests_per_minute,
+    requestsPerHour: row.requests_per_hour,
     requestsPerDay: row.requests_per_day,
+    maxMcpConnections: row.max_mcp_connections,
   };
 
   // Cache for 60 seconds
@@ -151,14 +153,45 @@ export async function verifyOAuthAccessToken(
 
   const rows = (await response.json()) as Array<{
     workspace_id: string;
-    tier: "free" | "pro" | "enterprise";
-    requests_per_minute: number;
+    tier: "free" | "pro" | "max" | "enterprise";
+    requests_per_hour: number;
     requests_per_day: number;
+    max_mcp_connections: number;
   }>;
 
   if (!rows || rows.length === 0) return null;
 
   const row = rows[0];
+
+  // Check MCP concurrent connection limit
+  if (row.max_mcp_connections !== -1) {
+    const connCacheKey = `mcp_conn:${stored.workspace_id}`;
+    let connCount: number | null = null;
+    const cachedCount = await env.CACHE_KV.get(connCacheKey);
+    if (cachedCount !== null) {
+      connCount = parseInt(cachedCount, 10);
+    } else {
+      const countResp = await fetch(
+        `${env.SUPABASE_URL}/rest/v1/oauth_connections?workspace_id=eq.${stored.workspace_id}&is_active=eq.true&select=id`,
+        {
+          headers: {
+            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+        }
+      );
+      if (countResp.ok) {
+        const connRows = (await countResp.json()) as unknown[];
+        connCount = connRows.length;
+        await env.CACHE_KV.put(connCacheKey, String(connCount), {
+          expirationTtl: 60,
+        });
+      }
+    }
+    if (connCount !== null && connCount > row.max_mcp_connections) {
+      return null; // Connection limit exceeded
+    }
+  }
 
   // Check Supabase for the latest connection state (allowed_accounts + is_active).
   // This lets admins modify permissions or revoke connections from the dashboard.
@@ -241,8 +274,9 @@ export async function verifyOAuthAccessToken(
     workspaceId: row.workspace_id,
     apiKeyId: `oauth:${stored.client_id}`,
     tier: row.tier,
-    requestsPerMinute: row.requests_per_minute,
+    requestsPerHour: row.requests_per_hour,
     requestsPerDay: row.requests_per_day,
+    maxMcpConnections: row.max_mcp_connections,
     allowedAccounts,
   };
 }

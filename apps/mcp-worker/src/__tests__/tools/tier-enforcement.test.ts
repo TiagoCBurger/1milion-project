@@ -121,37 +121,47 @@ describe("Tier Enforcement", () => {
 });
 
 describe("TIER_LIMITS constants", () => {
+  it("has all four tiers", () => {
+    expect(TIER_LIMITS).toHaveProperty("free");
+    expect(TIER_LIMITS).toHaveProperty("pro");
+    expect(TIER_LIMITS).toHaveProperty("max");
+    expect(TIER_LIMITS).toHaveProperty("enterprise");
+  });
+
   it("free tier has correct limits", () => {
-    expect(TIER_LIMITS.free.requests_per_minute).toBe(20);
-    expect(TIER_LIMITS.free.requests_per_day).toBe(500);
+    expect(TIER_LIMITS.free.requests_per_hour).toBe(20);
+    expect(TIER_LIMITS.free.requests_per_day).toBe(20);
     expect(TIER_LIMITS.free.max_api_keys).toBe(1);
-    expect(TIER_LIMITS.free.max_workspaces).toBe(1);
+    expect(TIER_LIMITS.free.max_mcp_connections).toBe(1);
   });
 
   it("pro tier has higher limits than free", () => {
-    expect(TIER_LIMITS.pro.requests_per_minute).toBeGreaterThan(
-      TIER_LIMITS.free.requests_per_minute,
+    expect(TIER_LIMITS.pro.requests_per_hour).toBeGreaterThan(
+      TIER_LIMITS.free.requests_per_hour,
     );
     expect(TIER_LIMITS.pro.requests_per_day).toBeGreaterThan(
       TIER_LIMITS.free.requests_per_day,
     );
   });
 
-  it("enterprise tier has highest limits", () => {
-    expect(TIER_LIMITS.enterprise.requests_per_minute).toBeGreaterThan(
-      TIER_LIMITS.pro.requests_per_minute,
+  it("max tier has higher limits than pro", () => {
+    expect(TIER_LIMITS.max.requests_per_hour).toBeGreaterThan(
+      TIER_LIMITS.pro.requests_per_hour,
     );
-    expect(TIER_LIMITS.enterprise.requests_per_day).toBeGreaterThan(
+    expect(TIER_LIMITS.max.requests_per_day).toBeGreaterThan(
       TIER_LIMITS.pro.requests_per_day,
     );
   });
 
-  it("all tiers have positive rate limits", () => {
-    for (const tier of ["free", "pro", "enterprise"] as const) {
-      expect(TIER_LIMITS[tier].requests_per_minute).toBeGreaterThan(0);
+  it("max tier allows unlimited MCP connections", () => {
+    expect(TIER_LIMITS.max.max_mcp_connections).toBe(-1);
+  });
+
+  it("paid tiers (free, pro, max) have positive rate limits", () => {
+    for (const tier of ["free", "pro", "max"] as const) {
+      expect(TIER_LIMITS[tier].requests_per_hour).toBeGreaterThan(0);
       expect(TIER_LIMITS[tier].requests_per_day).toBeGreaterThan(0);
       expect(TIER_LIMITS[tier].max_api_keys).toBeGreaterThan(0);
-      expect(TIER_LIMITS[tier].max_workspaces).toBeGreaterThan(0);
     }
   });
 });

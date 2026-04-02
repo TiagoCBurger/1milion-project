@@ -58,18 +58,22 @@ export interface ApiKey {
   created_at: string;
 }
 
-export type SubscriptionTier = "free" | "pro" | "enterprise";
+export type SubscriptionTier = "free" | "pro" | "max" | "enterprise";
 export type SubscriptionStatus = "active" | "canceled" | "past_due" | "trialing";
+export type BillingCycle = "monthly" | "annually";
 
 export interface Subscription {
   id: string;
   workspace_id: string;
   tier: SubscriptionTier;
   status: SubscriptionStatus;
-  stripe_customer_id: string | null;
-  stripe_subscription_id: string | null;
-  requests_per_minute: number;
+  abacatepay_customer_id: string | null;
+  abacatepay_subscription_id: string | null;
+  billing_cycle: BillingCycle | null;
+  current_period_end: string | null;
+  requests_per_hour: number;
   requests_per_day: number;
+  max_mcp_connections: number;
   created_at: string;
   updated_at: string;
 }
@@ -114,8 +118,19 @@ export interface ValidateApiKeyResult {
   workspace_id: string;
   api_key_id: string;
   tier: SubscriptionTier;
-  requests_per_minute: number;
+  requests_per_hour: number;
   requests_per_day: number;
+  max_mcp_connections: number;
+}
+
+export interface CreateCheckoutRequest {
+  workspace_id: string;
+  tier: "pro" | "max";
+  cycle: BillingCycle;
+}
+
+export interface CreateCheckoutResponse {
+  checkout_url: string;
 }
 
 export interface ConnectTokenRequest {

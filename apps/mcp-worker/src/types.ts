@@ -21,9 +21,10 @@ export interface Env {
 export interface WorkspaceContext {
   workspaceId: string;
   apiKeyId: string;
-  tier: "free" | "pro" | "enterprise";
-  requestsPerMinute: number;
+  tier: "free" | "pro" | "max" | "enterprise";
+  requestsPerHour: number;
   requestsPerDay: number;
+  maxMcpConnections: number;
   allowedAccounts?: string[];
 }
 

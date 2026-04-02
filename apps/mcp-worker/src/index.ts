@@ -90,7 +90,7 @@ export default {
     if (rateResult.limited) {
       return jsonRpcError(
         -32600,
-        `Rate limit exceeded (${rateResult.limit}/min). Retry after ${rateResult.retryAfter}s`,
+        `Rate limit exceeded (${rateResult.limit}/hr). Retry after ${rateResult.retryAfter}s`,
         null,
         429
       );

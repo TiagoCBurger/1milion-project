@@ -7,29 +7,35 @@ import type { SubscriptionTier } from "./types";
 export const TIER_LIMITS: Record<
   SubscriptionTier,
   {
-    requests_per_minute: number;
+    requests_per_hour: number;
     requests_per_day: number;
     max_api_keys: number;
-    max_workspaces: number;
+    max_mcp_connections: number;
   }
 > = {
   free: {
-    requests_per_minute: 20,
-    requests_per_day: 500,
+    requests_per_hour: 20,
+    requests_per_day: 20,
     max_api_keys: 1,
-    max_workspaces: 1,
+    max_mcp_connections: 1,
   },
   pro: {
-    requests_per_minute: 100,
-    requests_per_day: 5_000,
+    requests_per_hour: 200,
+    requests_per_day: 1_000,
     max_api_keys: 5,
-    max_workspaces: 5,
+    max_mcp_connections: 3,
+  },
+  max: {
+    requests_per_hour: 500,
+    requests_per_day: 5_000,
+    max_api_keys: 10,
+    max_mcp_connections: -1, // unlimited
   },
   enterprise: {
-    requests_per_minute: 500,
-    requests_per_day: 50_000,
-    max_api_keys: 20,
-    max_workspaces: 50,
+    requests_per_hour: 0, // custom per contract
+    requests_per_day: 0,
+    max_api_keys: 0,
+    max_mcp_connections: -1, // unlimited
   },
 };
 
@@ -58,13 +64,28 @@ export const UPLOAD_LIMITS: Record<
     max_image_bytes: 30 * 1024 * 1024,
     max_video_bytes: 500 * 1024 * 1024,
   },
+  max: {
+    images_per_day: 200,
+    videos_per_day: 50,
+    max_image_bytes: 30 * 1024 * 1024,
+    max_video_bytes: 1024 * 1024 * 1024,
+  },
   enterprise: {
-    images_per_day: Infinity,
-    videos_per_day: 100,
+    images_per_day: 0, // custom per contract
+    videos_per_day: 0,
     max_image_bytes: 30 * 1024 * 1024,
     max_video_bytes: 2 * 1024 * 1024 * 1024,
   },
 };
+
+// ============================================================
+// Pricing (amounts in centavos BRL)
+// ============================================================
+
+export const PRICING = {
+  pro: { monthly: 3_700, annually: 35_500, label: "Pro" },
+  max: { monthly: 9_700, annually: 93_100, label: "Max" },
+} as const;
 
 // ============================================================
 // Free tier: read-only tools only

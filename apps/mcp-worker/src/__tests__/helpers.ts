@@ -98,8 +98,9 @@ export function createMockWorkspace(
     workspaceId: "ws-123",
     apiKeyId: "key-456",
     tier: "pro",
-    requestsPerMinute: 100,
-    requestsPerDay: 5000,
+    requestsPerHour: 200,
+    requestsPerDay: 1000,
+    maxMcpConnections: 3,
     ...overrides,
   };
 }

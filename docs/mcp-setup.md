@@ -7,7 +7,7 @@ Com OAuth, o Claude Code autentica automaticamente via browser — sem necessida
 ### Configuração no Claude Code
 
 ```bash
-claude mcp add --scope project vibefly --transport http "http://localhost:8787/mcp"
+claude mcp add --scope project vibefly --transport http "vibefly.app/mcp"
 ```
 
 Ou manualmente no `.mcp.json` / `settings.local.json`:

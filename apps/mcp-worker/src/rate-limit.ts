@@ -2,34 +2,34 @@ import type { Env, WorkspaceContext, RateLimitResult } from "./types";
 
 /**
  * Checks rate limits for a workspace using KV counters.
- * Two windows: per-minute and per-day.
+ * Two windows: per-hour and per-day.
  */
 export async function checkRateLimit(
   workspace: WorkspaceContext,
   env: Env
 ): Promise<RateLimitResult> {
   const now = Date.now();
-  const minuteWindow = Math.floor(now / 60_000);
+  const hourWindow = Math.floor(now / 3_600_000);
   const dayWindow = new Date().toISOString().slice(0, 10);
 
-  const minuteKey = `rl:${workspace.workspaceId}:m:${minuteWindow}`;
+  const hourKey = `rl:${workspace.workspaceId}:h:${hourWindow}`;
   const dayKey = `rl:${workspace.workspaceId}:d:${dayWindow}`;
 
   // Read both counters in parallel
-  const [minuteStr, dayStr] = await Promise.all([
-    env.RATE_LIMIT_KV.get(minuteKey),
+  const [hourStr, dayStr] = await Promise.all([
+    env.RATE_LIMIT_KV.get(hourKey),
     env.RATE_LIMIT_KV.get(dayKey),
   ]);
 
-  const minuteCount = minuteStr ? parseInt(minuteStr, 10) : 0;
+  const hourCount = hourStr ? parseInt(hourStr, 10) : 0;
   const dayCount = dayStr ? parseInt(dayStr, 10) : 0;
 
   // Check limits before incrementing
-  if (minuteCount >= workspace.requestsPerMinute) {
+  if (hourCount >= workspace.requestsPerHour) {
     return {
       limited: true,
-      limit: workspace.requestsPerMinute,
-      retryAfter: 60,
+      limit: workspace.requestsPerHour,
+      retryAfter: 3600,
     };
   }
 
@@ -43,8 +43,8 @@ export async function checkRateLimit(
 
   // Increment counters (non-blocking, acceptable race condition)
   await Promise.all([
-    env.RATE_LIMIT_KV.put(minuteKey, String(minuteCount + 1), {
-      expirationTtl: 120,
+    env.RATE_LIMIT_KV.put(hourKey, String(hourCount + 1), {
+      expirationTtl: 7_200, // 2 hours
     }),
     env.RATE_LIMIT_KV.put(dayKey, String(dayCount + 1), {
       expirationTtl: 90_000,

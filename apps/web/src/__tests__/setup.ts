@@ -33,3 +33,11 @@ process.env.TOKEN_ENCRYPTION_KEY = "test-encryption-key-32chars!!!!!";
 process.env.FACEBOOK_APP_ID = "1234567890";
 process.env.FACEBOOK_APP_SECRET = "test-app-secret";
 process.env.OAUTH_SIGNING_SECRET = "test-oauth-signing-secret-32char";
+
+// AbacatePay
+process.env.ABACATEPAY_API_KEY = "test-abacatepay-key";
+process.env.ABACATEPAY_WEBHOOK_SECRET = "test-webhook-secret";
+process.env.ABACATEPAY_PRODUCT_PRO_MONTHLY = "prod_test_pro_m";
+process.env.ABACATEPAY_PRODUCT_PRO_ANNUALLY = "prod_test_pro_a";
+process.env.ABACATEPAY_PRODUCT_MAX_MONTHLY = "prod_test_max_m";
+process.env.ABACATEPAY_PRODUCT_MAX_ANNUALLY = "prod_test_max_a";

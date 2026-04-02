@@ -10,7 +10,7 @@ describe("checkRateLimit", () => {
   beforeEach(() => {
     env = createMockEnv();
     workspace = createMockWorkspace({
-      requestsPerMinute: 5,
+      requestsPerHour: 5,
       requestsPerDay: 100,
     });
   });
@@ -23,16 +23,16 @@ describe("checkRateLimit", () => {
     expect(env.RATE_LIMIT_KV.put).toHaveBeenCalledTimes(2);
   });
 
-  it("blocks when minute limit is reached", async () => {
+  it("blocks when hour limit is reached", async () => {
     // Pre-set counter to be at the limit
-    (env.RATE_LIMIT_KV.get as any).mockResolvedValueOnce("5"); // minute counter at limit
+    (env.RATE_LIMIT_KV.get as any).mockResolvedValueOnce("5"); // hour counter at limit
     (env.RATE_LIMIT_KV.get as any).mockResolvedValueOnce("10"); // day counter under limit
 
     const result = await checkRateLimit(workspace, env);
 
     expect(result.limited).toBe(true);
     expect(result.limit).toBe(5);
-    expect(result.retryAfter).toBe(60);
+    expect(result.retryAfter).toBe(3600);
   });
 
   it("blocks when day limit is reached", async () => {
@@ -51,9 +51,9 @@ describe("checkRateLimit", () => {
 
     const putCalls = (env.RATE_LIMIT_KV.put as any).mock.calls;
 
-    // Minute counter: TTL 120s
+    // Hour counter: TTL 7200s
     expect(putCalls[0][1]).toBe("1");
-    expect(putCalls[0][2]).toEqual({ expirationTtl: 120 });
+    expect(putCalls[0][2]).toEqual({ expirationTtl: 7_200 });
 
     // Day counter: TTL 90000s
     expect(putCalls[1][1]).toBe("1");
@@ -64,7 +64,7 @@ describe("checkRateLimit", () => {
     await checkRateLimit(workspace, env);
 
     const getCalls = (env.RATE_LIMIT_KV.get as any).mock.calls;
-    expect(getCalls[0][0]).toContain("rl:ws-123:m:");
+    expect(getCalls[0][0]).toContain("rl:ws-123:h:");
     expect(getCalls[1][0]).toContain("rl:ws-123:d:");
   });
 });

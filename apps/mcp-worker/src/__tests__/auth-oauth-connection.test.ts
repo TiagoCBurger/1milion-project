@@ -41,8 +41,9 @@ const STORED_TOKEN = {
 const WORKSPACE_ROW = {
   workspace_id: "ws-1",
   tier: "pro" as const,
-  requests_per_minute: 100,
-  requests_per_day: 5000,
+  requests_per_hour: 200,
+  requests_per_day: 1000,
+  max_mcp_connections: -1, // unlimited — these tests focus on OAuth, not connection limits
 };
 
 describe("verifyOAuthAccessToken — connection checks", () => {
@@ -50,7 +51,7 @@ describe("verifyOAuthAccessToken — connection checks", () => {
   let env: Env;
 
   beforeEach(() => {
-    globalThis.fetch = vi.fn();
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [], status: 200 });
     env = createMockEnv();
 
     // Default: OAUTH_KV returns our stored token
@@ -211,8 +212,8 @@ describe("verifyOAuthAccessToken — connection checks", () => {
     expect(result).not.toBeNull();
     expect(result!.workspaceId).toBe("ws-1");
     expect(result!.tier).toBe("pro");
-    expect(result!.requestsPerMinute).toBe(100);
-    expect(result!.requestsPerDay).toBe(5000);
+    expect(result!.requestsPerHour).toBe(200);
+    expect(result!.requestsPerDay).toBe(1000);
   });
 
   it("fires last_used_at update when connection exists", async () => {

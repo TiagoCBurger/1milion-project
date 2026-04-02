@@ -24,8 +24,9 @@ describe("validateApiKey", () => {
           workspace_id: "ws-1",
           api_key_id: "key-1",
           tier: "pro",
-          requests_per_minute: 100,
-          requests_per_day: 5000,
+          requests_per_hour: 200,
+          requests_per_day: 1000,
+          max_mcp_connections: 3,
         },
       ],
     });
@@ -36,8 +37,9 @@ describe("validateApiKey", () => {
       workspaceId: "ws-1",
       apiKeyId: "key-1",
       tier: "pro",
-      requestsPerMinute: 100,
-      requestsPerDay: 5000,
+      requestsPerHour: 200,
+      requestsPerDay: 1000,
+      maxMcpConnections: 3,
     });
   });
 
@@ -70,8 +72,9 @@ describe("validateApiKey", () => {
           workspace_id: "ws-1",
           api_key_id: "key-1",
           tier: "free",
-          requests_per_minute: 20,
-          requests_per_day: 500,
+          requests_per_hour: 20,
+          requests_per_day: 20,
+          max_mcp_connections: 1,
         },
       ],
     });
