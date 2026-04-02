@@ -212,6 +212,28 @@ export async function verifyOAuthAccessToken(
           }),
         }
       ).catch(() => {});
+    } else {
+      // Connection not found in DB — auto-register it so it appears in the dashboard.
+      // This handles cases where the initial recordConnection in token.ts failed.
+      const clientMeta = await env.OAUTH_KV.get<{ client_name?: string }>(
+        `oauth:client:${stored.client_id}`,
+        "json"
+      );
+      fetch(`${env.SUPABASE_URL}/rest/v1/rpc/upsert_oauth_connection`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          p_workspace_id: stored.workspace_id,
+          p_client_id: stored.client_id,
+          p_client_name: clientMeta?.client_name || stored.client_id,
+          p_user_id: stored.user_id,
+          p_allowed_accounts: stored.allowed_accounts || [],
+        }),
+      }).catch((err) => console.error("[oauth] Auto-register connection failed:", err));
     }
   }
 

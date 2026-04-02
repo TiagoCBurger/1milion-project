@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface AdAccount {
   id: string;
@@ -35,7 +39,7 @@ export function OAuthConnections({
 }: Props) {
   if (connections.length === 0) {
     return (
-      <p className="text-sm text-gray-400">
+      <p className="text-sm text-muted-foreground">
         No MCP clients have connected via OAuth yet.
       </p>
     );
@@ -91,11 +95,8 @@ function ConnectionCard({
           body: JSON.stringify({ allowed_accounts: allowed }),
         }
       );
-      if (res.ok) {
-        router.refresh();
-      }
+      if (res.ok) router.refresh();
     } catch {
-      // keep state
     } finally {
       setSaving(false);
     }
@@ -108,11 +109,8 @@ function ConnectionCard({
         `/api/workspaces/${workspaceId}/oauth-connections/${connection.id}`,
         { method: "DELETE" }
       );
-      if (res.ok) {
-        router.refresh();
-      }
+      if (res.ok) router.refresh();
     } catch {
-      // keep state
     } finally {
       setRevoking(false);
       setConfirmRevoke(false);
@@ -136,143 +134,120 @@ function ConnectionCard({
   }
 
   return (
-    <div
-      className={`rounded-lg border bg-white overflow-hidden ${
-        !connection.is_active ? "opacity-50" : ""
-      }`}
-    >
-      {/* Header */}
-      <div className="px-5 py-3 bg-gray-50 border-b flex items-center justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h4 className="font-medium text-gray-900 truncate">
-              {connection.client_name || connection.client_id}
-            </h4>
-            <span
-              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                connection.is_active
-                  ? "bg-green-100 text-green-700"
-                  : "bg-red-100 text-red-700"
-              }`}
-            >
-              {connection.is_active ? "Active" : "Revoked"}
-            </span>
-          </div>
-          <div className="flex gap-4 text-xs text-gray-500 mt-0.5">
-            <span>
-              Granted {new Date(connection.granted_at).toLocaleDateString()}
-            </span>
-            {connection.last_used_at && (
-              <span>
-                Last used{" "}
-                {new Date(connection.last_used_at).toLocaleDateString()}
-              </span>
-            )}
-            <span>
-              {allAllowed
-                ? "All accounts"
-                : `${allowed.length} account${allowed.length !== 1 ? "s" : ""}`}
-            </span>
-          </div>
-        </div>
-        {connection.is_active && canManage && (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="ml-4 shrink-0 rounded border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 transition"
-          >
-            {expanded ? "Close" : "Manage"}
-          </button>
-        )}
-      </div>
-
-      {/* Expanded: account selection */}
-      {expanded && connection.is_active && canManage && (
-        <div className="px-5 py-4 border-t">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-gray-700">
-              Allowed ad accounts
-            </p>
-            <button
-              onClick={toggleAll}
-              className="text-xs text-blue-600 hover:underline"
-            >
-              {allowed.length === adAccounts.length
-                ? "Deselect all"
-                : "Select all"}
-            </button>
-          </div>
-
-          {adAccounts.length === 0 ? (
-            <p className="text-sm text-gray-400">
-              No ad accounts found in this workspace.
-            </p>
-          ) : (
-            <div className="space-y-1.5 max-h-60 overflow-y-auto">
-              {adAccounts.map((acc) => {
-                const checked = allowed.includes(acc.meta_account_id);
-                return (
-                  <label
-                    key={acc.id}
-                    className="flex items-center gap-3 rounded px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleAccount(acc.meta_account_id)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-900">{acc.name}</span>
-                    <span className="text-xs text-gray-400 font-mono">
-                      {acc.meta_account_id}
-                    </span>
-                  </label>
-                );
-              })}
+    <Card className={!connection.is_active ? "opacity-50" : ""}>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h4 className="font-semibold text-sm truncate">
+                {connection.client_name || connection.client_id}
+              </h4>
+              <Badge variant={connection.is_active ? "success" : "destructive"}>
+                {connection.is_active ? "Active" : "Revoked"}
+              </Badge>
             </div>
+            <div className="flex gap-4 text-xs text-muted-foreground mt-1">
+              <span>Granted {new Date(connection.granted_at).toLocaleDateString()}</span>
+              {connection.last_used_at && (
+                <span>Last used {new Date(connection.last_used_at).toLocaleDateString()}</span>
+              )}
+              <span>
+                {allAllowed
+                  ? "All accounts"
+                  : `${allowed.length} account${allowed.length !== 1 ? "s" : ""}`}
+              </span>
+            </div>
+          </div>
+          {connection.is_active && canManage && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              <span className="ml-1">{expanded ? "Close" : "Manage"}</span>
+            </Button>
           )}
+        </div>
+      </CardHeader>
 
-          {/* Actions */}
-          <div className="mt-4 flex items-center justify-between border-t pt-4">
-            <div>
-              {confirmRevoke ? (
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleRevoke}
-                    disabled={revoking}
-                    className="rounded bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700 disabled:opacity-50 transition"
+      {expanded && connection.is_active && canManage && (
+        <CardContent className="pt-0 border-t">
+          <div className="pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-medium">Allowed ad accounts</p>
+              <Button variant="link" size="sm" onClick={toggleAll} className="h-auto p-0 text-xs">
+                {allowed.length === adAccounts.length ? "Deselect all" : "Select all"}
+              </Button>
+            </div>
+
+            {adAccounts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No ad accounts found.</p>
+            ) : (
+              <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                {adAccounts.map((acc) => {
+                  const checked = allowed.includes(acc.meta_account_id);
+                  return (
+                    <label
+                      key={acc.id}
+                      className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-accent cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleAccount(acc.meta_account_id)}
+                        className="rounded border-input text-primary focus:ring-ring"
+                      />
+                      <span className="text-sm">{acc.name}</span>
+                      <span className="text-xs text-muted-foreground font-mono">{acc.meta_account_id}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="mt-4 flex items-center justify-between border-t pt-4">
+              <div>
+                {confirmRevoke ? (
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleRevoke}
+                      disabled={revoking}
+                      variant="destructive"
+                      size="sm"
+                    >
+                      {revoking ? "Revoking..." : "Confirm revoke"}
+                    </Button>
+                    <Button
+                      onClick={() => setConfirmRevoke(false)}
+                      disabled={revoking}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => setConfirmRevoke(true)}
+                    variant="link"
+                    size="sm"
+                    className="text-destructive h-auto p-0 text-xs"
                   >
-                    {revoking ? "Revoking..." : "Confirm revoke"}
-                  </button>
-                  <button
-                    onClick={() => setConfirmRevoke(false)}
-                    disabled={revoking}
-                    className="rounded border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setConfirmRevoke(true)}
-                  className="text-xs text-red-600 hover:underline"
-                >
-                  Revoke connection
-                </button>
+                    Revoke connection
+                  </Button>
+                )}
+              </div>
+
+              {hasChanges && (
+                <Button onClick={handleSave} disabled={saving} size="sm">
+                  {saving ? "Saving..." : "Save changes"}
+                </Button>
               )}
             </div>
-
-            {hasChanges && (
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="rounded bg-blue-600 px-4 py-1.5 text-xs text-white hover:bg-blue-700 disabled:opacity-50 transition"
-              >
-                {saving ? "Saving..." : "Save changes"}
-              </button>
-            )}
           </div>
-        </div>
+        </CardContent>
       )}
-    </div>
+    </Card>
   );
 }

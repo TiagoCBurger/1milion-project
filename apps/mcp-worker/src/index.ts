@@ -43,11 +43,11 @@ export default {
       return new Response("Not found", { status: 404 });
     }
     if (request.method === "GET") {
-      // SSE streaming not supported on Workers — return server info
-      return new Response(
-        JSON.stringify({ name: "vibefly", version: "1.0.0", status: "ok" }),
-        { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
-      );
+      // SSE streaming not supported on Workers — tell client not to retry
+      return new Response("SSE not supported", {
+        status: 405,
+        headers: { "Access-Control-Allow-Origin": "*" },
+      });
     }
     if (request.method === "DELETE") {
       // No sessions to close in stateless mode

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Switch } from "@/components/ui/switch";
 
 interface Props {
   workspaceId: string;
@@ -38,19 +39,11 @@ export function AdAccountToggle({ workspaceId, accountId, enabled }: Props) {
   }
 
   return (
-    <button
-      onClick={handleToggle}
+    <Switch
+      checked={isEnabled}
+      onCheckedChange={handleToggle}
       disabled={loading}
-      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
-        isEnabled ? "bg-green-500" : "bg-gray-300"
-      }`}
-      title={isEnabled ? "Disable account" : "Enable account"}
-    >
-      <span
-        className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform duration-200 ${
-          isEnabled ? "translate-x-4.5" : "translate-x-0.5"
-        }`}
-      />
-    </button>
+      aria-label={isEnabled ? "Disable account" : "Enable account"}
+    />
   );
 }

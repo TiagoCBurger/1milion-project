@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Unlink } from "lucide-react";
 
 interface Props {
   workspaceId: string;
@@ -33,30 +35,35 @@ export function DisconnectButton({ workspaceId, slug }: Props) {
   if (confirming) {
     return (
       <div className="flex gap-2">
-        <button
+        <Button
           onClick={handleDisconnect}
           disabled={loading}
-          className="rounded bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700 disabled:opacity-50 transition"
+          variant="destructive"
+          size="sm"
         >
-          {loading ? "Disconnecting..." : "Confirm"}
-        </button>
-        <button
+          {loading ? "Disconnecting..." : "Confirm Disconnect"}
+        </Button>
+        <Button
           onClick={() => setConfirming(false)}
           disabled={loading}
-          className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition"
+          variant="outline"
+          size="sm"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
-    <button
+    <Button
       onClick={() => setConfirming(true)}
-      className="rounded border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 transition"
+      variant="outline"
+      size="sm"
+      className="text-destructive border-destructive/30 hover:bg-destructive/10"
     >
+      <Unlink className="mr-2 h-4 w-4" />
       Disconnect
-    </button>
+    </Button>
   );
 }

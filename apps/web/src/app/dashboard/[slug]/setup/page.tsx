@@ -3,13 +3,18 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams } from "next/navigation";
+import { Copy, Check } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 const MCP_GATEWAY_URL = process.env.NEXT_PUBLIC_MCP_GATEWAY_URL || "https://mcp-api.yourdomain.com";
 
 export default function SetupPage() {
   const { slug } = useParams<{ slug: string }>();
   const [apiKeyPrefix, setApiKeyPrefix] = useState("mads_your_key_here");
-  const [activeTab, setActiveTab] = useState<"claude" | "cursor" | "http">("claude");
+  const [copied, setCopied] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -34,12 +39,6 @@ export default function SetupPage() {
     }
     loadKey();
   }, [slug, supabase]);
-
-  const tabs = [
-    { id: "claude" as const, label: "Claude Desktop" },
-    { id: "cursor" as const, label: "Cursor" },
-    { id: "http" as const, label: "HTTP / Custom" },
-  ];
 
   const configs: Record<string, string> = {
     claude: JSON.stringify(
@@ -81,51 +80,65 @@ export default function SetupPage() {
   }'`,
   };
 
+  async function copyConfig(key: string) {
+    await navigator.clipboard.writeText(configs[key]);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-2">Setup Guide</h1>
-      <p className="text-sm text-gray-600 mb-6">
-        Copy the configuration for your AI tool and paste your full API key.
-      </p>
+    <>
+      <PageHeader
+        breadcrumbs={[
+          { label: "Workspaces", href: "/dashboard" },
+          { label: slug, href: `/dashboard/${slug}` },
+          { label: "Setup Guide" },
+        ]}
+      />
+      <div className="p-6 max-w-2xl">
+        <h1 className="text-2xl font-semibold tracking-tight mb-1">Setup Guide</h1>
+        <p className="text-muted-foreground mb-6">
+          Copy the configuration for your AI tool and paste your full API key.
+        </p>
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b mb-4">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
-              activeTab === tab.id
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        <Tabs defaultValue="claude">
+          <TabsList className="mb-4">
+            <TabsTrigger value="claude">Claude Desktop</TabsTrigger>
+            <TabsTrigger value="cursor">Cursor</TabsTrigger>
+            <TabsTrigger value="http">HTTP / Custom</TabsTrigger>
+          </TabsList>
+
+          {["claude", "cursor", "http"].map((tabId) => (
+            <TabsContent key={tabId} value={tabId}>
+              <Card>
+                <CardContent className="p-0 relative">
+                  <pre className="rounded-xl bg-neutral-950 text-neutral-100 p-5 text-sm overflow-x-auto font-mono">
+                    <code>{configs[tabId]}</code>
+                  </pre>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => copyConfig(tabId)}
+                    className="absolute top-3 right-3"
+                  >
+                    {copied ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                    {copied ? "Copied" : "Copy"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          ))}
+        </Tabs>
+
+        <p className="mt-4 text-sm text-muted-foreground">
+          Replace <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{apiKeyPrefix}</code> with
+          your full API key from the{" "}
+          <a href={`/dashboard/${slug}/api-keys`} className="text-primary hover:underline">
+            API Keys page
+          </a>
+          .
+        </p>
       </div>
-
-      {/* Config block */}
-      <div className="relative">
-        <pre className="rounded-lg bg-gray-900 text-gray-100 p-4 text-sm overflow-x-auto">
-          <code>{configs[activeTab]}</code>
-        </pre>
-        <button
-          onClick={() => navigator.clipboard.writeText(configs[activeTab])}
-          className="absolute top-2 right-2 rounded bg-gray-700 px-2 py-1 text-xs text-gray-300 hover:bg-gray-600 transition"
-        >
-          Copy
-        </button>
-      </div>
-
-      <p className="mt-4 text-sm text-gray-500">
-        Replace <code className="bg-gray-100 px-1 rounded">{apiKeyPrefix}</code> with
-        your full API key from the{" "}
-        <a href={`/dashboard/${slug}/api-keys`} className="text-blue-600 hover:underline">
-          API Keys page
-        </a>
-        .
-      </p>
-    </div>
+    </>
   );
 }

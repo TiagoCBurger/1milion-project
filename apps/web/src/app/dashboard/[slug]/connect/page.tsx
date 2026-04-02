@@ -3,6 +3,12 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { ChevronRight, Check, Copy } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 
 export default function ConnectPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -15,6 +21,7 @@ export default function ConnectPage() {
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
   const [manualSuccess, setManualSuccess] = useState<{
     meta_user_name: string;
     meta_business_name: string;
@@ -22,7 +29,6 @@ export default function ConnectPage() {
     api_key?: string;
   } | null>(null);
 
-  // OAuth redirect results
   const oauthSuccess = searchParams.get("success") === "true";
   const oauthName = searchParams.get("name");
   const oauthApiKey = searchParams.get("api_key");
@@ -40,7 +46,6 @@ export default function ConnectPage() {
     loadWorkspace();
   }, [slug, supabase]);
 
-  // Map error codes to user-friendly messages
   const errorMessages: Record<string, string> = {
     denied: "You denied the permissions request. Please try again and accept the required permissions.",
     invalid_state: "The connection request expired or was invalid. Please try again.",
@@ -62,14 +67,11 @@ export default function ConnectPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
       });
-
       const data = await res.json();
-
       if (!res.ok) {
         setError(data.error || "Failed to connect");
         return;
       }
-
       setManualSuccess(data);
       setToken("");
     } catch {
@@ -84,144 +86,171 @@ export default function ConnectPage() {
     window.location.href = `/api/auth/facebook?workspace_id=${workspaceId}&slug=${slug}`;
   }
 
-  // Show success state (from OAuth or manual)
+  async function copyToClipboard(text: string) {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   const successData = oauthSuccess
     ? { meta_user_name: oauthName || "Unknown", api_key: oauthApiKey || undefined }
     : manualSuccess;
 
   if (successData) {
     return (
-      <div className="max-w-xl">
-        <h1 className="text-2xl font-bold mb-2">Connect Meta Account</h1>
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 mt-6">
-          <h3 className="font-medium text-green-800">Connected successfully!</h3>
-          <p className="mt-1 text-sm text-green-700">
-            User: {successData.meta_user_name}
-            {"meta_business_name" in successData && (
-              <>
-                <br />
-                BM: {(successData as typeof manualSuccess)?.meta_business_name}
-              </>
+      <>
+        <PageHeader
+          breadcrumbs={[
+            { label: "Workspaces", href: "/dashboard" },
+            { label: slug, href: `/dashboard/${slug}` },
+            { label: "Connect" },
+          ]}
+        />
+        <div className="p-6 max-w-xl">
+          <Card className="border-emerald-200 bg-emerald-50">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
+                  <Check className="h-5 w-5 text-emerald-600" />
+                </div>
+                <CardTitle className="text-emerald-800">Connected successfully!</CardTitle>
+              </div>
+              <CardDescription className="text-emerald-700">
+                User: {successData.meta_user_name}
+                {"meta_business_name" in successData && (
+                  <> &middot; BM: {(successData as typeof manualSuccess)?.meta_business_name}</>
+                )}
+              </CardDescription>
+            </CardHeader>
+            {successData.api_key && (
+              <CardContent>
+                <div className="rounded-lg bg-white p-4 border">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Your API key (save it, shown only once):
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(successData.api_key!)}
+                      className="h-7 px-2"
+                    >
+                      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                    </Button>
+                  </div>
+                  <code className="text-sm font-mono break-all select-all block">
+                    {successData.api_key}
+                  </code>
+                </div>
+                <Button
+                  onClick={() => router.push(`/dashboard/${slug}`)}
+                  className="mt-4 w-full"
+                >
+                  Go to workspace
+                </Button>
+              </CardContent>
             )}
-            {"expires_at" in successData &&
-              (successData as typeof manualSuccess)?.expires_at && (
-                <>
-                  <br />
-                  Expires:{" "}
-                  {new Date(
-                    (successData as typeof manualSuccess)!.expires_at!
-                  ).toLocaleDateString()}
-                </>
-              )}
-          </p>
-          {successData.api_key && (
-            <div className="mt-3 rounded bg-white p-3 border">
-              <p className="text-xs text-gray-500 mb-1">
-                Your API key (save it, shown only once):
-              </p>
-              <code className="text-sm font-mono break-all select-all">
-                {successData.api_key}
-              </code>
-            </div>
-          )}
-          <button
-            onClick={() => router.push(`/dashboard/${slug}`)}
-            className="mt-4 rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700 transition"
-          >
-            Go to workspace
-          </button>
+            {!successData.api_key && (
+              <CardContent>
+                <Button
+                  onClick={() => router.push(`/dashboard/${slug}`)}
+                  className="w-full"
+                >
+                  Go to workspace
+                </Button>
+              </CardContent>
+            )}
+          </Card>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="max-w-xl">
-      <h1 className="text-2xl font-bold mb-2">Connect Meta Account</h1>
-      <p className="text-sm text-gray-600 mb-6">
-        Connect your Facebook account to authorize access to your Meta Ads data.
-      </p>
+    <>
+      <PageHeader
+        breadcrumbs={[
+          { label: "Workspaces", href: "/dashboard" },
+          { label: slug, href: `/dashboard/${slug}` },
+          { label: "Connect" },
+        ]}
+      />
+      <div className="p-6 max-w-xl">
+        <h1 className="text-2xl font-semibold tracking-tight mb-1">Connect Meta Account</h1>
+        <p className="text-muted-foreground mb-6">
+          Connect your Facebook account to authorize access to your Meta Ads data.
+        </p>
 
-      {/* Error from OAuth redirect or manual */}
-      {(oauthError || error) && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 mb-6">
-          {oauthError ? errorMessages[oauthError] || "An error occurred. Please try again." : error}
-        </div>
-      )}
+        {(oauthError || error) && (
+          <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive mb-6">
+            {oauthError ? errorMessages[oauthError] || "An error occurred. Please try again." : error}
+          </div>
+        )}
 
-      {/* Primary: Facebook OAuth Button */}
-      <button
-        onClick={handleFacebookConnect}
-        disabled={!workspaceId}
-        className="w-full flex items-center justify-center gap-3 rounded-lg px-6 py-3 text-white font-medium text-base transition disabled:opacity-50 hover:opacity-90"
-        style={{ backgroundColor: "#1877F2" }}
-      >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-        </svg>
-        Connect with Facebook
-      </button>
-
-      <p className="text-xs text-gray-500 mt-2 text-center">
-        We&apos;ll request access to manage your ads, read insights, and access your Business
-        Manager.
-      </p>
-
-      {/* Divider */}
-      <div className="relative my-8">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-200" />
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="bg-white px-4 text-gray-400">or</span>
-        </div>
-      </div>
-
-      {/* Secondary: Manual Token (collapsible) */}
-      <button
-        onClick={() => setShowManual(!showManual)}
-        className="w-full text-left text-sm text-gray-500 hover:text-gray-700 transition flex items-center gap-2"
-      >
-        <svg
-          className={`w-4 h-4 transition-transform ${showManual ? "rotate-90" : ""}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
+        {/* Facebook OAuth Button */}
+        <Button
+          onClick={handleFacebookConnect}
+          disabled={!workspaceId}
+          size="lg"
+          className="w-full text-base h-12"
+          style={{ backgroundColor: "#1877F2" }}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
-        Advanced: Paste Token Manually
-      </button>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="white" className="mr-2">
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+          </svg>
+          Connect with Facebook
+        </Button>
 
-      {showManual && (
-        <div className="mt-4 rounded-lg border bg-gray-50 p-4">
-          <p className="text-xs text-gray-500 mb-3">
-            Use this if you have a system user token or need to paste a token from the Graph API
-            Explorer.
-          </p>
-          <form onSubmit={handleManualConnect} className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">Access Token</label>
-              <textarea
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                required
-                rows={3}
-                className="w-full rounded-md border px-3 py-2 text-sm font-mono"
-                placeholder="EAAxxxxxxx..."
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading || !workspaceId}
-              className="rounded-md bg-gray-700 px-4 py-2 text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition"
-            >
-              {loading ? "Validating..." : "Connect Token"}
-            </button>
-          </form>
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          We&apos;ll request access to manage your ads, read insights, and access your Business Manager.
+        </p>
+
+        {/* Divider */}
+        <div className="relative my-8">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="bg-background px-4 text-muted-foreground">or</span>
+          </div>
         </div>
-      )}
-    </div>
+
+        {/* Manual Token */}
+        <button
+          onClick={() => setShowManual(!showManual)}
+          className="w-full text-left text-sm text-muted-foreground hover:text-foreground transition flex items-center gap-2"
+        >
+          <ChevronRight className={`h-4 w-4 transition-transform ${showManual ? "rotate-90" : ""}`} />
+          Advanced: Paste Token Manually
+        </button>
+
+        {showManual && (
+          <Card className="mt-4">
+            <CardContent className="pt-6">
+              <p className="text-xs text-muted-foreground mb-3">
+                Use this if you have a system user token or need to paste a token from the Graph API Explorer.
+              </p>
+              <form onSubmit={handleManualConnect} className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="token">Access Token</Label>
+                  <textarea
+                    id="token"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    required
+                    rows={3}
+                    className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    placeholder="EAAxxxxxxx..."
+                  />
+                </div>
+                <Button type="submit" disabled={loading || !workspaceId} variant="secondary" className="w-full">
+                  {loading ? "Validating..." : "Connect Token"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </>
   );
 }

@@ -3,6 +3,21 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams } from "next/navigation";
+import { Plus, Copy, Check, Trash2 } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface ApiKeyRow {
   id: string;
@@ -20,6 +35,7 @@ export default function ApiKeysPage() {
   const [newKey, setNewKey] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const supabase = createClient();
 
   const loadKeys = useCallback(async () => {
@@ -52,7 +68,6 @@ export default function ApiKeysPage() {
   async function handleGenerate() {
     if (!workspaceId) return;
     setLoading(true);
-
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -78,70 +93,125 @@ export default function ApiKeysPage() {
     loadKeys();
   }
 
-  return (
-    <div className="max-w-xl">
-      <h1 className="text-2xl font-bold mb-6">API Keys</h1>
+  async function copyToClipboard(text: string) {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
-      {/* Generate new key */}
-      <div className="rounded-lg border bg-white p-4 mb-6">
-        <h3 className="font-medium mb-3">Generate New Key</h3>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newKeyName}
-            onChange={(e) => setNewKeyName(e.target.value)}
-            className="flex-1 rounded-md border px-3 py-2 text-sm"
-            placeholder="Key name"
-          />
-          <button
-            onClick={handleGenerate}
-            disabled={loading}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white font-medium hover:bg-blue-700 disabled:opacity-50 transition"
-          >
-            Generate
-          </button>
+  return (
+    <>
+      <PageHeader
+        breadcrumbs={[
+          { label: "Workspaces", href: "/dashboard" },
+          { label: slug, href: `/dashboard/${slug}` },
+          { label: "API Keys" },
+        ]}
+      />
+      <div className="p-6 max-w-2xl space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">API Keys</h1>
+          <p className="text-muted-foreground mt-1">
+            Generate API keys to authenticate your MCP clients.
+          </p>
         </div>
 
-        {newKey && (
-          <div className="mt-3 rounded bg-amber-50 border border-amber-200 p-3">
-            <p className="text-xs text-amber-700 mb-1">
-              Copy this key now - it won&apos;t be shown again:
-            </p>
-            <code className="text-sm font-mono break-all select-all">{newKey}</code>
-          </div>
-        )}
-      </div>
-
-      {/* Key list */}
-      <div className="space-y-2">
-        {keys.map((key) => (
-          <div
-            key={key.id}
-            className="flex items-center justify-between rounded-lg border bg-white p-3"
-          >
-            <div>
-              <p className="font-medium text-sm">{key.name}</p>
-              <p className="text-xs text-gray-500 font-mono">
-                {key.key_prefix}...
-              </p>
-              {key.last_used_at && (
-                <p className="text-xs text-gray-400">
-                  Last used: {new Date(key.last_used_at).toLocaleDateString()}
-                </p>
-              )}
+        {/* Generate new key */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Generate New Key</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="keyName" className="sr-only">Key name</Label>
+                <Input
+                  id="keyName"
+                  value={newKeyName}
+                  onChange={(e) => setNewKeyName(e.target.value)}
+                  placeholder="Key name"
+                />
+              </div>
+              <Button onClick={handleGenerate} disabled={loading}>
+                <Plus className="mr-2 h-4 w-4" />
+                Generate
+              </Button>
             </div>
-            <button
-              onClick={() => handleRevoke(key.id)}
-              className="text-xs text-red-600 hover:text-red-800"
-            >
-              Revoke
-            </button>
-          </div>
-        ))}
-        {keys.length === 0 && (
-          <p className="text-sm text-gray-500">No API keys yet. Generate one above.</p>
-        )}
+
+            {newKey && (
+              <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-amber-700 font-medium">
+                    Copy this key now — it won&apos;t be shown again:
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => copyToClipboard(newKey)}
+                    className="h-7 px-2"
+                  >
+                    {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  </Button>
+                </div>
+                <code className="text-sm font-mono break-all select-all block">{newKey}</code>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Key list */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Active Keys</CardTitle>
+            <CardDescription>{keys.length} key{keys.length !== 1 ? "s" : ""}</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {keys.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Prefix</TableHead>
+                    <TableHead>Last Used</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="w-[60px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {keys.map((key) => (
+                    <TableRow key={key.id}>
+                      <TableCell className="font-medium">{key.name}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {key.key_prefix}...
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {key.last_used_at
+                          ? new Date(key.last_used_at).toLocaleDateString()
+                          : "Never"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {new Date(key.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRevoke(key.id)}
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4">No API keys yet. Generate one above.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </>
   );
 }

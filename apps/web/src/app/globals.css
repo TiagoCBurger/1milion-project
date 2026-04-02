@@ -1,7 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@200;300;400;500;700&display=swap');
 @import "tailwindcss";
 
+@plugin "tailwindcss-animate";
+
 @theme {
+  /* VibeFly brand colors */
   --color-violet-brand: #7C3AED;
   --color-violet-light: #8B5CF6;
   --color-violet-dark: #6D28D9;
@@ -9,12 +12,63 @@
   --color-cyan-light: #22D3EE;
   --color-amber-brand: #F59E0B;
   --color-amber-light: #FBBF24;
+
+  /* Typography */
   --font-family-sans: 'Inter', system-ui, sans-serif;
   --font-family-display: 'Outfit', system-ui, sans-serif;
   --font-family-mono: 'JetBrains Mono', monospace;
+
+  /* Border radius */
+  --radius: 0.625rem;
+
+  /* shadcn semantic colors — light (dashboard) */
+  --color-background: #ffffff;
+  --color-foreground: #0a0a0a;
+  --color-card: #ffffff;
+  --color-card-foreground: #0a0a0a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0a0a0a;
+  --color-primary: #7C3AED;
+  --color-primary-foreground: #fafafa;
+  --color-secondary: #f5f5f5;
+  --color-secondary-foreground: #171717;
+  --color-muted: #f5f5f5;
+  --color-muted-foreground: #737373;
+  --color-accent: #f5f5f5;
+  --color-accent-foreground: #171717;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #fafafa;
+  --color-border: #e5e5e5;
+  --color-input: #e5e5e5;
+  --color-ring: #7C3AED;
+  --color-chart-1: #7C3AED;
+  --color-chart-2: #06B6D4;
+  --color-chart-3: #F59E0B;
+  --color-chart-4: #10b981;
+  --color-chart-5: #f43f5e;
+
+  /* Sidebar — bg-sidebar uses --color-sidebar, text-sidebar-foreground uses --color-sidebar-foreground, etc. */
+  --color-sidebar: #fafafa;
+  --color-sidebar-foreground: #0a0a0a;
+  --color-sidebar-primary: #7C3AED;
+  --color-sidebar-primary-foreground: #fafafa;
+  --color-sidebar-accent: #f0f0f0;
+  --color-sidebar-accent-foreground: #171717;
+  --color-sidebar-border: #e5e5e5;
+  --color-sidebar-ring: #7C3AED;
 }
 
+/* Landing page dark override */
 html, body {
-  background-color: #000000;
   font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Animation keyframes for shadcn */
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
 }

@@ -216,21 +216,31 @@ async function recordConnection(
   allowedAccounts: string[],
   env: Env
 ): Promise<void> {
-  await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/upsert_oauth_connection`, {
+  const payload = {
+    p_workspace_id: workspaceId,
+    p_client_id: clientId,
+    p_client_name: clientName,
+    p_user_id: userId,
+    p_allowed_accounts: allowedAccounts,
+  };
+  console.log("[oauth] Recording connection:", JSON.stringify({ workspaceId, clientId, clientName, userId }));
+
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/upsert_oauth_connection`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       apikey: env.SUPABASE_SERVICE_ROLE_KEY,
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
     },
-    body: JSON.stringify({
-      p_workspace_id: workspaceId,
-      p_client_id: clientId,
-      p_client_name: clientName,
-      p_user_id: userId,
-      p_allowed_accounts: allowedAccounts,
-    }),
+    body: JSON.stringify(payload),
   });
+
+  if (!res.ok) {
+    const body = await res.text();
+    console.error("[oauth] Failed to record connection:", res.status, body);
+  } else {
+    console.log("[oauth] Connection recorded successfully");
+  }
 }
 
 /**
