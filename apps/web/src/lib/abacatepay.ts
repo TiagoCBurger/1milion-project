@@ -132,7 +132,7 @@ export interface CreateSubscriptionCheckoutParams {
 
 export async function createSubscriptionCheckout(
   params: CreateSubscriptionCheckoutParams
-): Promise<AbacatePaySubscription> {
+): Promise<AbacatePayCheckout> {
   const body: Record<string, unknown> = {
     items: [{ id: params.productId, quantity: 1 }],
     methods: ["CARD"],
@@ -143,7 +143,7 @@ export async function createSubscriptionCheckout(
   if (params.externalId) body.externalId = params.externalId;
   if (params.metadata) body.metadata = params.metadata;
 
-  return abacateRequest<AbacatePaySubscription>("POST", "/subscriptions/create", body);
+  return abacateRequest<AbacatePayCheckout>("POST", "/subscriptions/create", body);
 }
 
 // ── Product ID mapping ───────────────────────────────────────

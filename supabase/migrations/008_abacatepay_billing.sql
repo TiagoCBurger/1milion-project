@@ -106,7 +106,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================
 -- Update validate_api_key function
+-- Must DROP first because return type changed (added columns)
 -- ============================================================
+
+DROP FUNCTION IF EXISTS public.validate_api_key(TEXT);
 
 CREATE OR REPLACE FUNCTION public.validate_api_key(
     p_api_key TEXT
@@ -144,7 +147,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================
 -- Update get_workspace_context function
+-- Must DROP first because return type changed (added columns)
 -- ============================================================
+
+DROP FUNCTION IF EXISTS public.get_workspace_context(UUID);
 
 CREATE OR REPLACE FUNCTION public.get_workspace_context(
     p_workspace_id UUID
