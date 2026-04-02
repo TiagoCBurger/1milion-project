@@ -170,15 +170,17 @@ describe("POST /api/billing/webhook", () => {
       })
     );
 
-    const selectChain = mockAdminQueryChain({ data: null, error: null });
+    const idempotencyCheck = mockAdminQueryChain({ data: null, error: null });
     const insertChain = mockAdminQueryChain({ data: null, error: null });
+    const pendingCheck = mockAdminQueryChain({ data: null, error: null });
     const updateChain = mockAdminQueryChain({ data: null, error: null });
 
     let callCount = 0;
     mockAdminFrom.mockImplementation(() => {
       callCount++;
-      if (callCount === 1) return selectChain;
+      if (callCount === 1) return idempotencyCheck;
       if (callCount === 2) return insertChain;
+      if (callCount === 3) return pendingCheck;
       return updateChain;
     });
 
@@ -196,6 +198,8 @@ describe("POST /api/billing/webhook", () => {
         requests_per_hour: 200,
         requests_per_day: 1000,
         max_mcp_connections: 3,
+        pending_tier: null,
+        pending_billing_cycle: null,
       })
     );
   });
@@ -209,15 +213,17 @@ describe("POST /api/billing/webhook", () => {
       })
     );
 
-    const selectChain = mockAdminQueryChain({ data: null, error: null });
+    const idempotencyCheck = mockAdminQueryChain({ data: null, error: null });
     const insertChain = mockAdminQueryChain({ data: null, error: null });
+    const pendingCheck = mockAdminQueryChain({ data: null, error: null });
     const updateChain = mockAdminQueryChain({ data: null, error: null });
 
     let callCount = 0;
     mockAdminFrom.mockImplementation(() => {
       callCount++;
-      if (callCount === 1) return selectChain;
+      if (callCount === 1) return idempotencyCheck;
       if (callCount === 2) return insertChain;
+      if (callCount === 3) return pendingCheck;
       return updateChain;
     });
 
@@ -228,21 +234,27 @@ describe("POST /api/billing/webhook", () => {
     expect(updateChain.eq).toHaveBeenCalledWith("workspace_id", "ws-from-external");
   });
 
-  it("handles subscription.renewed event", async () => {
+  it("handles subscription.renewed without pending change", async () => {
     mockVerifyWebhookSignature.mockResolvedValue(true);
     mockParseWebhookPayload.mockReturnValue(
       makeV2Payload("evt_renew", "subscription.renewed")
     );
 
-    const selectChain = mockAdminQueryChain({ data: null, error: null });
+    const idempotencyCheck = mockAdminQueryChain({ data: null, error: null });
     const insertChain = mockAdminQueryChain({ data: null, error: null });
+    // subscriptions SELECT for pending check — no pending change
+    const pendingCheck = mockAdminQueryChain({
+      data: { id: "sub-1", tier: "pro", pending_tier: null, pending_billing_cycle: null },
+      error: null,
+    });
     const updateChain = mockAdminQueryChain({ data: null, error: null });
 
     let callCount = 0;
     mockAdminFrom.mockImplementation(() => {
       callCount++;
-      if (callCount === 1) return selectChain;
+      if (callCount === 1) return idempotencyCheck;
       if (callCount === 2) return insertChain;
+      if (callCount === 3) return pendingCheck;
       return updateChain;
     });
 
@@ -251,27 +263,70 @@ describe("POST /api/billing/webhook", () => {
     expect(body.ok).toBe(true);
 
     expect(updateChain.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: "active",
-      })
+      expect.objectContaining({ status: "active" })
     );
   });
 
-  it("handles subscription.cancelled event", async () => {
+  it("applies pending upgrade on subscription.renewed", async () => {
     mockVerifyWebhookSignature.mockResolvedValue(true);
     mockParseWebhookPayload.mockReturnValue(
-      makeV2Payload("evt_cancel", "subscription.cancelled")
+      makeV2Payload("evt_renew_upgrade", "subscription.renewed")
     );
 
-    const selectChain = mockAdminQueryChain({ data: null, error: null });
+    const idempotencyCheck = mockAdminQueryChain({ data: null, error: null });
     const insertChain = mockAdminQueryChain({ data: null, error: null });
+    // subscriptions SELECT — has pending upgrade to max
+    const pendingCheck = mockAdminQueryChain({
+      data: { id: "sub-1", tier: "pro", pending_tier: "max", pending_billing_cycle: "monthly" },
+      error: null,
+    });
     const updateChain = mockAdminQueryChain({ data: null, error: null });
 
     let callCount = 0;
     mockAdminFrom.mockImplementation(() => {
       callCount++;
-      if (callCount === 1) return selectChain;
+      if (callCount === 1) return idempotencyCheck;
       if (callCount === 2) return insertChain;
+      if (callCount === 3) return pendingCheck;
+      return updateChain;
+    });
+
+    const res = await handler.POST(makeWebhookRequest('{"id":"evt_renew_upgrade"}'));
+    expect(res.status).toBe(200);
+
+    // Should apply max tier limits and clear pending
+    expect(updateChain.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tier: "max",
+        requests_per_hour: 500,
+        requests_per_day: 5000,
+        pending_tier: null,
+        pending_billing_cycle: null,
+      })
+    );
+  });
+
+  it("handles subscription.cancelled — downgrades to free", async () => {
+    mockVerifyWebhookSignature.mockResolvedValue(true);
+    mockParseWebhookPayload.mockReturnValue(
+      makeV2Payload("evt_cancel", "subscription.cancelled")
+    );
+
+    const idempotencyCheck = mockAdminQueryChain({ data: null, error: null });
+    const insertChain = mockAdminQueryChain({ data: null, error: null });
+    // subscriptions SELECT — no pending change
+    const pendingCheck = mockAdminQueryChain({
+      data: { id: "sub-1", tier: "pro", pending_tier: null, pending_billing_cycle: null },
+      error: null,
+    });
+    const updateChain = mockAdminQueryChain({ data: null, error: null });
+
+    let callCount = 0;
+    mockAdminFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return idempotencyCheck;
+      if (callCount === 2) return insertChain;
+      if (callCount === 3) return pendingCheck;
       return updateChain;
     });
 
@@ -279,9 +334,49 @@ describe("POST /api/billing/webhook", () => {
     const body = await res.json();
     expect(body.ok).toBe(true);
 
+    // Should downgrade to free with free limits
     expect(updateChain.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        status: "canceled",
+        tier: "free",
+        status: "active",
+        requests_per_hour: 20,
+        requests_per_day: 20,
+        max_mcp_connections: 1,
+      })
+    );
+  });
+
+  it("applies pending downgrade to free on subscription.cancelled", async () => {
+    mockVerifyWebhookSignature.mockResolvedValue(true);
+    mockParseWebhookPayload.mockReturnValue(
+      makeV2Payload("evt_cancel_pending", "subscription.cancelled")
+    );
+
+    const idempotencyCheck = mockAdminQueryChain({ data: null, error: null });
+    const insertChain = mockAdminQueryChain({ data: null, error: null });
+    // subscriptions SELECT — has pending downgrade to free
+    const pendingCheck = mockAdminQueryChain({
+      data: { id: "sub-1", tier: "max", pending_tier: "free", pending_billing_cycle: null },
+      error: null,
+    });
+    const updateChain = mockAdminQueryChain({ data: null, error: null });
+
+    let callCount = 0;
+    mockAdminFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return idempotencyCheck;
+      if (callCount === 2) return insertChain;
+      if (callCount === 3) return pendingCheck;
+      return updateChain;
+    });
+
+    const res = await handler.POST(makeWebhookRequest('{"id":"evt_cancel_pending"}'));
+    expect(res.status).toBe(200);
+
+    expect(updateChain.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tier: "free",
+        pending_tier: null,
       })
     );
   });

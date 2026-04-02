@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   const { data: subscription, error } = await supabase
     .from("subscriptions")
     .select(
-      "id, tier, status, billing_cycle, current_period_end, requests_per_hour, requests_per_day, max_mcp_connections, created_at"
+      "id, tier, status, billing_cycle, current_period_end, requests_per_hour, requests_per_day, max_mcp_connections, pending_tier, pending_billing_cycle, created_at"
     )
     .eq("workspace_id", workspaceId)
     .single();

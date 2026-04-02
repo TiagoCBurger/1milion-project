@@ -60,6 +60,13 @@ export async function POST(request: Request) {
     payload: data,
   });
 
+  // Load current subscription to check for pending changes
+  const { data: currentSub } = await admin
+    .from("subscriptions")
+    .select("id, tier, pending_tier, pending_billing_cycle")
+    .eq("workspace_id", workspaceId)
+    .single();
+
   switch (event) {
     case "subscription.completed": {
       const tier = (metadata?.tier ?? "pro") as SubscriptionTier;
@@ -77,6 +84,9 @@ export async function POST(request: Request) {
           requests_per_hour: limits.requests_per_hour,
           requests_per_day: limits.requests_per_day,
           max_mcp_connections: limits.max_mcp_connections,
+          // Clear any pending changes since this is a fresh subscription
+          pending_tier: null,
+          pending_billing_cycle: null,
           updated_at: new Date().toISOString(),
         })
         .eq("workspace_id", workspaceId);
@@ -84,25 +94,47 @@ export async function POST(request: Request) {
     }
 
     case "subscription.renewed": {
-      await admin
-        .from("subscriptions")
-        .update({
-          status: "active",
-          current_period_end: data.subscription?.updatedAt ?? null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("workspace_id", workspaceId);
+      if (currentSub?.pending_tier) {
+        // Apply pending plan change at renewal
+        await applyPendingChange(admin, workspaceId, currentSub);
+      } else {
+        // No pending change — just update the period
+        await admin
+          .from("subscriptions")
+          .update({
+            status: "active",
+            current_period_end: data.subscription?.updatedAt ?? null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("workspace_id", workspaceId);
+      }
       break;
     }
 
     case "subscription.cancelled": {
-      await admin
-        .from("subscriptions")
-        .update({
-          status: "canceled",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("workspace_id", workspaceId);
+      if (currentSub?.pending_tier) {
+        // Subscription cancelled with pending change — apply it
+        await applyPendingChange(admin, workspaceId, currentSub);
+      } else {
+        // No pending change — downgrade to free
+        const freeLimits = TIER_LIMITS.free;
+        await admin
+          .from("subscriptions")
+          .update({
+            tier: "free",
+            status: "active",
+            billing_cycle: null,
+            current_period_end: null,
+            abacatepay_subscription_id: null,
+            requests_per_hour: freeLimits.requests_per_hour,
+            requests_per_day: freeLimits.requests_per_day,
+            max_mcp_connections: freeLimits.max_mcp_connections,
+            pending_tier: null,
+            pending_billing_cycle: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("workspace_id", workspaceId);
+      }
       break;
     }
 
@@ -111,4 +143,59 @@ export async function POST(request: Request) {
   }
 
   return Response.json({ ok: true });
+}
+
+/**
+ * Applies a pending tier/cycle change when the current period ends.
+ * - Downgrade to free: updates DB immediately
+ * - Change to paid tier: updates DB to the new tier limits.
+ *   The new AbacatePay subscription will be created via a new checkout
+ *   initiated from the billing page.
+ */
+async function applyPendingChange(
+  admin: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  currentSub: { pending_tier: string; pending_billing_cycle: string | null }
+) {
+  const newTier = currentSub.pending_tier as SubscriptionTier;
+  const newCycle = currentSub.pending_billing_cycle;
+
+  if (newTier === "free") {
+    // Downgrade to free
+    const freeLimits = TIER_LIMITS.free;
+    await admin
+      .from("subscriptions")
+      .update({
+        tier: "free",
+        status: "active",
+        billing_cycle: null,
+        current_period_end: null,
+        abacatepay_subscription_id: null,
+        requests_per_hour: freeLimits.requests_per_hour,
+        requests_per_day: freeLimits.requests_per_day,
+        max_mcp_connections: freeLimits.max_mcp_connections,
+        pending_tier: null,
+        pending_billing_cycle: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("workspace_id", workspaceId);
+  } else {
+    // Change to different paid tier — update limits, mark as needing new checkout
+    const limits = TIER_LIMITS[newTier];
+    await admin
+      .from("subscriptions")
+      .update({
+        tier: newTier,
+        status: "active",
+        billing_cycle: newCycle,
+        abacatepay_subscription_id: null, // cleared — needs new checkout
+        requests_per_hour: limits.requests_per_hour,
+        requests_per_day: limits.requests_per_day,
+        max_mcp_connections: limits.max_mcp_connections,
+        pending_tier: null,
+        pending_billing_cycle: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("workspace_id", workspaceId);
+  }
 }

@@ -33,18 +33,24 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
+  // Schedule downgrade to free at end of current period
+  // (don't cancel immediately — user keeps access until period ends)
   const { error } = await admin
     .from("subscriptions")
     .update({
-      status: "canceled",
+      pending_tier: "free",
+      pending_billing_cycle: null,
       updated_at: new Date().toISOString(),
     })
     .eq("workspace_id", workspace_id)
     .neq("tier", "free");
 
   if (error) {
-    return Response.json({ error: "Failed to cancel" }, { status: 500 });
+    return Response.json({ error: "Failed to schedule cancellation" }, { status: 500 });
   }
 
-  return Response.json({ success: true });
+  return Response.json({
+    success: true,
+    message: "Your plan will be downgraded to Free at the end of the current billing period.",
+  });
 }

@@ -74,6 +74,8 @@ export interface Subscription {
   requests_per_hour: number;
   requests_per_day: number;
   max_mcp_connections: number;
+  pending_tier: SubscriptionTier | null;
+  pending_billing_cycle: BillingCycle | null;
   created_at: string;
   updated_at: string;
 }
