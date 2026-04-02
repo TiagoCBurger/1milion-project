@@ -172,7 +172,7 @@ function ConnectionCard({
       </CardHeader>
 
       {expanded && connection.is_active && canManage && (
-        <CardContent className="pt-0 border-t">
+        <CardContent className="pt-0 border-t border-border/30">
           <div className="pt-4">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-medium">Allowed ad accounts</p>
@@ -206,7 +206,7 @@ function ConnectionCard({
               </div>
             )}
 
-            <div className="mt-4 flex items-center justify-between border-t pt-4">
+            <div className="mt-4 flex items-center justify-between border-t border-border/30 pt-4">
               <div>
                 {confirmRevoke ? (
                   <div className="flex gap-2">

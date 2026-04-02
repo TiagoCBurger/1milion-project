@@ -20,7 +20,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ breadcrumbs }: PageHeaderProps) {
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-6">
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/30 px-6">
       <Breadcrumb>
         <BreadcrumbList>
           {breadcrumbs.map((segment, i) => {

@@ -35,7 +35,7 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Top bar */}
-      <nav className="border-b">
+      <nav className="border-b border-border/30">
         <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-4">
           <Link href="/dashboard" className="text-lg font-light tracking-tight font-display bg-gradient-to-r from-violet-brand to-cyan-brand bg-clip-text text-transparent">
             VibeFly
@@ -68,7 +68,7 @@ export default async function DashboardPage() {
         </div>
 
         {workspaces.length === 0 ? (
-          <Card className="border-dashed">
+          <Card className="border border-dashed border-border/40">
             <CardContent className="flex flex-col items-center justify-center py-16">
               <div className="rounded-full bg-muted p-4 mb-4">
                 <Building2 className="h-8 w-8 text-muted-foreground" />

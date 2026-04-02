@@ -139,7 +139,7 @@ export default function ApiKeysPage() {
             </div>
 
             {newKey && (
-              <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 p-4">
+              <div className="mt-4 rounded-xl bg-amber-50/60 p-4">
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-xs text-amber-700 font-medium">
                     Copy this key now — it won&apos;t be shown again:

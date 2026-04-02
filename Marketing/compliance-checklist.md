@@ -56,8 +56,8 @@
 
 - [X] Documentar o caso de uso específico dentro do VibeFly → ver [`permission-use-cases.md`](permission-use-cases.md)
 - [ ] Gravar **screencast** (vídeo de 2-5 min) demonstrando como a permissão é usada
-- [ ] Preparar descrição textual detalhada para o formulário de review
-- [ ] Identificar quais telas/funcionalidades dependem de cada permissão
+- [X] Preparar descrição textual detalhada para o formulário de review → ver [`app-review-descriptions.md`](app-review-descriptions.md)
+- [X] Identificar quais telas/funcionalidades dependem de cada permissão → ver [`permission-use-cases.md`](permission-use-cases.md)
 
 ---
 
@@ -158,29 +158,29 @@
 
 > A Privacy Policy deve conter seções específicas exigidas pela Meta.
 
-- [ ] Mencionar explicitamente a integração com **Facebook/Meta**
-- [ ] Descrever quais dados são coletados via Facebook Login:
-  - [ ] Nome e ID do perfil público
-  - [ ] Permissões de acesso a Ads e Business Manager
-- [ ] Descrever como os dados da Meta API são usados
-- [ ] Descrever como os dados são armazenados e protegidos
-- [ ] Descrever como o usuário pode **revogar acesso** (desconectar conta)
-- [ ] Descrever o processo de **exclusão de dados** (Data Deletion)
-- [ ] Incluir informações de contato para questões de privacidade
-- [ ] Informar que os dados **não são vendidos a terceiros**
-- [ ] Mencionar conformidade com a LGPD (Lei Geral de Proteção de Dados)
-- [ ] Manter a policy acessível publicamente (sem login)
+- [X] Mencionar explicitamente a integração com **Facebook/Meta** → Section 1
+- [X] Descrever quais dados são coletados via Facebook Login:
+  - [X] Nome e ID do perfil público → Section 2.3
+  - [X] Permissões de acesso a Ads e Business Manager → Section 2.3
+- [X] Descrever como os dados da Meta API são usados → Section 3
+- [X] Descrever como os dados são armazenados e protegidos → Section 5
+- [X] Descrever como o usuário pode **revogar acesso** (desconectar conta) → Section 6.1
+- [X] Descrever o processo de **exclusão de dados** (Data Deletion) → Section 6.1
+- [X] Incluir informações de contato para questões de privacidade → Section 7.2, 12
+- [X] Informar que os dados **não são vendidos a terceiros** → Section 3
+- [X] Mencionar conformidade com a LGPD (Lei Geral de Proteção de Dados) → Section 7, 7.1, 7.2
+- [X] Manter a policy acessível publicamente (sem login) → https://www.vibefly.app/privacy
 
 ---
 
 ## 8. Terms of Service — Requisitos Meta
 
-- [ ] Mencionar que o serviço integra com a **Meta Platform**
-- [ ] Incluir cláusula de que o usuário concorda com os [Termos da Meta Platform](https://developers.facebook.com/terms/)
-- [ ] Descrever responsabilidades do usuário sobre os dados de anúncios
-- [ ] Descrever limitações do serviço (dependência da API Meta)
-- [ ] Incluir cláusula de isenção de responsabilidade por mudanças na API Meta
-- [ ] Manter os termos acessíveis publicamente (sem login)
+- [X] Mencionar que o serviço integra com a **Meta Platform** → Section 2
+- [X] Incluir cláusula de que o usuário concorda com os [Termos da Meta Platform](https://developers.facebook.com/terms/) → Section 1
+- [X] Descrever responsabilidades do usuário sobre os dados de anúncios → Section 5
+- [X] Descrever limitações do serviço (dependência da API Meta) → Section 6, 8
+- [X] Incluir cláusula de isenção de responsabilidade por mudanças na API Meta → Section 8.2.1
+- [X] Manter os termos acessíveis publicamente (sem login) → https://www.vibefly.app/terms
 
 ---
 
@@ -403,19 +403,19 @@ LLM (base64 ou URL) → MCP Worker → R2 (salva) → URL pública R2 → Meta A
 
 | Área | Status | Responsável | Prazo |
 |---|---|---|---|
-| Facebook App Setup | ⬜ Pendente | | |
-| Facebook Login Config | ⬜ Pendente | | |
-| Business Verification | ⬜ Pendente | | |
-| App Review | ⬜ Pendente | | |
+| Facebook App Setup | ✅ Concluído | | |
+| Facebook Login Config | ✅ Concluído | | |
+| Business Verification | ✅ Concluído | | |
+| App Review | ⬜ Pendente (falta screencast) | | |
 | Data Use Checkup | ⬜ Pendente | | |
-| Privacy Policy Update | ⬜ Pendente | | |
-| Terms of Service Update | ⬜ Pendente | | |
-| Data Deletion | ⬜ Pendente | | |
+| Privacy Policy Update | ✅ Concluído (2026-04-02) | | |
+| Terms of Service Update | ✅ Concluído (2026-04-02) | | |
+| Data Deletion | ⬜ Pendente (implementação técnica) | | |
 | Segurança Técnica | ⬜ Pendente | | |
 | Upload de Criativos (R2) | ⬜ Pendente | | |
-| LGPD | ⬜ Pendente | | |
+| LGPD | ✅ Concluído (na Privacy Policy) | | |
 | Monitoramento | ⬜ Pendente | | |
 
 ---
 
-*Última atualização: 2026-04-01*
+*Última atualização: 2026-04-02*

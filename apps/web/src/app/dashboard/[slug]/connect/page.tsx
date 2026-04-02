@@ -107,7 +107,7 @@ export default function ConnectPage() {
           ]}
         />
         <div className="p-6 max-w-xl">
-          <Card className="border-emerald-200 bg-emerald-50">
+          <Card className="bg-emerald-50/60">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
@@ -124,7 +124,7 @@ export default function ConnectPage() {
             </CardHeader>
             {successData.api_key && (
               <CardContent>
-                <div className="rounded-lg bg-white p-4 border">
+                <div className="rounded-lg bg-white p-4">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-xs text-muted-foreground font-medium">
                       Your API key (save it, shown only once):
@@ -208,7 +208,7 @@ export default function ConnectPage() {
         {/* Divider */}
         <div className="relative my-8">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t" />
+            <div className="w-full border-t border-border/30" />
           </div>
           <div className="relative flex justify-center text-sm">
             <span className="bg-background px-4 text-muted-foreground">or</span>
@@ -239,7 +239,7 @@ export default function ConnectPage() {
                     onChange={(e) => setToken(e.target.value)}
                     required
                     rows={3}
-                    className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="flex w-full rounded-xl bg-secondary/60 px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:bg-card"
                     placeholder="EAAxxxxxxx..."
                   />
                 </div>

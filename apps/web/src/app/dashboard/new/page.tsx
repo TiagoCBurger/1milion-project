@@ -58,7 +58,7 @@ export default function NewWorkspacePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <nav className="border-b">
+      <nav className="border-b border-border/30">
         <div className="mx-auto max-w-5xl flex items-center px-6 py-4">
           <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition">
             <ArrowLeft className="h-4 w-4" />

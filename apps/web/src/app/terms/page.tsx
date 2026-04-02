@@ -8,24 +8,24 @@ export const metadata: Metadata = {
 
 export default function TermsOfService() {
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-background">
       <div className="mx-auto max-w-3xl px-6 py-16">
         <Link
           href="/"
-          className="text-sm text-blue-600 hover:underline"
+          className="text-sm text-primary hover:underline"
         >
           &larr; Back to home
         </Link>
 
-        <h1 className="mt-8 text-4xl font-bold tracking-tight">
+        <h1 className="mt-8 text-4xl font-bold tracking-tight text-foreground font-display">
           Terms of Service
         </h1>
-        <p className="mt-2 text-gray-500">Last updated: March 31, 2026</p>
+        <p className="mt-2 text-muted-foreground">Last updated: April 2, 2026</p>
 
-        <div className="mt-10 space-y-10 text-gray-700 leading-relaxed">
+        <div className="mt-10 space-y-10 text-foreground/80 leading-relaxed">
           {/* 1 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               1. Acceptance of Terms
             </h2>
             <p className="mt-3">
@@ -35,11 +35,34 @@ export default function TermsOfService() {
               these Terms of Service. If you do not agree with any part of these
               terms, you must not use our Service.
             </p>
+            <p className="mt-3">
+              By using our Service, you also agree to comply with the{" "}
+              <a
+                href="https://developers.facebook.com/terms/"
+                className="text-primary hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Meta Platform Terms
+              </a>
+              {" "}and the{" "}
+              <a
+                href="https://developers.facebook.com/devpolicy/"
+                className="text-primary hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Meta Developer Policies
+              </a>
+              , as our Service relies on the Meta Platform API. Any violation of
+              Meta&apos;s terms may result in suspension of your access to
+              VibeFly.
+            </p>
           </section>
 
           {/* 2 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               2. Description of Service
             </h2>
             <p className="mt-3">
@@ -63,7 +86,7 @@ export default function TermsOfService() {
 
           {/* 3 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               3. Nature of the Service &mdash; Intermediary Role
             </h2>
             <p className="mt-3">
@@ -89,7 +112,7 @@ export default function TermsOfService() {
 
           {/* 4 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               4. Limitation of Liability
             </h2>
             <p className="mt-3">
@@ -135,7 +158,7 @@ export default function TermsOfService() {
 
           {/* 5 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               5. User Responsibilities
             </h2>
             <p className="mt-3">5.1. You are solely responsible for:</p>
@@ -180,7 +203,7 @@ export default function TermsOfService() {
 
           {/* 6 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               6. No Warranty
             </h2>
             <p className="mt-3">
@@ -215,7 +238,7 @@ export default function TermsOfService() {
 
           {/* 7 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               7. Indemnification
             </h2>
             <p className="mt-3">
@@ -243,7 +266,7 @@ export default function TermsOfService() {
 
           {/* 8 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               8. Third-Party Services
             </h2>
             <p className="mt-3">
@@ -259,6 +282,15 @@ export default function TermsOfService() {
               of our Service.
             </p>
             <p className="mt-3">
+              8.2.1. In particular, the Meta Graph API is subject to versioning,
+              deprecation, and breaking changes at Meta&apos;s sole discretion.
+              We will make commercially reasonable efforts to migrate to new API
+              versions before deprecation deadlines, but we cannot guarantee
+              uninterrupted service during such transitions. VibeFly shall not
+              be liable for any loss of functionality, data access, or service
+              disruption caused by changes to the Meta API.
+            </p>
+            <p className="mt-3">
               8.3. AI model providers (such as Anthropic, OpenAI, and others)
               have their own terms of service and usage policies. You are
               responsible for complying with the terms of the AI tools you
@@ -268,7 +300,7 @@ export default function TermsOfService() {
 
           {/* 9 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               9. Data and Security
             </h2>
             <p className="mt-3">
@@ -288,7 +320,7 @@ export default function TermsOfService() {
 
           {/* 10 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               10. Subscription and Billing
             </h2>
             <p className="mt-3">
@@ -308,7 +340,7 @@ export default function TermsOfService() {
 
           {/* 11 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               11. Suspension and Termination
             </h2>
             <p className="mt-3">
@@ -333,7 +365,7 @@ export default function TermsOfService() {
 
           {/* 12 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               12. Modifications to the Terms
             </h2>
             <p className="mt-3">
@@ -347,7 +379,7 @@ export default function TermsOfService() {
 
           {/* 13 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               13. Governing Law and Dispute Resolution
             </h2>
             <p className="mt-3">
@@ -368,7 +400,7 @@ export default function TermsOfService() {
 
           {/* 14 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               14. Severability
             </h2>
             <p className="mt-3">
@@ -380,7 +412,7 @@ export default function TermsOfService() {
 
           {/* 15 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               15. Entire Agreement
             </h2>
             <p className="mt-3">
@@ -392,7 +424,7 @@ export default function TermsOfService() {
 
           {/* 16 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               16. Contact Us
             </h2>
             <p className="mt-3">
@@ -403,7 +435,7 @@ export default function TermsOfService() {
               <strong>Email:</strong>{" "}
               <a
                 href="mailto:contato@vibefly.app"
-                className="text-blue-600 hover:underline"
+                className="text-primary hover:underline"
               >
                 contato@vibefly.app
               </a>
@@ -411,7 +443,7 @@ export default function TermsOfService() {
           </section>
         </div>
 
-        <div className="mt-16 border-t pt-8 text-center text-sm text-gray-400">
+        <div className="mt-16 border-t border-border pt-8 text-center text-sm text-muted-foreground">
           <Link href="/" className="hover:underline">
             VibeFly
           </Link>

@@ -160,7 +160,7 @@ export function ConnectionManager({
 
       {/* Expanded management panel */}
       {expanded && connection.is_active && canManage && (
-        <CardContent className="border-t pt-4 space-y-4">
+        <CardContent className="border-t border-border/30 pt-4 space-y-4">
           {/* Ad account permissions */}
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -180,7 +180,7 @@ export function ConnectionManager({
                 No ad accounts found in this workspace.
               </p>
             ) : (
-              <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+              <div className="rounded-xl bg-secondary/40 divide-y divide-border/30 max-h-64 overflow-y-auto">
                 {adAccounts.map((acc) => {
                   const checked = allowed.includes(acc.meta_account_id);
                   return (
@@ -213,7 +213,7 @@ export function ConnectionManager({
           </div>
 
           {/* Danger zone */}
-          <div className="border-t pt-4">
+          <div className="border-t border-border/30 pt-4">
             <h4 className="text-sm font-medium text-destructive mb-1">Danger Zone</h4>
             <p className="text-xs text-muted-foreground mb-3">
               Revoking a connection will immediately block this client from accessing your workspace. This cannot be undone — the client will need to re-authorize.
@@ -244,7 +244,7 @@ export function ConnectionManager({
                 onClick={() => setConfirmRevoke(true)}
                 variant="outline"
                 size="sm"
-                className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                className="text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 Revoke connection

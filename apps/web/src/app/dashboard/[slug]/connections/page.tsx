@@ -162,7 +162,7 @@ export default async function ConnectionsPage({
           </div>
 
           {activeKeys.length === 0 && (apiKeys ?? []).filter((k) => !k.is_active).length === 0 ? (
-            <Card className="border-dashed">
+            <Card className="border border-dashed border-border/40">
               <CardContent className="py-8 text-center">
                 <Key className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">No API keys created yet.</p>
@@ -234,7 +234,7 @@ export default async function ConnectionsPage({
           </div>
 
           {connections.length === 0 ? (
-            <Card className="border-dashed">
+            <Card className="border border-dashed border-border/40">
               <CardContent className="py-8 text-center">
                 <Cable className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">

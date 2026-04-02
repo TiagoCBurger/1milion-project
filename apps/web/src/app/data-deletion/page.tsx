@@ -8,23 +8,23 @@ export const metadata: Metadata = {
 
 export default function DataDeletion() {
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-background">
       <div className="mx-auto max-w-3xl px-6 py-16">
         <Link
           href="/"
-          className="text-sm text-blue-600 hover:underline"
+          className="text-sm text-primary hover:underline"
         >
           &larr; Back to home
         </Link>
 
-        <h1 className="mt-8 text-4xl font-bold tracking-tight">
+        <h1 className="mt-8 text-4xl font-bold tracking-tight text-foreground font-display">
           Data Deletion Instructions
         </h1>
-        <p className="mt-2 text-gray-500">Last updated: March 31, 2026</p>
+        <p className="mt-2 text-muted-foreground">Last updated: March 31, 2026</p>
 
-        <div className="mt-10 space-y-10 text-gray-700 leading-relaxed">
+        <div className="mt-10 space-y-10 text-foreground/80 leading-relaxed">
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               How to Delete Your Data
             </h2>
             <p className="mt-3">
@@ -35,7 +35,7 @@ export default function DataDeletion() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               Option 1: Delete Your Account via the Platform
             </h2>
             <p className="mt-3">
@@ -56,7 +56,7 @@ export default function DataDeletion() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               Option 2: Request Deletion via Email
             </h2>
             <p className="mt-3">
@@ -66,7 +66,7 @@ export default function DataDeletion() {
             <p className="mt-3">
               <a
                 href="mailto:contato@vibefly.app"
-                className="text-blue-600 hover:underline font-medium"
+                className="text-primary hover:underline font-medium"
               >
                 contato@vibefly.app
               </a>
@@ -79,7 +79,7 @@ export default function DataDeletion() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               What Data Is Deleted
             </h2>
             <p className="mt-3">
@@ -97,7 +97,7 @@ export default function DataDeletion() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               Disconnecting Your Meta Account
             </h2>
             <p className="mt-3">
@@ -109,7 +109,7 @@ export default function DataDeletion() {
                 Go to your{" "}
                 <a
                   href="https://www.facebook.com/settings?tab=business_tools"
-                  className="text-blue-600 hover:underline"
+                  className="text-primary hover:underline"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -127,7 +127,7 @@ export default function DataDeletion() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               Data Retention After Deletion
             </h2>
             <p className="mt-3">
@@ -139,7 +139,7 @@ export default function DataDeletion() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">
+            <h2 className="text-2xl font-semibold text-foreground">
               Contact Us
             </h2>
             <p className="mt-3">
@@ -150,7 +150,7 @@ export default function DataDeletion() {
               <strong>Email:</strong>{" "}
               <a
                 href="mailto:contato@vibefly.app"
-                className="text-blue-600 hover:underline"
+                className="text-primary hover:underline"
               >
                 contato@vibefly.app
               </a>
@@ -158,7 +158,7 @@ export default function DataDeletion() {
           </section>
         </div>
 
-        <div className="mt-16 border-t pt-8 text-center text-sm text-gray-400">
+        <div className="mt-16 border-t border-border pt-8 text-center text-sm text-muted-foreground">
           <Link href="/" className="hover:underline">
             VibeFly
           </Link>

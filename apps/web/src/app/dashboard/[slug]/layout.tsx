@@ -41,7 +41,7 @@ export default async function WorkspaceLayout({
   return (
     <div className="flex min-h-screen bg-background">
       {/* Fixed sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r bg-sidebar md:flex md:flex-col">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 bg-sidebar md:flex md:flex-col">
         <AppSidebar
           workspaces={workspaces}
           currentWorkspace={currentWorkspace}

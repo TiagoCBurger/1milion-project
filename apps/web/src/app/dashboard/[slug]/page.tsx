@@ -196,7 +196,7 @@ export default async function WorkspacePage({
                 </div>
               </div>
               {token.scopes && (
-                <div className="mt-4 pt-4 border-t">
+                <div className="mt-4 pt-4 border-t border-border/30">
                   <p className="text-xs text-muted-foreground font-medium uppercase mb-2">Scopes</p>
                   <div className="flex flex-wrap gap-1.5">
                     {(token.scopes as string[]).map((scope) => (
@@ -340,7 +340,7 @@ export default async function WorkspacePage({
 
         {/* Empty state for connected but no BMs */}
         {isConnected && (businessManagers ?? []).length === 0 && (
-          <Card className="border-amber-200 bg-amber-50">
+          <Card className="bg-amber-50/60">
             <CardContent className="p-5">
               <p className="text-sm text-amber-700">
                 Your Meta account is connected but no Business Managers were found. This could mean

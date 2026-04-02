@@ -16,7 +16,10 @@ import {
   LogOut,
   ChevronsUpDown,
   Building2,
+  Moon,
+  Sun,
 } from "lucide-react"
+import { useTheme } from "next-themes"
 
 import {
   DropdownMenu,
@@ -50,6 +53,7 @@ interface NavItem {
 
 export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarProps) {
   const pathname = usePathname()
+  const { theme, setTheme } = useTheme()
   const slug = currentWorkspace?.slug
 
   const overviewItems: NavItem[] = [
@@ -168,6 +172,17 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" className="w-56">
+            <DropdownMenuItem
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4 mr-2" />
+              ) : (
+                <Moon className="h-4 w-4 mr-2" />
+              )}
+              {theme === "dark" ? "Light mode" : "Dark mode"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <form action="/api/auth/signout" method="POST" className="w-full">
                 <button type="submit" className="flex w-full items-center gap-2">

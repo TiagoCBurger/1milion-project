@@ -60,7 +60,7 @@ export function DisconnectButton({ workspaceId, slug }: Props) {
       onClick={() => setConfirming(true)}
       variant="outline"
       size="sm"
-      className="text-destructive border-destructive/30 hover:bg-destructive/10"
+      className="text-destructive hover:bg-destructive/10"
     >
       <Unlink className="mr-2 h-4 w-4" />
       Disconnect
