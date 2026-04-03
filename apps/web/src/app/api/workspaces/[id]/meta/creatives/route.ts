@@ -42,6 +42,10 @@ export async function POST(
     return Response.json({ error: "image_hash is required — upload an image first" }, { status: 400 });
   }
 
+  if (page_id && !link_url) {
+    return Response.json({ error: "Destination URL is required for link ads" }, { status: 400 });
+  }
+
   const token = await getDecryptedToken(workspaceId);
   if (!token) {
     return Response.json({ error: "No Meta account connected" }, { status: 403 });
@@ -94,11 +98,31 @@ export async function POST(
       const msg = metaError?.error_user_msg || metaError?.message || "Meta API error";
       return Response.json({ error: msg, meta_error: metaError }, { status: 400 });
     }
+
+    // Dev-mode: retry object_story_spec without call_to_action (sometimes it's the blocker)
+    const simpleLinkData: Record<string, unknown> = { image_hash };
+    if (link_url) simpleLinkData.link = link_url;
+    if (message) simpleLinkData.message = message;
+    if (headline) simpleLinkData.name = headline;
+    const simpleSpec = { page_id, link_data: simpleLinkData };
+    const retryParams: Record<string, unknown> = {
+      object_story_spec: JSON.stringify(simpleSpec),
+    };
+    if (name) retryParams.name = name;
+
+    console.log("[creatives] Dev-mode retry with simplified object_story_spec");
+    const retryResult = await metaApiPost(`${accountId}/adcreatives`, token, retryParams);
+
+    if (!(retryResult as any).error) {
+      return Response.json(retryResult);
+    }
+
+    console.warn("[creatives] Dev-mode retry also failed:", JSON.stringify((retryResult as any).error, null, 2));
   }
 
-  // Fallback: create creative without object_story_spec (works in dev mode)
-  // Uses image_hash + link_url directly
-  console.log("[creatives] Using fallback (no object_story_spec) for dev mode");
+  // Fallback: create creative without object_story_spec
+  // NOTE: These creatives may not work for ad creation (missing page association)
+  console.log("[creatives] Using fallback (no object_story_spec) — creative may not be usable in ads");
 
   const fallbackParams: Record<string, unknown> = {
     image_hash,
@@ -117,5 +141,5 @@ export async function POST(
     return Response.json({ error: msg, meta_error: metaError }, { status: 400 });
   }
 
-  return Response.json(fallbackResult);
+  return Response.json({ ...fallbackResult as object, _dev_fallback: true });
 }

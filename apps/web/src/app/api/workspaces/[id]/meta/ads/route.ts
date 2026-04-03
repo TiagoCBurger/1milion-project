@@ -54,8 +54,10 @@ export async function POST(
   );
 
   if ((result as any).error) {
+    const metaError = (result as any).error;
+    const msg = metaError?.error_user_msg || metaError?.message || "Meta API error";
     return Response.json(
-      { error: (result as any).error?.message ?? "Meta API error" },
+      { error: msg, meta_error: metaError },
       { status: 400 }
     );
   }

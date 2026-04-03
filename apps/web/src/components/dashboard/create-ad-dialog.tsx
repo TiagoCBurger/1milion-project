@@ -142,7 +142,16 @@ export function CreateAdDialog({
 
         const creativeData = await creativeRes.json();
         if (!creativeRes.ok) {
-          setError(creativeData.error || "Failed to create creative");
+          const detail = creativeData.meta_error
+            ? ` (code ${creativeData.meta_error.code ?? "?"}${creativeData.meta_error.error_subcode ? `/${creativeData.meta_error.error_subcode}` : ""})`
+            : "";
+          setError((creativeData.error || "Failed to create creative") + detail);
+          setLoading(false);
+          return;
+        }
+
+        if (creativeData._dev_fallback) {
+          setError("Your Meta app is in development mode. Creatives created in dev mode may not work for ads. Switch to live mode or request Standard Access.");
           setLoading(false);
           return;
         }
@@ -169,7 +178,10 @@ export function CreateAdDialog({
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to create ad");
+        const detail = data.meta_error
+          ? ` (code ${data.meta_error.code ?? "?"}${data.meta_error.error_subcode ? `/${data.meta_error.error_subcode}` : ""})`
+          : "";
+        setError((data.error || "Failed to create ad") + detail);
         return;
       }
 
@@ -406,7 +418,7 @@ export function CreateAdDialog({
 
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Destination URL</Label>
-                  <Input type="url" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://example.com" />
+                  <Input type="url" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://example.com" required />
                 </div>
               </div>
             )}
@@ -418,7 +430,7 @@ export function CreateAdDialog({
               disabled={
                 loading || !adsetId || !name ||
                 (mode === "existing" && !creativeId) ||
-                (mode === "new" && !imageHash)
+                (mode === "new" && (!imageHash || !linkUrl || !pageId))
               }
             >
               {loading ? "Creating..." : "Create Ad"}
