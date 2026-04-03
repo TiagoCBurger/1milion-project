@@ -181,8 +181,9 @@ export async function verifyOAuthAccessToken(
     if (cachedCount !== null) {
       connCount = parseInt(cachedCount, 10);
     } else {
+      // Exclude current client from count — it's reconnecting, not adding a new slot
       const countResp = await fetch(
-        `${env.SUPABASE_URL}/rest/v1/oauth_connections?workspace_id=eq.${stored.workspace_id}&is_active=eq.true&select=id`,
+        `${env.SUPABASE_URL}/rest/v1/oauth_connections?workspace_id=eq.${stored.workspace_id}&is_active=eq.true&client_id=neq.${encodeURIComponent(stored.client_id)}&select=id`,
         {
           headers: {
             apikey: env.SUPABASE_SERVICE_ROLE_KEY,
