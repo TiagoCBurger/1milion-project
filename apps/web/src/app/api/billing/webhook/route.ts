@@ -97,6 +97,33 @@ export async function POST(request: Request) {
           updated_at: new Date().toISOString(),
         })
         .eq("workspace_id", workspaceId);
+
+      // Send billing receipt email + sync to paid audience
+      const ownerEmail = data.customer?.email;
+      const ownerName = data.customer?.name;
+      if (ownerEmail) {
+        const tierLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
+        const cycleLabel = cycle === "annually" ? "anual" : "mensal";
+        const amount = `R$ ${(data.checkout?.amount ?? 0) / 100}`;
+
+        sendTransactionalEmail({
+          to: ownerEmail,
+          subject: `Pagamento confirmado — VibeFly ${tierLabel}`,
+          template: BillingReceiptEmail,
+          props: {
+            userName: ownerName ?? ownerEmail.split("@")[0],
+            tierName: tierLabel,
+            amount,
+            cycle: cycleLabel,
+          },
+          tags: [{ name: "category", value: EMAIL_TAGS.BILLING }],
+        }).catch(console.error);
+
+        const paidAudienceId = process.env.RESEND_AUDIENCE_PAID_USERS;
+        if (paidAudienceId) {
+          syncUserToAudience(paidAudienceId, ownerEmail, ownerName?.split(" ")[0]).catch(console.error);
+        }
+      }
       break;
     }
 
@@ -141,6 +168,29 @@ export async function POST(request: Request) {
             updated_at: new Date().toISOString(),
           })
           .eq("workspace_id", workspaceId);
+      }
+
+      // Send plan canceling email
+      const cancelOwnerEmail = data.customer?.email;
+      const cancelOwnerName = data.customer?.name;
+      if (cancelOwnerEmail) {
+        const canceledTier = currentSub?.pending_tier ?? "pro";
+        const tierLabel = canceledTier.charAt(0).toUpperCase() + canceledTier.slice(1);
+        const endDate = data.subscription?.canceledAt
+          ? new Date(data.subscription.canceledAt).toLocaleDateString("pt-BR")
+          : "em breve";
+
+        sendTransactionalEmail({
+          to: cancelOwnerEmail,
+          subject: "Cancelamento confirmado — VibeFly",
+          template: PlanCancelingEmail,
+          props: {
+            userName: cancelOwnerName ?? cancelOwnerEmail.split("@")[0],
+            tierName: tierLabel,
+            endDate,
+          },
+          tags: [{ name: "category", value: EMAIL_TAGS.BILLING }],
+        }).catch(console.error);
       }
       break;
     }

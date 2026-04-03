@@ -10,6 +10,7 @@ import {
   clearOAuthStateCookie,
 } from "@/lib/oauth-state";
 import { NextRequest, NextResponse } from "next/server";
+import { sendTransactionalEmail, MetaConnectedEmail, EMAIL_TAGS } from "@vibefly/email";
 
 const FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID!;
 const FACEBOOK_APP_SECRET = process.env.FACEBOOK_APP_SECRET!;
@@ -142,6 +143,25 @@ export async function GET(request: NextRequest) {
       if (keyData?.[0]) {
         apiKeyParam = `&api_key=${encodeURIComponent(keyData[0].raw_key)}`;
       }
+    }
+
+    // Send meta-connected email (fire-and-forget)
+    if (user.email) {
+      const totalAccounts = inspection.businessManagers.reduce(
+        (sum, bm) => sum + (bm.ad_accounts?.length ?? 0),
+        0
+      );
+      sendTransactionalEmail({
+        to: user.email,
+        subject: "Meta conectado ao VibeFly!",
+        template: MetaConnectedEmail,
+        props: {
+          userName: inspection.userName,
+          businessName: inspection.bmName ?? inspection.userName,
+          accountCount: totalAccounts,
+        },
+        tags: [{ name: "category", value: EMAIL_TAGS.META }],
+      }).catch(console.error);
     }
 
     // Redirect to connect page with success
