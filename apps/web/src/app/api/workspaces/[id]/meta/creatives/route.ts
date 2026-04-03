@@ -34,8 +34,8 @@ export async function POST(
     headline, description, image_hash, call_to_action_type,
   } = body;
 
-  if (!account_id || !page_id) {
-    return Response.json({ error: "account_id and page_id are required" }, { status: 400 });
+  if (!account_id) {
+    return Response.json({ error: "account_id is required" }, { status: 400 });
   }
 
   if (!image_hash) {
@@ -47,10 +47,11 @@ export async function POST(
     return Response.json({ error: "No Meta account connected" }, { status: 403 });
   }
 
-  // Build object_story_spec (same logic as MCP worker)
-  const objectStorySpec: Record<string, unknown> = { page_id };
+  const accountId = ensureActPrefix(account_id);
 
-  if (image_hash) {
+  // Try with object_story_spec first (requires page_id + live mode)
+  if (page_id) {
+    const objectStorySpec: Record<string, unknown> = { page_id };
     const linkData: Record<string, unknown> = { image_hash };
     if (link_url) linkData.link = link_url;
     if (message) linkData.message = message;
@@ -63,31 +64,56 @@ export async function POST(
       };
     }
     objectStorySpec.link_data = linkData;
-  }
 
-  const metaParams: Record<string, unknown> = {
-    object_story_spec: JSON.stringify(objectStorySpec),
-  };
-  if (name) metaParams.name = name;
+    const metaParams: Record<string, unknown> = {
+      object_story_spec: JSON.stringify(objectStorySpec),
+    };
+    if (name) metaParams.name = name;
 
-  console.log("[creatives] object_story_spec:", JSON.stringify(objectStorySpec, null, 2));
-  console.log("[creatives] metaParams:", JSON.stringify(metaParams, null, 2));
+    console.log("[creatives] Trying with object_story_spec:", JSON.stringify(objectStorySpec, null, 2));
 
-  const result = await metaApiPost(
-    `${ensureActPrefix(account_id)}/adcreatives`,
-    token,
-    metaParams
-  );
+    const result = await metaApiPost(`${accountId}/adcreatives`, token, metaParams);
 
-  if ((result as any).error) {
+    if (!(result as any).error) {
+      return Response.json(result);
+    }
+
+    // If it failed due to dev mode, try fallback
     const metaError = (result as any).error;
-    const msg = metaError?.error_user_msg || metaError?.message || "Meta API error";
-    console.error("[creatives] Meta error:", JSON.stringify(metaError, null, 2));
-    return Response.json(
-      { error: msg, meta_error: metaError },
-      { status: 400 }
-    );
+    console.warn("[creatives] object_story_spec failed, trying fallback:", metaError?.message);
+
+    // If it's NOT a dev-mode error, return the error
+    const isDeveloperModeError =
+      metaError?.message?.includes("desenvolvimento") ||
+      metaError?.message?.includes("development") ||
+      metaError?.code === 1487851;
+
+    if (!isDeveloperModeError) {
+      const msg = metaError?.error_user_msg || metaError?.message || "Meta API error";
+      return Response.json({ error: msg, meta_error: metaError }, { status: 400 });
+    }
   }
 
-  return Response.json(result);
+  // Fallback: create creative without object_story_spec (works in dev mode)
+  // Uses image_hash + link_url directly
+  console.log("[creatives] Using fallback (no object_story_spec) for dev mode");
+
+  const fallbackParams: Record<string, unknown> = {
+    image_hash,
+  };
+  if (name) fallbackParams.name = name;
+  if (link_url) fallbackParams.link_url = link_url;
+  if (body.title || headline) fallbackParams.title = headline || body.title;
+  if (body.body || message) fallbackParams.body = message || body.body;
+
+  const fallbackResult = await metaApiPost(`${accountId}/adcreatives`, token, fallbackParams);
+
+  if ((fallbackResult as any).error) {
+    const metaError = (fallbackResult as any).error;
+    const msg = metaError?.error_user_msg || metaError?.message || "Meta API error";
+    console.error("[creatives] Fallback also failed:", JSON.stringify(metaError, null, 2));
+    return Response.json({ error: msg, meta_error: metaError }, { status: 400 });
+  }
+
+  return Response.json(fallbackResult);
 }
