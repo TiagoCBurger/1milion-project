@@ -83,10 +83,12 @@ export async function POST(
     console.warn("[creatives] object_story_spec failed, trying fallback:", metaError?.message);
 
     // If it's NOT a dev-mode error, return the error
+    const errorText = `${metaError?.message ?? ""} ${metaError?.error_user_msg ?? ""}`.toLowerCase();
     const isDeveloperModeError =
-      metaError?.message?.includes("desenvolvimento") ||
-      metaError?.message?.includes("development") ||
-      metaError?.code === 1487851;
+      errorText.includes("development") ||
+      errorText.includes("desenvolvimento") ||
+      metaError?.code === 1487851 ||
+      metaError?.error_subcode === 1487851;
 
     if (!isDeveloperModeError) {
       const msg = metaError?.error_user_msg || metaError?.message || "Meta API error";

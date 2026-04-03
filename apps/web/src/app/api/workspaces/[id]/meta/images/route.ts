@@ -1,20 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getDecryptedToken, metaApiUploadImage } from "@/lib/meta-api";
 import { uploadToR2 } from "@/lib/r2-upload";
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id: workspaceId } = await params;
+async function authorize(workspaceId: string) {
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!user) return null;
 
   const { data: membership } = await supabase
     .from("memberships")
@@ -24,7 +18,53 @@ export async function POST(
     .in("role", ["owner", "admin"])
     .single();
 
-  if (!membership) {
+  return membership ? user : null;
+}
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: workspaceId } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const accountId = searchParams.get("account_id");
+
+  const admin = createAdminClient();
+  let query = admin
+    .from("ad_images")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (accountId) {
+    query = query.eq("account_id", accountId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  return Response.json({ data: data ?? [] });
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: workspaceId } = await params;
+  const user = await authorize(workspaceId);
+  if (!user) {
     return Response.json({ error: "Not authorized" }, { status: 403 });
   }
 
@@ -42,15 +82,16 @@ export async function POST(
     return Response.json({ error: "file and account_id are required" }, { status: 400 });
   }
 
-  const MAX_SIZE = 30 * 1024 * 1024; // 30MB
+  const MAX_SIZE = 30 * 1024 * 1024;
   if (file.size > MAX_SIZE) {
     return Response.json({ error: "Image exceeds 30MB limit" }, { status: 400 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  // Upload to R2 as backup storage (non-blocking, don't fail if R2 is down)
+  // Upload to R2
   let r2Key: string | null = null;
+  let r2Url: string | null = null;
   try {
     const r2Result = await uploadToR2(
       buffer,
@@ -60,11 +101,12 @@ export async function POST(
       file.type || "image/jpeg"
     );
     r2Key = r2Result.key;
+    r2Url = r2Result.publicUrl;
   } catch (err) {
     console.warn("[images] R2 upload failed (non-critical):", err);
   }
 
-  // Upload directly to Meta via multipart (no public URL needed)
+  // Upload to Meta
   const metaResult = await metaApiUploadImage(
     accountId,
     token,
@@ -81,13 +123,44 @@ export async function POST(
     );
   }
 
-  // Extract image_hash from Meta response: { images: { "hash": { hash: "..." } } }
   const images = (metaResult as any).images ?? {};
   const firstImage = Object.values(images)[0] as any;
   const imageHash = firstImage?.hash ?? null;
 
+  if (!imageHash) {
+    return Response.json({ error: "Failed to get image hash from Meta" }, { status: 500 });
+  }
+
+  // Persist metadata in Supabase
+  const admin = createAdminClient();
+  const { data: saved, error: dbError } = await admin
+    .from("ad_images")
+    .upsert(
+      {
+        workspace_id: workspaceId,
+        account_id: accountId,
+        image_hash: imageHash,
+        r2_key: r2Key,
+        r2_url: r2Url,
+        file_name: file.name,
+        file_size: file.size,
+        content_type: file.type || "image/jpeg",
+        created_by: user.id,
+      },
+      { onConflict: "workspace_id,account_id,image_hash" }
+    )
+    .select()
+    .single();
+
+  if (dbError) {
+    console.error("[images] DB save error:", dbError);
+  }
+
   return Response.json({
+    id: saved?.id,
     image_hash: imageHash,
     r2_key: r2Key,
+    r2_url: r2Url,
+    file_name: file.name,
   });
 }

@@ -1,16 +1,15 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getDecryptedToken, fetchPages } from "@/lib/meta-api";
 import { getEnabledAdAccounts } from "@/lib/workspace-data";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { AccountSelector } from "@/components/dashboard/account-selector";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ImageIcon, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { CreateCreativeDialog } from "@/components/dashboard/create-creative-dialog";
-import { UploadImageDialog } from "@/components/dashboard/upload-image-dialog";
+import { CreativesClient } from "@/components/dashboard/creatives-client";
 
 export default async function CreativesPage({
   params,
@@ -64,6 +63,16 @@ export default async function CreativesPage({
   const { data: pages } = await fetchPages(token);
   const pageOptions = pages.map((p: any) => ({ id: p.id, name: p.name }));
 
+  // Fetch persisted images
+  const admin = createAdminClient();
+  const { data: images } = await admin
+    .from("ad_images")
+    .select("*")
+    .eq("workspace_id", workspace.id)
+    .eq("account_id", selectedAccount)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
   return (
     <>
       <PageHeader breadcrumbs={[
@@ -82,50 +91,12 @@ export default async function CreativesPage({
           <AccountSelector accounts={accounts} current={selectedAccount} />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Upload Image</CardTitle>
-              <CardDescription>
-                Upload an image to R2 storage and register it with Meta for use in creatives.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <UploadImageDialog
-                workspaceId={workspace.id}
-                accountId={selectedAccount}
-                trigger={
-                  <Button className="w-full">
-                    <ImageIcon className="mr-2 h-4 w-4" />
-                    Upload Image
-                  </Button>
-                }
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Create Ad Creative</CardTitle>
-              <CardDescription>
-                Combine an uploaded image with ad text, headline, and CTA linked to a Facebook Page.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {pageOptions.length > 0 ? (
-                <CreateCreativeDialog
-                  workspaceId={workspace.id}
-                  accountId={selectedAccount}
-                  pages={pageOptions}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No Facebook Pages found. Connect a page to create creatives.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <CreativesClient
+          workspaceId={workspace.id}
+          accountId={selectedAccount}
+          pages={pageOptions}
+          initialImages={images ?? []}
+        />
       </div>
     </>
   );
