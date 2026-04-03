@@ -208,14 +208,23 @@ export default function BillingPage() {
     const isDowngrade = (TIER_ORDER[planTier] ?? 0) < (TIER_ORDER[currentTier] ?? 0);
     const isOnFree = currentTier === "free";
 
+    // This plan is already the pending target
     if (isPending) {
       return { label: "Scheduled", disabled: true, action: () => {} };
     }
-    if (isCurrent) {
+
+    // This is the current active plan (and no pending or pending goes elsewhere)
+    if (isCurrent && !hasPending) {
       return { label: "Current plan", disabled: true, action: () => {} };
     }
-    if (hasPending) {
-      return { label: "Change pending", disabled: true, action: () => {} };
+
+    // Current plan but there's a pending change — allow "Keep current"
+    if (isCurrent && hasPending) {
+      return {
+        label: "Keep current plan",
+        disabled: false,
+        action: () => handleCancelPending(),
+      };
     }
 
     // From free → checkout (immediate, needs payment)
@@ -224,6 +233,15 @@ export default function BillingPage() {
         label: "Subscribe",
         disabled: false,
         action: () => handleCheckout(planTier as "pro" | "max"),
+      };
+    }
+
+    // If there's a pending change, allow switching the pending target
+    if (hasPending) {
+      return {
+        label: isUpgrade ? "Switch to upgrade" : "Switch to downgrade",
+        disabled: false,
+        action: () => (planTier === "free" ? handleCancel() : handleChangePlan(planTier)),
       };
     }
 

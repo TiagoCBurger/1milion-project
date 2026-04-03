@@ -13,6 +13,8 @@ import {
 import { Megaphone, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { CreateCampaignDialog } from "@/components/dashboard/create-campaign-dialog";
+import { CampaignActions } from "@/components/dashboard/campaign-actions";
 
 const statusVariant = (s: string) => {
   switch (s) {
@@ -90,7 +92,10 @@ export default async function CampaignsPage({
               {campaigns.length} campaign{campaigns.length !== 1 ? "s" : ""} found
             </p>
           </div>
-          <AccountSelector accounts={accounts} current={selectedAccount} />
+          <div className="flex items-center gap-2">
+            <CreateCampaignDialog workspaceId={workspace.id} accountId={selectedAccount} />
+            <AccountSelector accounts={accounts} current={selectedAccount} />
+          </div>
         </div>
 
         {error && (
@@ -112,6 +117,7 @@ export default async function CampaignsPage({
                     <TableHead>Lifetime Budget</TableHead>
                     <TableHead>Bid Strategy</TableHead>
                     <TableHead>Created</TableHead>
+                    <TableHead className="w-[60px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -137,6 +143,13 @@ export default async function CampaignsPage({
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {c.created_time ? new Date(c.created_time).toLocaleDateString() : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <CampaignActions
+                          workspaceId={workspace.id}
+                          campaignId={c.id}
+                          currentStatus={c.status}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}

@@ -19,6 +19,7 @@ import {
   Building2,
   Moon,
   Sun,
+  ImageIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -70,6 +71,7 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
         { title: "Campaigns", url: `/dashboard/${slug}/campaigns`, icon: Megaphone },
         { title: "Ad Sets", url: `/dashboard/${slug}/adsets`, icon: Layers },
         { title: "Ads", url: `/dashboard/${slug}/ads`, icon: FileText },
+        { title: "Creatives", url: `/dashboard/${slug}/creatives`, icon: ImageIcon },
         { title: "Insights", url: `/dashboard/${slug}/insights`, icon: BarChart3 },
         { title: "Pages", url: `/dashboard/${slug}/pages`, icon: Globe },
       ]

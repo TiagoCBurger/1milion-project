@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getDecryptedToken, fetchAds } from "@/lib/meta-api";
+import { getDecryptedToken, fetchAds, fetchAdSets } from "@/lib/meta-api";
 import { getEnabledAdAccounts } from "@/lib/workspace-data";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { AccountSelector } from "@/components/dashboard/account-selector";
@@ -13,6 +13,7 @@ import {
 import { FileText, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { CreateAdDialog } from "@/components/dashboard/create-ad-dialog";
 
 const statusVariant = (s: string) => {
   switch (s) {
@@ -72,6 +73,8 @@ export default async function AdsPage({
 
   const selectedAccount = account_id ?? accounts[0].meta_account_id;
   const { data: ads, error } = await fetchAds(token, selectedAccount);
+  const { data: adsets } = await fetchAdSets(token, selectedAccount);
+  const adsetOptions = adsets.map((a: any) => ({ id: a.id, name: a.name }));
 
   return (
     <>
@@ -88,7 +91,10 @@ export default async function AdsPage({
               {ads.length} ad{ads.length !== 1 ? "s" : ""} found
             </p>
           </div>
-          <AccountSelector accounts={accounts} current={selectedAccount} />
+          <div className="flex items-center gap-2">
+            <CreateAdDialog workspaceId={workspace.id} accountId={selectedAccount} adSets={adsetOptions} />
+            <AccountSelector accounts={accounts} current={selectedAccount} />
+          </div>
         </div>
 
         {error && (

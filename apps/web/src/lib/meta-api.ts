@@ -30,7 +30,7 @@ export async function getDecryptedToken(workspaceId: string): Promise<string | n
 
 // ── Meta Graph API GET ────────────────────────────────────────
 
-async function metaApiGet(
+export async function metaApiGet(
   endpoint: string,
   token: string,
   params: Record<string, unknown> = {}
@@ -50,7 +50,61 @@ async function metaApiGet(
   return json;
 }
 
-function ensureActPrefix(accountId: string): string {
+// ── Meta Graph API POST ───────────────────────────────────────
+
+export async function metaApiPost(
+  endpoint: string,
+  token: string,
+  params: Record<string, unknown> = {}
+): Promise<Record<string, unknown>> {
+  const url = `${BASE_URL}/${endpoint}`;
+  const body = new URLSearchParams();
+  body.set("access_token", token);
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null) continue;
+    body.set(key, typeof value === "string" ? value : JSON.stringify(value));
+  }
+  console.log("[meta-api] POST", endpoint);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  const json = (await res.json()) as Record<string, unknown>;
+  if ((json as any).error) {
+    console.error("[meta-api] POST error:", JSON.stringify((json as any).error));
+  }
+  return json;
+}
+
+// ── Meta Graph API multipart upload ──────────────────────────
+
+export async function metaApiUploadImage(
+  accountId: string,
+  token: string,
+  fileBuffer: Buffer | Uint8Array,
+  fileName: string,
+  contentType: string,
+  imageName?: string
+): Promise<Record<string, unknown>> {
+  const url = `${BASE_URL}/${ensureActPrefix(accountId)}/adimages`;
+  const form = new FormData();
+  form.append("access_token", token);
+  form.append("filename", new Blob([new Uint8Array(fileBuffer)], { type: contentType }), fileName);
+  if (imageName) form.append("name", imageName);
+
+  console.log("[meta-api] UPLOAD IMAGE", accountId, fileName);
+  const res = await fetch(url, { method: "POST", body: form });
+  const json = (await res.json()) as Record<string, unknown>;
+  if ((json as any).error) {
+    console.error("[meta-api] Upload error:", JSON.stringify((json as any).error));
+  }
+  return json;
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+
+export function ensureActPrefix(accountId: string): string {
   return accountId.startsWith("act_") ? accountId : `act_${accountId}`;
 }
 
