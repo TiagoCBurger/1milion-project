@@ -10,7 +10,7 @@ export default function OgImage() {
     (
       <div
         style={{
-          background: "#000000",
+          background: "#0a0a0a",
           width: "100%",
           height: "100%",
           display: "flex",
@@ -22,68 +22,73 @@ export default function OgImage() {
           overflow: "hidden",
         }}
       >
-        {/* Glow background */}
+        {/* Glow */}
         <div
           style={{
             position: "absolute",
-            top: "-100px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "800px",
-            height: "500px",
-            background:
-              "radial-gradient(ellipse at center, rgba(124,58,237,0.25) 0%, rgba(6,182,212,0.1) 60%, transparent 100%)",
+            top: -80,
+            left: 200,
+            width: 800,
+            height: 500,
+            background: "rgba(124,58,237,0.18)",
             borderRadius: "50%",
+            filter: "blur(80px)",
+            display: "flex",
           }}
         />
 
         {/* Logo */}
         <div
           style={{
-            fontSize: 64,
+            fontSize: 72,
             fontWeight: 300,
-            letterSpacing: "-2px",
-            background: "linear-gradient(90deg, #7c3aed, #06b6d4)",
-            backgroundClip: "text",
-            color: "transparent",
-            marginBottom: 24,
+            letterSpacing: "-3px",
+            color: "#a78bfa",
+            marginBottom: 20,
+            display: "flex",
           }}
         >
           VibeFly
         </div>
 
-        {/* Tagline */}
+        {/* Tagline line 1 */}
         <div
           style={{
             fontSize: 28,
             fontWeight: 300,
             color: "#94a3b8",
-            textAlign: "center",
-            maxWidth: 700,
-            lineHeight: 1.4,
+            display: "flex",
           }}
         >
-          Connect your marketing tools to any AI via MCP.{"\n"}Manage campaigns with natural language.
+          Connect your marketing tools to any AI via MCP.
+        </div>
+
+        {/* Tagline line 2 */}
+        <div
+          style={{
+            fontSize: 28,
+            fontWeight: 300,
+            color: "#94a3b8",
+            marginBottom: 48,
+            display: "flex",
+          }}
+        >
+          Manage campaigns with natural language.
         </div>
 
         {/* Pills */}
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            marginTop: 48,
-          }}
-        >
+        <div style={{ display: "flex", gap: 12 }}>
           {["Claude", "Cursor", "ChatGPT", "MCP"].map((label) => (
             <div
               key={label}
               style={{
                 padding: "8px 20px",
                 borderRadius: 999,
-                border: "1px solid rgba(124,58,237,0.4)",
-                background: "rgba(124,58,237,0.08)",
+                border: "1px solid rgba(124,58,237,0.5)",
+                background: "rgba(124,58,237,0.1)",
                 color: "#c4b5fd",
                 fontSize: 18,
+                display: "flex",
               }}
             >
               {label}
