@@ -78,6 +78,7 @@ export default async function AdSetsPage({
     id: c.id,
     name: c.name,
     hasBudget: !!(c.daily_budget || c.lifetime_budget),
+    bidStrategy: c.bid_strategy ?? null,
   }));
 
   return (

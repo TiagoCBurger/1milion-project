@@ -34,7 +34,7 @@ export function CreateAdSetDialog({
 }: {
   workspaceId: string;
   accountId: string;
-  campaigns: { id: string; name: string; hasBudget: boolean }[];
+  campaigns: { id: string; name: string; hasBudget: boolean; bidStrategy: string | null }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
