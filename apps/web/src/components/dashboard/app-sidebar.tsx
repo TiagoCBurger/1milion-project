@@ -11,7 +11,6 @@ import {
   Globe,
   Link2,
   Cable,
-  Key,
   BookOpen,
   CreditCard,
   LogOut,
@@ -87,7 +86,6 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
         { title: "Billing", url: `/dashboard/${slug}/billing`, icon: CreditCard },
         { title: "MCP Connections", url: `/dashboard/${slug}/connections`, icon: Cable },
         { title: "Connect Meta", url: `/dashboard/${slug}/connect`, icon: Link2 },
-        { title: "API Keys", url: `/dashboard/${slug}/api-keys`, icon: Key },
         { title: "Setup Guide", url: `/dashboard/${slug}/setup`, icon: BookOpen },
       ]
     : []
