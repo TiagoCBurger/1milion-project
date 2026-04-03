@@ -44,8 +44,11 @@ export async function POST(
     objective,
     status: "PAUSED",
     special_ad_categories: special_ad_categories ?? [],
-    bid_strategy: bid_strategy ?? "LOWEST_COST_WITHOUT_CAP",
   };
+
+  if (bid_strategy) {
+    metaParams.bid_strategy = bid_strategy;
+  }
 
   if (daily_budget) {
     metaParams.daily_budget = String(daily_budget);

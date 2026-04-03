@@ -31,7 +31,7 @@ export async function POST(
   console.log("[adsets] Request body:", JSON.stringify(body, null, 2));
   const {
     account_id, campaign_id, name, optimization_goal,
-    billing_event, daily_budget, targeting,
+    billing_event, daily_budget, bid_amount, targeting,
   } = body;
 
   if (!account_id || !campaign_id || !name || !optimization_goal || !billing_event) {
@@ -68,6 +68,9 @@ export async function POST(
 
   if (daily_budget) {
     metaParams.daily_budget = String(daily_budget);
+  }
+  if (bid_amount) {
+    metaParams.bid_amount = String(bid_amount);
   }
 
   const result = await metaApiPost(
