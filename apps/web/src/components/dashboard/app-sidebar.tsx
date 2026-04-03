@@ -58,6 +58,11 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
   const { theme, setTheme } = useTheme()
   const slug = currentWorkspace?.slug
 
+  async function handleSignOut() {
+    await fetch("/api/auth/signout", { method: "POST", credentials: "include" })
+    window.location.assign("/login")
+  }
+
   const overviewItems: NavItem[] = [
     {
       title: "Dashboard",
@@ -187,13 +192,15 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
               {theme === "dark" ? "Light mode" : "Dark mode"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <form action="/api/auth/signout" method="POST" className="w-full">
-                <button type="submit" className="flex w-full items-center gap-2">
-                  <LogOut className="h-4 w-4" />
-                  Sign out
-                </button>
-              </form>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onSelect={(e) => {
+                e.preventDefault()
+                void handleSignOut()
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

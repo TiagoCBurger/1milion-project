@@ -140,9 +140,11 @@ export const META_GRAPH_BASE_URL = "https://graph.facebook.com";
 // ============================================================
 
 export const META_OAUTH_SCOPES = [
+  "public_profile",
   "ads_management",
   "ads_read",
   "business_management",
+  "pages_show_list",
   "pages_manage_ads",
   "pages_read_engagement",
 ] as const;
