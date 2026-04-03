@@ -43,7 +43,10 @@ export function CreateAdSetDialog({
 
   const [name, setName] = useState("");
   const [campaignId, setCampaignId] = useState(campaigns[0]?.id ?? "");
-  const hasCampaignBudget = campaigns.find((c) => c.id === campaignId)?.hasBudget ?? false;
+  const selectedCampaign = campaigns.find((c) => c.id === campaignId);
+  const hasCampaignBudget = selectedCampaign?.hasBudget ?? false;
+  const BID_AMOUNT_REQUIRED_STRATEGIES = ["LOWEST_COST_WITH_BID_CAP", "TARGET_COST"];
+  const bidAmountRequired = BID_AMOUNT_REQUIRED_STRATEGIES.includes(selectedCampaign?.bidStrategy ?? "");
   const [optimizationGoal, setOptimizationGoal] = useState("LINK_CLICKS");
   const [billingEvent, setBillingEvent] = useState("IMPRESSIONS");
   const [dailyBudget, setDailyBudget] = useState("");
@@ -59,6 +62,12 @@ export function CreateAdSetDialog({
 
     if (!hasCampaignBudget && !dailyBudget) {
       setError("Enter a daily budget for this ad set, or use a campaign with Campaign Budget Optimization.");
+      setLoading(false);
+      return;
+    }
+
+    if (bidAmountRequired && !bidAmount) {
+      setError(`This campaign uses ${selectedCampaign?.bidStrategy} — a bid amount is required.`);
       setLoading(false);
       return;
     }
