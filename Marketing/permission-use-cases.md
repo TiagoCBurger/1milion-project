@@ -222,6 +222,38 @@ Para criar um ad creative, o usuário precisa informar o `page_id`. Esta permiss
 
 ---
 
+## Rate Limiting & Prevenção de Abuso
+
+O VibeFly respeita integralmente os rate limits da Meta API e implementa controles adicionais de rate limiting no servidor para prevenir abusos e garantir que todo uso esteja em conformidade com as Políticas da Plataforma Meta.
+
+### Conformidade com Rate Limits da Meta API
+
+- O VibeFly monitora os headers `x-business-use-case-usage` e `x-app-usage` retornados pela Meta Graph API para acompanhar o consumo em relação aos limites estabelecidos.
+- Quando se aproxima dos limites da Meta, o VibeFly automaticamente reduz a taxa de requisições para evitar ultrapassar os thresholds permitidos.
+
+### Rate Limiting no Servidor (controles próprios do VibeFly)
+
+- Toda requisição é verificada contra limites de taxa por workspace **antes** de ser encaminhada para a API da Meta.
+- Os limites são aplicados em duas janelas de tempo: **por hora** e **por dia**, utilizando contadores baseados em KV store.
+- Os limites são vinculados ao plano de assinatura do usuário, garantindo uso justo:
+
+| Plano | Requisições/Hora | Requisições/Dia |
+|---|---|---|
+| Free | 20 | 20 |
+| Pro | Limites ampliados conforme plano | Limites ampliados conforme plano |
+| Enterprise | Limites customizados | Limites customizados |
+
+- **Limites de upload**: Limites diários de upload de imagens e vídeos por workspace, também aplicados por plano.
+- Quando um workspace excede seu rate limit, o VibeFly retorna uma mensagem de erro clara com um indicador `retryAfter` — nenhuma requisição é encaminhada para a Meta.
+
+### Prevenção de Abuso
+
+- Todas as operações de escrita (criação de campanhas, gestão de anúncios) são restritas a planos pagos — usuários do plano Free não podem realizar nenhuma operação de escrita, prevenindo modificações não autorizadas ou acidentais.
+- O VibeFly nunca toma ações autônomas nas contas Meta dos usuários. Toda chamada à API é explicitamente iniciada pelo usuário autenticado através do assistente IA.
+- O acesso a contas de anúncio é isolado por workspace. Usuários só podem interagir com as contas que explicitamente conectaram e autorizaram.
+
+---
+
 ## Resumo de Permissões × Funcionalidades
 
 | Permissão | Plano Free | Plano Pro | Plano Enterprise |

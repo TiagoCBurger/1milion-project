@@ -9,12 +9,27 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
-const MCP_GATEWAY_URL = process.env.NEXT_PUBLIC_MCP_GATEWAY_URL || "https://mcp-api.yourdomain.com";
+const MCP_GATEWAY_URL =
+  process.env.NEXT_PUBLIC_MCP_GATEWAY_URL ||
+  "https://mcp-worker.ticburger.workers.dev";
+
+const OAUTH_MCP_CONFIG = JSON.stringify(
+  {
+    mcpServers: {
+      vibefly: {
+        type: "streamable-http",
+        url: `${MCP_GATEWAY_URL}/mcp`,
+      },
+    },
+  },
+  null,
+  2
+);
 
 export default function SetupPage() {
   const { slug } = useParams<{ slug: string }>();
   const [apiKeyPrefix, setApiKeyPrefix] = useState("mads_your_key_here");
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -40,35 +55,26 @@ export default function SetupPage() {
     loadKey();
   }, [slug, supabase]);
 
+  const apiKeyConfig = JSON.stringify(
+    {
+      mcpServers: {
+        [`meta-ads-${slug}`]: {
+          type: "streamable-http",
+          url: `${MCP_GATEWAY_URL}/mcp`,
+          headers: {
+            Authorization: `Bearer ${apiKeyPrefix}`,
+          },
+        },
+      },
+    },
+    null,
+    2
+  );
+
   const configs: Record<string, string> = {
-    claude: JSON.stringify(
-      {
-        mcpServers: {
-          [`meta-ads-${slug}`]: {
-            url: `${MCP_GATEWAY_URL}/mcp`,
-            headers: {
-              Authorization: `Bearer ${apiKeyPrefix}`,
-            },
-          },
-        },
-      },
-      null,
-      2
-    ),
-    cursor: JSON.stringify(
-      {
-        mcpServers: {
-          [`meta-ads-${slug}`]: {
-            url: `${MCP_GATEWAY_URL}/mcp`,
-            headers: {
-              Authorization: `Bearer ${apiKeyPrefix}`,
-            },
-          },
-        },
-      },
-      null,
-      2
-    ),
+    oauth: OAUTH_MCP_CONFIG,
+    claude: apiKeyConfig,
+    cursor: apiKeyConfig,
     http: `curl -X POST ${MCP_GATEWAY_URL}/mcp \\
   -H "Content-Type: application/json" \\
   -H "Accept: application/json, text/event-stream" \\
@@ -82,8 +88,8 @@ export default function SetupPage() {
 
   async function copyConfig(key: string) {
     await navigator.clipboard.writeText(configs[key]);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
   }
 
   return (
@@ -98,17 +104,50 @@ export default function SetupPage() {
       <div className="p-6 max-w-2xl">
         <h1 className="text-2xl font-semibold tracking-tight mb-1">Setup Guide</h1>
         <p className="text-muted-foreground mb-6">
-          Copy the configuration for your AI tool and paste your full API key.
+          Connect your AI tool to the Vibefly MCP server.
         </p>
 
-        <Tabs defaultValue="claude">
+        <Tabs defaultValue="oauth">
           <TabsList className="mb-4">
+            <TabsTrigger value="oauth">Claude Code (OAuth)</TabsTrigger>
             <TabsTrigger value="claude">Claude Desktop</TabsTrigger>
             <TabsTrigger value="cursor">Cursor</TabsTrigger>
             <TabsTrigger value="http">HTTP / Custom</TabsTrigger>
           </TabsList>
 
-          {["claude", "cursor", "http"].map((tabId) => (
+          {/* OAuth tab */}
+          <TabsContent value="oauth">
+            <Card>
+              <CardContent className="p-0 relative">
+                <pre className="rounded-xl bg-neutral-950 text-neutral-100 p-5 text-sm overflow-x-auto font-mono">
+                  <code>{configs.oauth}</code>
+                </pre>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => copyConfig("oauth")}
+                  className="absolute top-3 right-3"
+                >
+                  {copied === "oauth" ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                  {copied === "oauth" ? "Copied" : "Copy"}
+                </Button>
+              </CardContent>
+            </Card>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Paste this into your project&apos;s <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">.mcp.json</code>.
+              No API key needed — Claude Code will open a browser window for you to log in and select
+              your workspace on first connection. Tokens renew automatically.
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Or add via CLI:{" "}
+              <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono break-all">
+                claude mcp add --scope project vibefly --transport streamable-http &quot;{MCP_GATEWAY_URL}/mcp&quot;
+              </code>
+            </p>
+          </TabsContent>
+
+          {/* API key tabs */}
+          {(["claude", "cursor", "http"] as const).map((tabId) => (
             <TabsContent key={tabId} value={tabId}>
               <Card>
                 <CardContent className="p-0 relative">
@@ -121,8 +160,8 @@ export default function SetupPage() {
                     onClick={() => copyConfig(tabId)}
                     className="absolute top-3 right-3"
                   >
-                    {copied ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
-                    {copied ? "Copied" : "Copy"}
+                    {copied === tabId ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                    {copied === tabId ? "Copied" : "Copy"}
                   </Button>
                 </CardContent>
               </Card>
@@ -130,9 +169,11 @@ export default function SetupPage() {
           ))}
         </Tabs>
 
+        {/* API key note — only relevant for non-OAuth tabs */}
         <p className="mt-4 text-sm text-muted-foreground">
-          Replace <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{apiKeyPrefix}</code> with
-          your full API key from the{" "}
+          For API key authentication, replace{" "}
+          <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{apiKeyPrefix}</code>{" "}
+          with your full API key from the{" "}
           <a href={`/dashboard/${slug}/api-keys`} className="text-primary hover:underline">
             API Keys page
           </a>

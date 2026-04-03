@@ -208,6 +208,32 @@ VibeFly uses the `pages_read_engagement` permission to read the user's Facebook 
 
 VibeFly is a SaaS platform that acts as a secure bridge between the Meta Advertising API (Graph API v24.0) and AI tools compatible with the Model Context Protocol (MCP). Users connect their Meta accounts through standard Facebook Login (OAuth 2.0), and then use AI assistants (such as Claude, ChatGPT, Cursor) to manage their advertising campaigns through natural language.
 
+### Rate Limiting & Abuse Prevention
+
+VibeFly fully respects Meta's API rate limits and additionally implements its own server-side rate limiting to prevent abuse and ensure all usage complies with Meta Platform Policies.
+
+**Meta API rate limit compliance:**
+
+- VibeFly monitors the `x-business-use-case-usage` and `x-app-usage` headers returned by the Meta Graph API to track usage against Meta's rate limit thresholds.
+- When approaching Meta's rate limits, VibeFly automatically throttles requests to avoid exceeding the allowed thresholds.
+
+**Server-side rate limiting (VibeFly's own controls):**
+
+- Every API request is checked against per-workspace rate limits **before** being forwarded to Meta's API.
+- Rate limits are enforced on two time windows: **per hour** and **per day**, using KV-based counters.
+- Rate limits are tied to the user's subscription plan, ensuring fair usage:
+  - **Free plan**: 20 requests/hour, 20 requests/day
+  - **Pro plan**: Higher limits based on subscription tier
+  - **Enterprise plan**: Custom rate limits tailored to the client's needs
+- **Upload limits**: Daily limits on image and video uploads per workspace, also enforced per plan.
+- When a workspace exceeds its rate limit, VibeFly returns a clear error message with a `retryAfter` indicator — no request is forwarded to Meta.
+
+**Abuse prevention:**
+
+- All write operations (campaign creation, ad management) are restricted to paid plans only — Free plan users cannot perform any write operations, which prevents unauthorized or unintended modifications.
+- VibeFly never takes autonomous actions on users' Meta accounts. Every API call is explicitly initiated by the authenticated user through their AI assistant.
+- Access to ad accounts is scoped per workspace. Users can only interact with the ad accounts they have explicitly connected and authorized.
+
 ### Data Handling
 
 - **Tokens**: Encrypted at rest using AES-256 (pgcrypto). Never exposed to the frontend.
