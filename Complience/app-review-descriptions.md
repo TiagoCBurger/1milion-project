@@ -72,7 +72,7 @@ Users perform all management actions primarily through the **VibeFly web dashboa
 
 5. **Create and update ads** — Users create ads linking a creative to an ad set via `POST /{account_id}/ads`, or update status/name via `POST /{ad_id}`.
 
-6. **Upload images and videos** — Users upload creative assets via `POST /{account_id}/adimages` and `POST /{account_id}/advideos` for use in ad creatives.
+6. **Upload images and videos** — Users upload creative assets via `POST /{account_id}/adimages` and `POST /{account_id}/advideos` for use in ad creatives..
 
 7. **Create ad creatives** — Users create ad creatives with images/videos, text, headlines, and CTAs via `POST /{account_id}/adcreatives`.
 
