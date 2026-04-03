@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
-import { validateApiKey, getMetaToken, verifyOAuthAccessToken } from "./auth";
+import { validateApiKey, getMetaToken, verifyOAuthAccessToken, type AuthResult } from "./auth";
 import { checkRateLimit } from "./rate-limit";
 import { logUsage } from "./usage";
 import { registerAllTools } from "./tools";
@@ -60,17 +60,17 @@ export default {
     // -------------------------------------------------------
     // 1. Authenticate (API key or OAuth token)
     // -------------------------------------------------------
-    const workspace = await authenticateRequest(request, url, env);
-    if (!workspace) {
-      // Return 401 with WWW-Authenticate for OAuth discovery
+    const authResult = await authenticateRequest(request, url, env);
+    if (!authResult.ok) {
+      const isNoCredentials = authResult.error === "no_credentials";
+      const message = isNoCredentials
+        ? "Unauthorized. Use API key or OAuth to authenticate."
+        : authResult.error;
       return new Response(
         JSON.stringify({
           jsonrpc: "2.0",
           id: null,
-          error: {
-            code: -32600,
-            message: "Unauthorized. Use API key or OAuth to authenticate.",
-          },
+          error: { code: -32600, message },
         }),
         {
           status: 401,
@@ -82,6 +82,7 @@ export default {
         }
       );
     }
+    const workspace = authResult.workspace;
 
     // -------------------------------------------------------
     // 3. Rate limit
@@ -192,7 +193,7 @@ async function authenticateRequest(
   request: Request,
   url: URL,
   env: Env
-): Promise<WorkspaceContext | null> {
+): Promise<AuthResult> {
   const authHeader = request.headers.get("Authorization");
 
   // API key via header
@@ -211,7 +212,7 @@ async function authenticateRequest(
     return validateApiKey(keyParam, env);
   }
 
-  return null;
+  return { ok: false, error: "no_credentials" };
 }
 
 function handleCors(): Response {
