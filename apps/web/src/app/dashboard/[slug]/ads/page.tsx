@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getDecryptedToken, fetchAds, fetchAdSets } from "@/lib/meta-api";
+import { getDecryptedToken, fetchAds, fetchAdSets, fetchCreatives, fetchPages } from "@/lib/meta-api";
 import { getEnabledAdAccounts } from "@/lib/workspace-data";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { AccountSelector } from "@/components/dashboard/account-selector";
@@ -74,7 +74,15 @@ export default async function AdsPage({
   const selectedAccount = account_id ?? accounts[0].meta_account_id;
   const { data: ads, error } = await fetchAds(token, selectedAccount);
   const { data: adsets } = await fetchAdSets(token, selectedAccount);
+  const { data: creatives } = await fetchCreatives(token, selectedAccount);
+  const { data: pages } = await fetchPages(token);
   const adsetOptions = adsets.map((a: any) => ({ id: a.id, name: a.name }));
+  const creativeOptions = creatives.map((c: any) => ({
+    id: c.id,
+    name: c.name || `Creative ${c.id}`,
+    thumbnail_url: c.thumbnail_url,
+  }));
+  const pageOptions = pages.map((p: any) => ({ id: p.id, name: p.name }));
 
   return (
     <>
@@ -92,7 +100,7 @@ export default async function AdsPage({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <CreateAdDialog workspaceId={workspace.id} accountId={selectedAccount} adSets={adsetOptions} />
+            <CreateAdDialog workspaceId={workspace.id} accountId={selectedAccount} adSets={adsetOptions} creatives={creativeOptions} pages={pageOptions} />
             <AccountSelector accounts={accounts} current={selectedAccount} />
           </div>
         </div>

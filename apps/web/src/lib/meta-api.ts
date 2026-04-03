@@ -299,6 +299,24 @@ export async function fetchInsights(
   return { data: (result as any).data ?? [] };
 }
 
+const CREATIVE_FIELDS = "id,name,status,thumbnail_url,object_type";
+
+export async function fetchCreatives(
+  token: string,
+  accountId: string,
+  options?: { limit?: number }
+): Promise<MetaApiResult<Record<string, unknown>>> {
+  const params: Record<string, unknown> = {
+    fields: CREATIVE_FIELDS,
+    limit: options?.limit ?? 50,
+  };
+  const result = await metaApiGet(`${ensureActPrefix(accountId)}/adcreatives`, token, params);
+  if ((result as any).error) {
+    return { data: [], error: (result as any).error?.message ?? "Unknown error" };
+  }
+  return { data: (result as any).data ?? [] };
+}
+
 export async function fetchPages(
   token: string
 ): Promise<MetaApiResult<Record<string, unknown>>> {

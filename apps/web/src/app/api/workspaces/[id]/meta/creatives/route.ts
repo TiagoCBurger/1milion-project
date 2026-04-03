@@ -28,6 +28,7 @@ export async function POST(
   }
 
   const body = await request.json();
+  console.log("[creatives] Request body:", JSON.stringify(body, null, 2));
   const {
     account_id, page_id, name, link_url, message,
     headline, description, image_hash, call_to_action_type,
@@ -35,6 +36,10 @@ export async function POST(
 
   if (!account_id || !page_id) {
     return Response.json({ error: "account_id and page_id are required" }, { status: 400 });
+  }
+
+  if (!image_hash) {
+    return Response.json({ error: "image_hash is required — upload an image first" }, { status: 400 });
   }
 
   const token = await getDecryptedToken(workspaceId);
@@ -65,6 +70,9 @@ export async function POST(
   };
   if (name) metaParams.name = name;
 
+  console.log("[creatives] object_story_spec:", JSON.stringify(objectStorySpec, null, 2));
+  console.log("[creatives] metaParams:", JSON.stringify(metaParams, null, 2));
+
   const result = await metaApiPost(
     `${ensureActPrefix(account_id)}/adcreatives`,
     token,
@@ -72,8 +80,11 @@ export async function POST(
   );
 
   if ((result as any).error) {
+    const metaError = (result as any).error;
+    const msg = metaError?.error_user_msg || metaError?.message || "Meta API error";
+    console.error("[creatives] Meta error:", JSON.stringify(metaError, null, 2));
     return Response.json(
-      { error: (result as any).error?.message ?? "Meta API error" },
+      { error: msg, meta_error: metaError },
       { status: 400 }
     );
   }
