@@ -5,9 +5,6 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "VibeFly",
   description: "Connect your marketing tools to any AI via MCP. Manage campaigns with natural language.",
-  other: {
-    "fb:app_id": "1330746402408443",
-  },
   openGraph: {
     title: "VibeFly",
     description: "Connect your marketing tools to any AI via MCP. Manage campaigns with natural language.",
@@ -25,6 +22,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta property="fb:app_id" content="1330746402408443" />
+      </head>
       <body className="min-h-screen antialiased">
         <ThemeProvider
           attribute="class"
