@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Upload, ImageIcon, Check } from "lucide-react";
+import { Plus, Check, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,28 +24,31 @@ const CTA_TYPES = [
   { value: "GET_OFFER", label: "Get Offer" },
 ];
 
+interface AdImage {
+  id: string;
+  image_hash: string;
+  r2_url: string | null;
+  file_name: string;
+}
+
 export function CreateCreativeDialog({
   workspaceId,
   accountId,
   pages,
+  images,
 }: {
   workspaceId: string;
   accountId: string;
   pages: { id: string; name: string }[];
+  images?: AdImage[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Image upload state
-  const [imageHash, setImageHash] = useState("");
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  // Creative fields
+  const [selectedImageHash, setSelectedImageHash] = useState("");
   const [creativeName, setCreativeName] = useState("");
   const [pageId, setPageId] = useState(pages[0]?.id ?? "");
   const [linkUrl, setLinkUrl] = useState("");
@@ -53,45 +56,10 @@ export function CreateCreativeDialog({
   const [headline, setHeadline] = useState("");
   const [ctaType, setCtaType] = useState("LEARN_MORE");
 
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = () => setImagePreview(reader.result as string);
-    reader.readAsDataURL(file);
-
-    // Upload
-    setUploading(true);
-    setError("");
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("account_id", accountId);
-      formData.append("name", file.name);
-
-      const res = await fetch(`/api/workspaces/${workspaceId}/meta/images`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to upload image");
-        return;
-      }
-      setImageHash(data.image_hash);
-    } catch {
-      setError("Image upload failed");
-    } finally {
-      setUploading(false);
-    }
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!imageHash) {
-      setError("Upload an image first");
+    if (!selectedImageHash) {
+      setError("Select an image first");
       return;
     }
     setLoading(true);
@@ -106,7 +74,7 @@ export function CreateCreativeDialog({
           account_id: accountId,
           page_id: pageId,
           name: creativeName || undefined,
-          image_hash: imageHash,
+          image_hash: selectedImageHash,
           link_url: linkUrl || undefined,
           message: message || undefined,
           headline: headline || undefined,
@@ -133,14 +101,15 @@ export function CreateCreativeDialog({
     if (!v) {
       setError("");
       setSuccess(null);
-      setImageHash("");
-      setImagePreview(null);
+      setSelectedImageHash("");
       setCreativeName("");
       setMessage("");
       setHeadline("");
       setLinkUrl("");
     }
   }
+
+  const availableImages = images ?? [];
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -154,7 +123,7 @@ export function CreateCreativeDialog({
         <DialogHeader>
           <DialogTitle>Create Ad Creative</DialogTitle>
           <DialogDescription>
-            Upload an image and configure your ad creative with page, text, and CTA.
+            Select an uploaded image and configure your ad creative.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -164,39 +133,49 @@ export function CreateCreativeDialog({
             </div>
           )}
 
-          {/* Step 1: Image Upload */}
+          {/* Step 1: Select Image */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">1. Upload Image</Label>
-            <div
-              className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/25 p-4 cursor-pointer hover:border-muted-foreground/50 transition-colors"
-              onClick={() => fileRef.current?.click()}
-            >
-              {imagePreview ? (
-                <div className="relative">
-                  <img src={imagePreview} alt="Preview" className="max-h-36 rounded-lg object-contain" />
-                  {imageHash && (
-                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white rounded-full p-0.5">
-                      <Check className="h-3 w-3" />
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <ImageIcon className="h-8 w-8 text-muted-foreground/50 mb-1" />
-                  <p className="text-sm text-muted-foreground">Click to select image</p>
-                </>
-              )}
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-            </div>
-            {uploading && <p className="text-xs text-muted-foreground">Uploading to R2 and Meta...</p>}
-            {imageHash && (
-              <p className="text-xs text-muted-foreground font-mono">Hash: {imageHash}</p>
+            <Label className="text-sm font-medium">1. Select Image</Label>
+            {availableImages.length > 0 ? (
+              <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto rounded-lg border p-2">
+                {availableImages.map((img) => (
+                  <button
+                    key={img.id}
+                    type="button"
+                    onClick={() => setSelectedImageHash(img.image_hash)}
+                    className={`relative rounded-md overflow-hidden border-2 transition-all ${
+                      selectedImageHash === img.image_hash
+                        ? "border-primary ring-2 ring-primary/20"
+                        : "border-transparent hover:border-muted-foreground/30"
+                    }`}
+                  >
+                    {img.r2_url ? (
+                      <img
+                        src={img.r2_url}
+                        alt={img.file_name}
+                        className="aspect-square w-full object-cover"
+                      />
+                    ) : (
+                      <div className="aspect-square w-full flex items-center justify-center bg-muted">
+                        <ImageIcon className="h-5 w-5 text-muted-foreground/40" />
+                      </div>
+                    )}
+                    {selectedImageHash === img.image_hash && (
+                      <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                        <div className="bg-primary text-primary-foreground rounded-full p-0.5">
+                          <Check className="h-3 w-3" />
+                        </div>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed p-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No images uploaded yet. Upload an image first using the button above.
+                </p>
+              </div>
             )}
           </div>
 
@@ -285,7 +264,7 @@ export function CreateCreativeDialog({
           )}
 
           <DialogFooter>
-            <Button type="submit" disabled={loading || !imageHash || !pageId}>
+            <Button type="submit" disabled={loading || !selectedImageHash || !pageId}>
               {loading ? "Creating..." : "Create Creative"}
             </Button>
           </DialogFooter>
