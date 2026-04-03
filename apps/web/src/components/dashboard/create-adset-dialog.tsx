@@ -46,7 +46,7 @@ export function CreateAdSetDialog({
   const hasCampaignBudget = campaigns.find((c) => c.id === campaignId)?.hasBudget ?? false;
   const [optimizationGoal, setOptimizationGoal] = useState("LINK_CLICKS");
   const [billingEvent, setBillingEvent] = useState("IMPRESSIONS");
-  const [dailyBudget, setDailyBudget] = useState("10");
+  const [dailyBudget, setDailyBudget] = useState("");
   const [bidAmount, setBidAmount] = useState("");
   const [ageMin, setAgeMin] = useState("18");
   const [ageMax, setAgeMax] = useState("65");
@@ -56,6 +56,12 @@ export function CreateAdSetDialog({
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    if (!hasCampaignBudget && !dailyBudget) {
+      setError("Enter a daily budget for this ad set, or use a campaign with Campaign Budget Optimization.");
+      setLoading(false);
+      return;
+    }
 
     try {
       const targeting = {
@@ -183,7 +189,6 @@ export function CreateAdSetDialog({
                   step="0.01"
                   value={dailyBudget}
                   onChange={(e) => setDailyBudget(e.target.value)}
-                  required
                 />
               </div>
               <div className="space-y-2">
