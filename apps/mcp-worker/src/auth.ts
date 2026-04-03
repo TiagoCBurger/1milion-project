@@ -125,11 +125,19 @@ export async function verifyOAuthAccessToken(
     "json"
   );
 
-  if (!stored) return null;
+  if (!stored) {
+    console.log("[oauth] token not found in KV, hash:", tokenHash.slice(0, 8));
+    return null;
+  }
 
   // Check expiration
   const now = Math.floor(Date.now() / 1000);
-  if (stored.expires_at < now) return null;
+  if (stored.expires_at < now) {
+    console.log("[oauth] token expired, workspace:", stored.workspace_id);
+    return null;
+  }
+
+  console.log("[oauth] token OK, workspace:", stored.workspace_id, "client:", stored.client_id);
 
   // Resolve workspace context from Supabase
   // We look up workspace tier and limits via RPC
@@ -147,7 +155,7 @@ export async function verifyOAuthAccessToken(
   );
 
   if (!response.ok) {
-    console.error("get_workspace_context error:", response.status);
+    console.error("[oauth] get_workspace_context error:", response.status, await response.text());
     return null;
   }
 
@@ -158,6 +166,8 @@ export async function verifyOAuthAccessToken(
     requests_per_day: number;
     max_mcp_connections: number;
   }>;
+
+  console.log("[oauth] get_workspace_context rows:", rows.length, rows[0] ? JSON.stringify(rows[0]) : "empty");
 
   if (!rows || rows.length === 0) return null;
 
@@ -188,7 +198,9 @@ export async function verifyOAuthAccessToken(
         });
       }
     }
+    console.log("[oauth] conn limit check: count=", connCount, "max=", row.max_mcp_connections);
     if (connCount !== null && connCount > row.max_mcp_connections) {
+      console.log("[oauth] connection limit exceeded");
       return null; // Connection limit exceeded
     }
   }
@@ -220,11 +232,16 @@ export async function verifyOAuthAccessToken(
       allowed_accounts: string[];
     }>;
 
+    console.log("[oauth] get_oauth_connection rows:", connRows.length, connRows[0] ? JSON.stringify(connRows[0]) : "empty");
+
     if (connRows && connRows.length > 0) {
       const conn = connRows[0];
 
       // Connection was revoked by admin
-      if (!conn.is_active) return null;
+      if (!conn.is_active) {
+        console.log("[oauth] connection is_active=false, revoked");
+        return null;
+      }
 
       // Use DB as source of truth for allowed accounts
       allowedAccounts = conn.allowed_accounts;
