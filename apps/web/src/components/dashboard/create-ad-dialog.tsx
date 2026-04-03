@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, ImageIcon, Check, Upload } from "lucide-react";
+import { Plus, ImageIcon, Check, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,18 +23,27 @@ const CTA_TYPES = [
   { value: "DOWNLOAD", label: "Download" },
 ];
 
+interface AdImage {
+  id: string;
+  image_hash: string;
+  r2_url: string | null;
+  file_name: string;
+}
+
 export function CreateAdDialog({
   workspaceId,
   accountId,
   adSets,
   creatives,
   pages,
+  images,
 }: {
   workspaceId: string;
   accountId: string;
   adSets: { id: string; name: string }[];
   creatives: { id: string; name: string; thumbnail_url?: string }[];
   pages: { id: string; name: string }[];
+  images: AdImage[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -46,20 +55,27 @@ export function CreateAdDialog({
   const [adsetId, setAdsetId] = useState(adSets[0]?.id ?? "");
   const [creativeId, setCreativeId] = useState("");
 
-  // New creative mode
+  // Creative mode
   const [mode, setMode] = useState<"existing" | "new">("existing");
 
-  // New creative fields
-  const [uploading, setUploading] = useState(false);
+  // Image selection / upload
   const [imageHash, setImageHash] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // New creative fields
   const [pageId, setPageId] = useState(pages[0]?.id ?? "");
   const [message, setMessage] = useState("");
   const [headline, setHeadline] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [ctaType, setCtaType] = useState("LEARN_MORE");
   const [creativeName, setCreativeName] = useState("");
+
+  function selectExistingImage(img: AdImage) {
+    setImageHash(img.image_hash);
+    setImagePreview(img.r2_url);
+  }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -102,10 +118,9 @@ export function CreateAdDialog({
     try {
       let finalCreativeId = creativeId;
 
-      // If creating a new creative, do that first
       if (mode === "new") {
         if (!imageHash) {
-          setError("Upload an image first");
+          setError("Select or upload an image first");
           setLoading(false);
           return;
         }
@@ -141,7 +156,6 @@ export function CreateAdDialog({
         return;
       }
 
-      // Create the ad
       const res = await fetch(`/api/workspaces/${workspaceId}/meta/ads`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -264,41 +278,88 @@ export function CreateAdDialog({
                   </Select>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    No creatives found. Switch to "Create New" to build one.
+                    No creatives found. Switch to &quot;Create New&quot; to build one.
                   </p>
                 )}
               </div>
             ) : (
               <div className="space-y-3 rounded-lg border p-3">
-                {/* Image upload */}
-                <div
-                  className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/25 p-4 cursor-pointer hover:border-muted-foreground/50 transition-colors"
-                  onClick={() => fileRef.current?.click()}
-                >
-                  {imagePreview ? (
-                    <div className="relative">
-                      <img src={imagePreview} alt="Preview" className="max-h-28 rounded-lg object-contain" />
-                      {imageHash && (
-                        <div className="absolute -top-2 -right-2 bg-emerald-500 text-white rounded-full p-0.5">
-                          <Check className="h-3 w-3" />
+                {/* Image: select from gallery or upload */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Image</Label>
+
+                  {/* Selected image preview */}
+                  {imagePreview && (
+                    <div className="flex items-center gap-3 rounded-md border bg-muted/30 p-2">
+                      <img src={imagePreview} alt="Selected" className="h-16 w-16 rounded-md object-cover" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">Image selected</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{imageHash.slice(0, 16)}...</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { setImageHash(""); setImagePreview(null); }}
+                        className="text-xs"
+                      >
+                        Change
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Gallery + upload (shown when no image selected) */}
+                  {!imagePreview && (
+                    <>
+                      {images.length > 0 && (
+                        <div className="grid grid-cols-5 gap-1.5 max-h-32 overflow-y-auto rounded-md border p-1.5">
+                          {images.map((img) => (
+                            <button
+                              key={img.id}
+                              type="button"
+                              onClick={() => selectExistingImage(img)}
+                              className={`relative rounded overflow-hidden border-2 transition-all ${
+                                imageHash === img.image_hash
+                                  ? "border-primary ring-1 ring-primary/20"
+                                  : "border-transparent hover:border-muted-foreground/30"
+                              }`}
+                              title={img.file_name}
+                            >
+                              {img.r2_url ? (
+                                <img src={img.r2_url} alt={img.file_name} className="aspect-square w-full object-cover" />
+                              ) : (
+                                <div className="aspect-square w-full flex items-center justify-center bg-muted">
+                                  <ImageIcon className="h-4 w-4 text-muted-foreground/40" />
+                                </div>
+                              )}
+                            </button>
+                          ))}
                         </div>
                       )}
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="h-6 w-6 text-muted-foreground/50 mb-1" />
-                      <p className="text-xs text-muted-foreground">Click to upload image</p>
+
+                      <div
+                        className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-3 cursor-pointer hover:border-muted-foreground/50 transition-colors"
+                        onClick={() => fileRef.current?.click()}
+                      >
+                        {uploading ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        ) : (
+                          <Upload className="h-4 w-4 text-muted-foreground/50" />
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {uploading ? "Uploading..." : "Upload new image"}
+                        </p>
+                        <input
+                          ref={fileRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                      </div>
                     </>
                   )}
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
                 </div>
-                {uploading && <p className="text-xs text-muted-foreground">Uploading...</p>}
 
                 {/* Page selector */}
                 <div className="space-y-1">

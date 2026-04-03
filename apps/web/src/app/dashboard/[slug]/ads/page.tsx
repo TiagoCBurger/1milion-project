@@ -1,5 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getDecryptedToken, fetchAds, fetchAdSets, fetchCreatives, fetchPages } from "@/lib/meta-api";
 import { getEnabledAdAccounts } from "@/lib/workspace-data";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -84,6 +85,16 @@ export default async function AdsPage({
   }));
   const pageOptions = pages.map((p: any) => ({ id: p.id, name: p.name }));
 
+  // Fetch persisted images
+  const admin = createAdminClient();
+  const { data: images } = await admin
+    .from("ad_images")
+    .select("id, image_hash, r2_url, file_name")
+    .eq("workspace_id", workspace.id)
+    .eq("account_id", selectedAccount)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
   return (
     <>
       <PageHeader breadcrumbs={[
@@ -100,7 +111,7 @@ export default async function AdsPage({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <CreateAdDialog workspaceId={workspace.id} accountId={selectedAccount} adSets={adsetOptions} creatives={creativeOptions} pages={pageOptions} />
+            <CreateAdDialog workspaceId={workspace.id} accountId={selectedAccount} adSets={adsetOptions} creatives={creativeOptions} pages={pageOptions} images={images ?? []} />
             <AccountSelector accounts={accounts} current={selectedAccount} />
           </div>
         </div>
