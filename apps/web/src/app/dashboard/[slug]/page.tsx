@@ -97,7 +97,7 @@ export default async function WorkspacePage({
         {/* Stat Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            title="Meta Connection"
+            title="Connection Status"
             value={isConnected ? "Connected" : "Disconnected"}
             subtitle={
               isConnected && daysUntilExpiry !== null && daysUntilExpiry <= 15
@@ -133,7 +133,7 @@ export default async function WorkspacePage({
             <Button asChild>
               <Link href={`/dashboard/${slug}/connect`}>
                 <Link2 className="mr-2 h-4 w-4" />
-                Connect Meta Account
+                Connect Account
               </Link>
             </Button>
           )}
@@ -215,7 +215,7 @@ export default async function WorkspacePage({
         {isConnected && (businessManagers ?? []).length > 0 && (
           <div className="space-y-4">
             <div>
-              <h2 className="text-lg font-semibold">Business Managers & Ad Accounts</h2>
+              <h2 className="text-lg font-semibold">Advertising Accounts</h2>
               <p className="text-sm text-muted-foreground">
                 {businessManagers!.length} BM{businessManagers!.length !== 1 ? "s" : ""} &middot;{" "}
                 {totalAdAccounts} ad account{totalAdAccounts !== 1 ? "s" : ""}
@@ -307,7 +307,7 @@ export default async function WorkspacePage({
             <div>
               <h2 className="text-lg font-semibold">MCP Connections</h2>
               <p className="text-sm text-muted-foreground">
-                Clients connected via OAuth. Control which ad accounts each client can access.
+                Clients connected via OAuth. Control which accounts each client can access.
               </p>
             </div>
             <OAuthConnections

@@ -56,7 +56,7 @@ export default async function DashboardPage() {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Workspaces</h1>
             <p className="mt-1 text-muted-foreground">
-              Select a workspace to manage your Meta Ads.
+              Select a workspace to manage your marketing tools.
             </p>
           </div>
           <Button asChild>
@@ -75,7 +75,7 @@ export default async function DashboardPage() {
               </div>
               <h3 className="text-lg font-semibold">No workspaces yet</h3>
               <p className="mt-1 text-sm text-muted-foreground text-center max-w-sm">
-                Create a workspace to connect your Meta Business Manager and start managing ads with AI.
+                Create a workspace to connect your marketing tools and start managing campaigns with AI.
               </p>
               <Button asChild className="mt-6">
                 <Link href="/dashboard/new">

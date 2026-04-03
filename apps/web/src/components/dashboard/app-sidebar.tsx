@@ -85,7 +85,7 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
     ? [
         { title: "Billing", url: `/dashboard/${slug}/billing`, icon: CreditCard },
         { title: "MCP Connections", url: `/dashboard/${slug}/connections`, icon: Cable },
-        { title: "Connect Meta", url: `/dashboard/${slug}/connect`, icon: Link2 },
+        { title: "Integrations", url: `/dashboard/${slug}/connect`, icon: Link2 },
         { title: "Setup Guide", url: `/dashboard/${slug}/setup`, icon: BookOpen },
       ]
     : []
@@ -155,7 +155,7 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
       <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-6">
         <NavGroup label="Overview" items={overviewItems} pathname={pathname} />
         {metaAdsItems.length > 0 && (
-          <NavGroup label="Meta Ads" items={metaAdsItems} pathname={pathname} />
+          <NavGroup label="Advertising" items={metaAdsItems} pathname={pathname} />
         )}
         {settingsItems.length > 0 && (
           <NavGroup label="Settings" items={settingsItems} pathname={pathname} />

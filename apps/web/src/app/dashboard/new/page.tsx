@@ -72,7 +72,7 @@ export default function NewWorkspacePage() {
           <CardHeader>
             <CardTitle>Create Workspace</CardTitle>
             <CardDescription>
-              Each workspace connects to one Meta Business Manager.
+              Each workspace connects to your marketing platforms and tools.
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -176,9 +176,9 @@ export default function ConnectPage() {
         ]}
       />
       <div className="p-6 max-w-xl">
-        <h1 className="text-2xl font-semibold tracking-tight mb-1">Connect Meta Account</h1>
+        <h1 className="text-2xl font-semibold tracking-tight mb-1">Connect Marketing Account</h1>
         <p className="text-muted-foreground mb-6">
-          Connect your Facebook account to authorize access to your Meta Ads data.
+          Connect your Facebook account to authorize access to your advertising data and tools.
         </p>
 
         {(oauthError || error) && (
@@ -202,7 +202,7 @@ export default function ConnectPage() {
         </Button>
 
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          We&apos;ll request access to manage your ads, read insights, and access your Business Manager.
+          We&apos;ll request access to manage your campaigns, read insights, and access your advertising accounts.
         </p>
 
         {/* Divider */}
