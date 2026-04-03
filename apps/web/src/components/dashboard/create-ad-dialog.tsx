@@ -116,64 +116,39 @@ export function CreateAdDialog({
     setError("");
 
     try {
-      let finalCreativeId = creativeId;
+      // Build the request body based on mode
+      const adBody: Record<string, unknown> = {
+        account_id: accountId,
+        name,
+        adset_id: adsetId,
+      };
 
-      if (mode === "new") {
+      if (mode === "existing") {
+        if (!creativeId) {
+          setError("No creative selected");
+          setLoading(false);
+          return;
+        }
+        adBody.creative_id = creativeId;
+      } else {
+        // "new" mode: send inline creative fields — the ad route builds object_story_spec
         if (!imageHash) {
           setError("Select or upload an image first");
           setLoading(false);
           return;
         }
-
-        const creativeRes = await fetch(`/api/workspaces/${workspaceId}/meta/creatives`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            account_id: accountId,
-            page_id: pageId,
-            name: creativeName || name + " Creative",
-            image_hash: imageHash,
-            link_url: linkUrl || undefined,
-            message: message || undefined,
-            headline: headline || undefined,
-            call_to_action_type: ctaType,
-          }),
-        });
-
-        const creativeData = await creativeRes.json();
-        if (!creativeRes.ok) {
-          const detail = creativeData.meta_error
-            ? ` (code ${creativeData.meta_error.code ?? "?"}${creativeData.meta_error.error_subcode ? `/${creativeData.meta_error.error_subcode}` : ""})`
-            : "";
-          setError((creativeData.error || "Failed to create creative") + detail);
-          setLoading(false);
-          return;
-        }
-
-        if (creativeData._dev_fallback) {
-          setError("Your Meta app is in development mode. Creatives created in dev mode may not work for ads. Switch to live mode or request Standard Access.");
-          setLoading(false);
-          return;
-        }
-
-        finalCreativeId = creativeData.id;
-      }
-
-      if (!finalCreativeId) {
-        setError("No creative selected");
-        setLoading(false);
-        return;
+        adBody.page_id = pageId;
+        adBody.image_hash = imageHash;
+        adBody.link_url = linkUrl;
+        if (message) adBody.message = message;
+        if (headline) adBody.headline = headline;
+        adBody.call_to_action_type = ctaType;
       }
 
       const res = await fetch(`/api/workspaces/${workspaceId}/meta/ads`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          account_id: accountId,
-          name,
-          adset_id: adsetId,
-          creative_id: finalCreativeId,
-        }),
+        body: JSON.stringify(adBody),
       });
 
       const data = await res.json();
