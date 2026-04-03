@@ -183,12 +183,12 @@ export function CreateAdSetDialog({
             </div>
           </div>
 
-          {hasCampaignBudget ? (
-            <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
-              This campaign uses Campaign Budget Optimization (CBO). The budget is managed at the campaign level — no ad set budget needed.
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            {hasCampaignBudget ? (
+              <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground col-span-1">
+                Budget managed at campaign level (CBO)
+              </div>
+            ) : (
               <div className="space-y-2">
                 <Label htmlFor="adset-budget">Daily Budget ($)</Label>
                 <Input
@@ -200,27 +200,27 @@ export function CreateAdSetDialog({
                   onChange={(e) => setDailyBudget(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="bid-amount">
-                  Bid Cap ($){bidAmountRequired && <span className="ml-1 text-destructive">*</span>}
-                </Label>
-                <Input
-                  id="bid-amount"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={bidAmount}
-                  onChange={(e) => setBidAmount(e.target.value)}
-                  placeholder={bidAmountRequired ? "Required" : "Optional"}
-                />
-                {bidAmountRequired && (
-                  <p className="text-xs text-destructive">
-                    Required for {selectedCampaign?.bidStrategy} strategy
-                  </p>
-                )}
-              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="bid-amount">
+                Bid Cap ($){bidAmountRequired && <span className="ml-1 text-destructive">*</span>}
+              </Label>
+              <Input
+                id="bid-amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={bidAmount}
+                onChange={(e) => setBidAmount(e.target.value)}
+                placeholder={bidAmountRequired ? "Required" : "Optional"}
+              />
+              {bidAmountRequired && (
+                <p className="text-xs text-destructive">
+                  Required for {selectedCampaign?.bidStrategy} strategy
+                </p>
+              )}
             </div>
-          )}
+          </div>
 
           <div className="space-y-2">
             <Label className="text-sm font-medium">Targeting</Label>
