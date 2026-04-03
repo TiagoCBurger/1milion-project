@@ -6,6 +6,13 @@ import {
 } from "@/lib/abacatepay";
 import { TIER_LIMITS } from "@vibefly/shared";
 import type { SubscriptionTier } from "@vibefly/shared";
+import {
+  sendTransactionalEmail,
+  syncUserToAudience,
+  BillingReceiptEmail,
+  PlanCancelingEmail,
+  EMAIL_TAGS,
+} from "@vibefly/email";
 
 export async function POST(request: Request) {
   // Verify query string secret

@@ -18,6 +18,14 @@
     },
     "type-check": {
       "dependsOn": ["^build"]
+    },
+    "email:dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "email:preview": {
+      "cache": false,
+      "persistent": true
     }
   }
 }

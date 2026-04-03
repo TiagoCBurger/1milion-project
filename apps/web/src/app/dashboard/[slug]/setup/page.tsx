@@ -17,7 +17,7 @@ const OAUTH_MCP_CONFIG = JSON.stringify(
   {
     mcpServers: {
       vibefly: {
-        type: "streamable-http",
+        type: "http",
         url: `${MCP_GATEWAY_URL}/mcp`,
       },
     },
@@ -59,7 +59,7 @@ export default function SetupPage() {
     {
       mcpServers: {
         [`meta-ads-${slug}`]: {
-          type: "streamable-http",
+          type: "http",
           url: `${MCP_GATEWAY_URL}/mcp`,
           headers: {
             Authorization: `Bearer ${apiKeyPrefix}`,
@@ -141,7 +141,7 @@ export default function SetupPage() {
             <p className="mt-2 text-sm text-muted-foreground">
               Or add via CLI:{" "}
               <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono break-all">
-                claude mcp add --scope project vibefly --transport streamable-http &quot;{MCP_GATEWAY_URL}/mcp&quot;
+                claude mcp add --scope project vibefly --transport http &quot;{MCP_GATEWAY_URL}/mcp&quot;
               </code>
             </p>
           </TabsContent>

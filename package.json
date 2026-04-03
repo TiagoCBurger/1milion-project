@@ -14,7 +14,10 @@
     "build:worker": "turbo build --filter=@vibefly/mcp-worker",
     "test": "turbo test",
     "test:worker": "turbo test --filter=@vibefly/mcp-worker",
-    "test:shared": "turbo test --filter=@vibefly/shared"
+    "test:shared": "turbo test --filter=@vibefly/shared",
+    "email:dev": "turbo email:dev --filter=@vibefly/email",
+    "email:preview": "turbo email:preview --filter=@vibefly/email",
+    "email:export-auth": "pnpm --filter=@vibefly/email export:auth"
   },
   "devDependencies": {
     "turbo": "^2.4.0",
