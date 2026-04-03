@@ -201,7 +201,9 @@ export function CreateAdSetDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="bid-amount">Bid Cap ($)</Label>
+                <Label htmlFor="bid-amount">
+                  Bid Cap ($){bidAmountRequired && <span className="ml-1 text-destructive">*</span>}
+                </Label>
                 <Input
                   id="bid-amount"
                   type="number"
@@ -209,9 +211,13 @@ export function CreateAdSetDialog({
                   step="0.01"
                   value={bidAmount}
                   onChange={(e) => setBidAmount(e.target.value)}
-                  placeholder="Optional"
+                  placeholder={bidAmountRequired ? "Required" : "Optional"}
                 />
-                <p className="text-xs text-muted-foreground">Required if campaign uses bid cap strategy</p>
+                {bidAmountRequired && (
+                  <p className="text-xs text-destructive">
+                    Required for {selectedCampaign?.bidStrategy} strategy
+                  </p>
+                )}
               </div>
             </div>
           )}
