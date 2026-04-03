@@ -45,7 +45,7 @@ export function CreateCampaignDialog({
 
   const [name, setName] = useState("");
   const [objective, setObjective] = useState("OUTCOME_TRAFFIC");
-  const [dailyBudget, setDailyBudget] = useState("10");
+  const [dailyBudget, setDailyBudget] = useState("");
   const [specialCategory, setSpecialCategory] = useState("NONE");
 
   async function handleSubmit(e: React.FormEvent) {
@@ -61,7 +61,7 @@ export function CreateCampaignDialog({
           account_id: accountId,
           name,
           objective,
-          daily_budget: Math.round(parseFloat(dailyBudget) * 100),
+          daily_budget: dailyBudget ? Math.round(parseFloat(dailyBudget) * 100) : undefined,
           special_ad_categories: specialCategory === "NONE" ? [] : [specialCategory],
         }),
       });
@@ -74,7 +74,7 @@ export function CreateCampaignDialog({
 
       setOpen(false);
       setName("");
-      setDailyBudget("10");
+      setDailyBudget("");
       router.refresh();
     } catch {
       setError("Network error");
@@ -137,8 +137,11 @@ export function CreateCampaignDialog({
               step="0.01"
               value={dailyBudget}
               onChange={(e) => setDailyBudget(e.target.value)}
-              required
+              placeholder="Optional"
             />
+            <p className="text-xs text-muted-foreground">
+              Setting a budget enables Campaign Budget Optimization (CBO). Leave empty if ad sets will manage their own budgets.
+            </p>
           </div>
 
           <div className="space-y-2">

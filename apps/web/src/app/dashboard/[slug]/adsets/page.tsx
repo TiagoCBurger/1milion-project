@@ -74,7 +74,11 @@ export default async function AdSetsPage({
   const selectedAccount = account_id ?? accounts[0].meta_account_id;
   const { data: adsets, error } = await fetchAdSets(token, selectedAccount);
   const { data: campaigns } = await fetchCampaigns(token, selectedAccount);
-  const campaignOptions = campaigns.map((c: any) => ({ id: c.id, name: c.name }));
+  const campaignOptions = campaigns.map((c: any) => ({
+    id: c.id,
+    name: c.name,
+    hasBudget: !!(c.daily_budget || c.lifetime_budget),
+  }));
 
   return (
     <>

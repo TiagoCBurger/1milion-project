@@ -34,7 +34,7 @@ export function CreateAdSetDialog({
 }: {
   workspaceId: string;
   accountId: string;
-  campaigns: { id: string; name: string }[];
+  campaigns: { id: string; name: string; hasBudget: boolean }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -43,6 +43,7 @@ export function CreateAdSetDialog({
 
   const [name, setName] = useState("");
   const [campaignId, setCampaignId] = useState(campaigns[0]?.id ?? "");
+  const hasCampaignBudget = campaigns.find((c) => c.id === campaignId)?.hasBudget ?? false;
   const [optimizationGoal, setOptimizationGoal] = useState("LINK_CLICKS");
   const [billingEvent, setBillingEvent] = useState("IMPRESSIONS");
   const [dailyBudget, setDailyBudget] = useState("10");
@@ -75,7 +76,7 @@ export function CreateAdSetDialog({
           name,
           optimization_goal: optimizationGoal,
           billing_event: billingEvent,
-          daily_budget: String(Math.round(parseFloat(dailyBudget) * 100)),
+          daily_budget: hasCampaignBudget ? undefined : String(Math.round(parseFloat(dailyBudget) * 100)),
           bid_amount: bidAmount ? String(Math.round(parseFloat(bidAmount) * 100)) : undefined,
           targeting,
         }),
@@ -167,33 +168,39 @@ export function CreateAdSetDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="adset-budget">Daily Budget ($)</Label>
-              <Input
-                id="adset-budget"
-                type="number"
-                min="1"
-                step="0.01"
-                value={dailyBudget}
-                onChange={(e) => setDailyBudget(e.target.value)}
-                required
-              />
+          {hasCampaignBudget ? (
+            <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+              This campaign uses Campaign Budget Optimization (CBO). The budget is managed at the campaign level — no ad set budget needed.
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="bid-amount">Bid Cap ($)</Label>
-              <Input
-                id="bid-amount"
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={bidAmount}
-                onChange={(e) => setBidAmount(e.target.value)}
-                placeholder="Optional"
-              />
-              <p className="text-xs text-muted-foreground">Required if campaign uses bid cap strategy</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="adset-budget">Daily Budget ($)</Label>
+                <Input
+                  id="adset-budget"
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={dailyBudget}
+                  onChange={(e) => setDailyBudget(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bid-amount">Bid Cap ($)</Label>
+                <Input
+                  id="bid-amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={bidAmount}
+                  onChange={(e) => setBidAmount(e.target.value)}
+                  placeholder="Optional"
+                />
+                <p className="text-xs text-muted-foreground">Required if campaign uses bid cap strategy</p>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-2">
             <Label className="text-sm font-medium">Targeting</Label>
