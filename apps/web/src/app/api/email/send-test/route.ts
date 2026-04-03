@@ -3,11 +3,11 @@
 // POST /api/email/send-test
 // ============================================================
 
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { sendTransactionalEmail, WelcomeEmail, EMAIL_TAGS } from "@vibefly/email";
 
 export async function POST(request: Request) {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {

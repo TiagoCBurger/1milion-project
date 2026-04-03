@@ -5,7 +5,7 @@
 // DELETE /api/email/audiences/[id]/contacts  — remove contact
 // ============================================================
 
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { listContacts, addContact, removeContact } from "@vibefly/email";
 
 interface Params {
@@ -13,7 +13,7 @@ interface Params {
 }
 
 export async function GET(request: Request, { params }: Params) {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -23,7 +23,7 @@ export async function GET(request: Request, { params }: Params) {
 }
 
 export async function POST(request: Request, { params }: Params) {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -39,7 +39,7 @@ export async function POST(request: Request, { params }: Params) {
 }
 
 export async function DELETE(request: Request, { params }: Params) {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 

@@ -4,7 +4,7 @@
 // POST /api/email/broadcasts/[id]  — send the broadcast
 // ============================================================
 
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { getBroadcast, sendBroadcastById } from "@vibefly/email";
 
 interface Params {
@@ -12,7 +12,7 @@ interface Params {
 }
 
 export async function GET(request: Request, { params }: Params) {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -22,7 +22,7 @@ export async function GET(request: Request, { params }: Params) {
 }
 
 export async function POST(request: Request, { params }: Params) {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 

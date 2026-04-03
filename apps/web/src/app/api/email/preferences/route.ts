@@ -4,12 +4,12 @@
 // PATCH /api/email/preferences  — update preferences
 // ============================================================
 
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { EmailPreference } from "@vibefly/shared";
 
 export async function GET(request: Request) {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
