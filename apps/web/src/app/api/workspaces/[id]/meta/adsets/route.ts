@@ -28,6 +28,7 @@ export async function POST(
   }
 
   const body = await request.json();
+  console.log("[adsets] Request body:", JSON.stringify(body, null, 2));
   const {
     account_id, campaign_id, name, optimization_goal,
     billing_event, daily_budget, targeting,
@@ -52,13 +53,17 @@ export async function POST(
     targeting_automation: { advantage_audience: 1 },
   };
 
+  // targeting must be a pre-stringified JSON string for metaApiPost
+  // (metaApiPost will JSON.stringify non-string values, so pass as string to avoid double encoding)
+  const targetingStr = JSON.stringify(targeting ?? defaultTargeting);
+
   const metaParams: Record<string, unknown> = {
     campaign_id,
     name,
     optimization_goal,
     billing_event,
     status: "PAUSED",
-    targeting: JSON.stringify(targeting ?? defaultTargeting),
+    targeting: targetingStr,
   };
 
   if (daily_budget) {
@@ -72,8 +77,11 @@ export async function POST(
   );
 
   if ((result as any).error) {
+    const metaError = (result as any).error;
+    const message = metaError?.error_user_msg || metaError?.message || "Meta API error";
+    console.error("[adsets] Meta error:", JSON.stringify(metaError));
     return Response.json(
-      { error: (result as any).error?.message ?? "Meta API error" },
+      { error: message, meta_error: metaError },
       { status: 400 }
     );
   }

@@ -8,6 +8,7 @@ import {
   metaApiPost,
   metaApiUploadImage,
   ensureActPrefix,
+  invalidateCache,
 } from "@/lib/meta-api";
 
 describe("Meta API Write Operations", () => {
@@ -16,6 +17,7 @@ describe("Meta API Write Operations", () => {
   beforeEach(() => {
     originalFetch = global.fetch;
     vi.clearAllMocks();
+    invalidateCache();
   });
 
   afterEach(() => {

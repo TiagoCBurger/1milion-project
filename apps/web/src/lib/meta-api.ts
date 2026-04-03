@@ -3,9 +3,78 @@ import { META_GRAPH_BASE_URL, META_API_VERSION } from "@vibefly/shared";
 
 const BASE_URL = `${META_GRAPH_BASE_URL}/${META_API_VERSION}`;
 
+// ── In-memory cache ──────────────────────────────────────────
+
+interface CacheEntry {
+  data: Record<string, unknown>;
+  expiresAt: number;
+}
+
+const cache = new Map<string, CacheEntry>();
+
+const TTL = {
+  token: 5 * 60_000,       // 5 min  — tokens rarely change
+  campaigns: 60_000,        // 1 min  — listing data
+  adsets: 60_000,
+  ads: 60_000,
+  insights: 5 * 60_000,    // 5 min  — insights are heavy and update slowly
+  pages: 10 * 60_000,      // 10 min — pages almost never change
+  default: 60_000,
+};
+
+function cacheKey(endpoint: string, params: Record<string, unknown>): string {
+  const paramStr = Object.entries(params)
+    .filter(([k]) => k !== "access_token")
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`)
+    .join("&");
+  return `${endpoint}?${paramStr}`;
+}
+
+function ttlForEndpoint(endpoint: string): number {
+  if (endpoint.includes("/campaigns")) return TTL.campaigns;
+  if (endpoint.includes("/adsets")) return TTL.adsets;
+  if (endpoint.includes("/ads")) return TTL.ads;
+  if (endpoint.includes("/insights")) return TTL.insights;
+  if (endpoint.includes("me/accounts")) return TTL.pages;
+  return TTL.default;
+}
+
+function getCached(key: string): Record<string, unknown> | null {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCache(key: string, data: Record<string, unknown>, ttl: number): void {
+  cache.set(key, { data, expiresAt: Date.now() + ttl });
+}
+
+/** Invalidate cache entries matching a pattern (e.g. after a mutation). */
+export function invalidateCache(pattern?: string): void {
+  if (!pattern) {
+    cache.clear();
+    return;
+  }
+  for (const key of cache.keys()) {
+    if (key.includes(pattern)) cache.delete(key);
+  }
+}
+
 // ── Token decryption ──────────────────────────────────────────
 
 export async function getDecryptedToken(workspaceId: string): Promise<string | null> {
+  // Check token cache first
+  const tokenCacheKey = `token:${workspaceId}`;
+  const cachedToken = getCached(tokenCacheKey);
+  if (cachedToken) {
+    return cachedToken._token as string;
+  }
+
   const encKey = process.env.TOKEN_ENCRYPTION_KEY;
   if (!encKey) {
     console.error("[meta-api] TOKEN_ENCRYPTION_KEY is not set");
@@ -25,6 +94,7 @@ export async function getDecryptedToken(workspaceId: string): Promise<string | n
     return null;
   }
   console.log("[meta-api] Token decrypted successfully, length:", (data as string).length);
+  setCache(tokenCacheKey, { _token: data as string }, TTL.token);
   return data as string;
 }
 
@@ -35,17 +105,26 @@ export async function metaApiGet(
   token: string,
   params: Record<string, unknown> = {}
 ): Promise<Record<string, unknown>> {
+  const key = cacheKey(endpoint, params);
+  const cached = getCached(key);
+  if (cached) {
+    console.log("[meta-api] CACHE HIT", endpoint);
+    return cached;
+  }
+
   const url = new URL(`${BASE_URL}/${endpoint}`);
   url.searchParams.set("access_token", token);
-  for (const [key, value] of Object.entries(params)) {
+  for (const [k, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue;
-    url.searchParams.set(key, typeof value === "string" ? value : JSON.stringify(value));
+    url.searchParams.set(k, typeof value === "string" ? value : JSON.stringify(value));
   }
   console.log("[meta-api] GET", endpoint);
   const res = await fetch(url.toString(), { cache: "no-store" });
   const json = (await res.json()) as Record<string, unknown>;
   if ((json as any).error) {
     console.error("[meta-api] API error:", JSON.stringify((json as any).error));
+  } else {
+    setCache(key, json, ttlForEndpoint(endpoint));
   }
   return json;
 }
@@ -73,6 +152,12 @@ export async function metaApiPost(
   const json = (await res.json()) as Record<string, unknown>;
   if ((json as any).error) {
     console.error("[meta-api] POST error:", JSON.stringify((json as any).error));
+  } else {
+    // Invalidate related caches after successful mutation
+    if (endpoint.includes("/campaigns")) invalidateCache("/campaigns");
+    if (endpoint.includes("/adsets")) invalidateCache("/adsets");
+    if (endpoint.includes("/ads")) invalidateCache("/ads");
+    if (endpoint.includes("/adcreatives")) invalidateCache("/adcreatives");
   }
   return json;
 }

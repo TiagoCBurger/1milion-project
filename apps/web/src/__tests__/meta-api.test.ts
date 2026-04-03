@@ -12,6 +12,7 @@ import {
   fetchAds,
   fetchInsights,
   fetchPages,
+  invalidateCache,
 } from "@/lib/meta-api";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -24,6 +25,7 @@ describe("Meta API Layer", () => {
   beforeEach(() => {
     originalFetch = global.fetch;
     vi.clearAllMocks();
+    invalidateCache();
   });
 
   afterEach(() => {

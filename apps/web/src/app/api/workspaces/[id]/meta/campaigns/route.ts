@@ -58,8 +58,11 @@ export async function POST(
   );
 
   if ((result as any).error) {
+    const metaError = (result as any).error;
+    const message = metaError?.error_user_msg || metaError?.message || "Meta API error";
+    console.error("[campaigns] Meta error:", JSON.stringify(metaError));
     return Response.json(
-      { error: (result as any).error?.message ?? "Meta API error" },
+      { error: message, meta_error: metaError },
       { status: 400 }
     );
   }
