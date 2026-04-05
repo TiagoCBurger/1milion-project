@@ -13,6 +13,7 @@ import {
   Cable,
   BookOpen,
   CreditCard,
+  Radar,
   LogOut,
   ChevronsUpDown,
   Building2,
@@ -83,6 +84,7 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
 
   const settingsItems: NavItem[] = slug
     ? [
+        { title: "Tracking & CAPI", url: `/dashboard/${slug}/tracking`, icon: Radar },
         { title: "Billing", url: `/dashboard/${slug}/billing`, icon: CreditCard },
         { title: "MCP Connections", url: `/dashboard/${slug}/connections`, icon: Cable },
         { title: "Integrations", url: `/dashboard/${slug}/connect`, icon: Link2 },
