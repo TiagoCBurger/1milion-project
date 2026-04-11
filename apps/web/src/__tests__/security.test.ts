@@ -32,8 +32,42 @@ function mockQueryChain(finalResult: { data: unknown; error: unknown }) {
     chain[m] = vi.fn().mockReturnValue(chain);
   }
   chain.single = vi.fn().mockResolvedValue(finalResult);
+  chain.maybeSingle = vi.fn().mockResolvedValue(finalResult);
   chain.then = (resolve: any) => Promise.resolve(finalResult).then(resolve);
   return chain;
+}
+
+function mockHeadCountChain(count: number) {
+  const result = { count, error: null };
+  const chain: any = {};
+  for (const m of ["select", "eq", "neq", "in"]) {
+    chain[m] = vi.fn().mockReturnValue(chain);
+  }
+  chain.then = (onFulfilled: (v: unknown) => unknown) =>
+    Promise.resolve(result).then(onFulfilled);
+  return chain;
+}
+
+function mockApproveFromSuccess() {
+  mockFrom.mockImplementation((table: string) => {
+    if (table === "memberships") {
+      return mockQueryChain({ data: { role: "owner" }, error: null });
+    }
+    if (table === "subscriptions") {
+      const chain: any = {};
+      chain.select = vi.fn().mockReturnValue(chain);
+      chain.eq = vi.fn().mockReturnValue(chain);
+      chain.maybeSingle = vi.fn().mockResolvedValue({
+        data: { max_mcp_connections: 5 },
+        error: null,
+      });
+      return chain;
+    }
+    if (table === "oauth_connections") {
+      return mockHeadCountChain(0);
+    }
+    return mockQueryChain({ data: null, error: null });
+  });
 }
 
 function setupAuth(user: ReturnType<typeof mockUser> | null) {
@@ -272,7 +306,7 @@ describe("Security: CSRF protection", () => {
 describe("Security: JWT token generation", () => {
   it("JWT has short TTL (30 seconds)", async () => {
     setupAuth(mockUser({ id: "user-123" }));
-    mockFrom.mockReturnValue(mockQueryChain({ data: { role: "owner" }, error: null }));
+    mockApproveFromSuccess();
 
     const handler = await import("@/app/api/oauth/approve/route");
     const res = await handler.POST(
@@ -292,7 +326,7 @@ describe("Security: JWT token generation", () => {
 
   it("JWT includes required claims", async () => {
     setupAuth(mockUser({ id: "user-123" }));
-    mockFrom.mockReturnValue(mockQueryChain({ data: { role: "owner" }, error: null }));
+    mockApproveFromSuccess();
 
     const handler = await import("@/app/api/oauth/approve/route");
     const res = await handler.POST(

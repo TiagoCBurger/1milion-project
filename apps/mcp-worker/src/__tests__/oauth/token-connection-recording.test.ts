@@ -70,13 +70,33 @@ function makeTokenRequest(body: Record<string, string>): Request {
   });
 }
 
+/** Default: unlimited MCP connections so authorization_code passes assertOauthNewConnectionAllowed */
+function mockFetchDefault() {
+  globalThis.fetch = vi.fn().mockImplementation(async (url: string | URL) => {
+    const u = typeof url === "string" ? url : url.toString();
+    if (u.includes("get_workspace_context")) {
+      return {
+        ok: true,
+        json: async () => [
+          {
+            workspace_id: "ws-1",
+            tier: "pro",
+            max_mcp_connections: -1,
+          },
+        ],
+      };
+    }
+    return { ok: true, json: async () => ({}) };
+  });
+}
+
 describe("Token endpoint — connection recording", () => {
   const originalFetch = globalThis.fetch;
   let env: Env;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+    mockFetchDefault();
     env = createMockEnv();
 
     // Setup KV to return client and auth code based on key pattern
@@ -247,8 +267,21 @@ describe("Token endpoint — connection recording", () => {
   });
 
   it("does not block token issuance if recordConnection fails", async () => {
-    // Make the upsert fetch reject
-    (globalThis.fetch as any).mockRejectedValue(new Error("Network error"));
+    (globalThis.fetch as any).mockImplementation(async (url: string | URL) => {
+      const u = typeof url === "string" ? url : url.toString();
+      if (u.includes("get_workspace_context")) {
+        return {
+          ok: true,
+          json: async () => [
+            { workspace_id: "ws-1", tier: "pro", max_mcp_connections: -1 },
+          ],
+        };
+      }
+      if (u.includes("upsert_oauth_connection")) {
+        throw new Error("Network error");
+      }
+      return { ok: true, json: async () => ({}) };
+    });
 
     const request = makeTokenRequest({
       grant_type: "authorization_code",
@@ -264,6 +297,45 @@ describe("Token endpoint — connection recording", () => {
     const data = await response.json();
     expect(data).toHaveProperty("access_token");
     expect(data).toHaveProperty("refresh_token");
+  });
+
+  it("returns invalid_grant when MCP connection limit is reached (authorization_code)", async () => {
+    (globalThis.fetch as any).mockImplementation(async (url: string | URL) => {
+      const u = typeof url === "string" ? url : url.toString();
+      if (u.includes("get_workspace_context")) {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              workspace_id: "ws-1",
+              tier: "free",
+              max_mcp_connections: 1,
+            },
+          ],
+        };
+      }
+      if (u.includes("/oauth_connections?")) {
+        return {
+          ok: true,
+          json: async () => [{ id: "other-conn" }],
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+
+    const request = makeTokenRequest({
+      grant_type: "authorization_code",
+      code: "test_code",
+      code_verifier: "test_verifier",
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+    });
+
+    const response = await handleToken(request, env);
+    expect(response.status).toBe(400);
+    const data = (await response.json()) as { error: string; error_description: string };
+    expect(data.error).toBe("invalid_grant");
+    expect(data.error_description).toContain("MCP connection limit reached");
   });
 
   it("returns valid token response with expected fields", async () => {

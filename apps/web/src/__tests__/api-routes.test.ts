@@ -28,9 +28,44 @@ function mockQueryChain(finalResult: { data: unknown; error: unknown }) {
     chain[m] = vi.fn().mockReturnValue(chain);
   }
   chain.single = vi.fn().mockResolvedValue(finalResult);
+  chain.maybeSingle = vi.fn().mockResolvedValue(finalResult);
   // Make chain thenable
   chain.then = (resolve: any) => Promise.resolve(finalResult).then(resolve);
   return chain;
+}
+
+/** Head count query: await builder → { count, error } */
+function mockHeadCountChain(count: number, error: unknown = null) {
+  const result = { count, error };
+  const chain: any = {};
+  for (const m of ["select", "eq", "neq", "in"]) {
+    chain[m] = vi.fn().mockReturnValue(chain);
+  }
+  chain.then = (onFulfilled: (v: unknown) => unknown) =>
+    Promise.resolve(result).then(onFulfilled);
+  return chain;
+}
+
+function mockApproveFromSuccess() {
+  mockFrom.mockImplementation((table: string) => {
+    if (table === "memberships") {
+      return mockQueryChain({ data: { role: "owner" }, error: null });
+    }
+    if (table === "subscriptions") {
+      const chain: any = {};
+      chain.select = vi.fn().mockReturnValue(chain);
+      chain.eq = vi.fn().mockReturnValue(chain);
+      chain.maybeSingle = vi.fn().mockResolvedValue({
+        data: { max_mcp_connections: 5 },
+        error: null,
+      });
+      return chain;
+    }
+    if (table === "oauth_connections") {
+      return mockHeadCountChain(0);
+    }
+    return mockQueryChain({ data: null, error: null });
+  });
 }
 
 function setupAuth(user: ReturnType<typeof mockUser> | null) {
@@ -393,7 +428,7 @@ describe("POST /api/oauth/approve", () => {
 
   it("returns JWT redirect URL on success", async () => {
     setupAuth(mockUser({ id: "user-123" }));
-    mockFrom.mockReturnValue(mockQueryChain({ data: { role: "owner" }, error: null }));
+    mockApproveFromSuccess();
 
     const res = await handler.POST(
       new Request("http://localhost/api/oauth/approve", {
@@ -418,5 +453,44 @@ describe("POST /api/oauth/approve", () => {
     expect(payload.user_id).toBe("user-123");
     expect(payload.exp).toBeGreaterThan(payload.iat);
     expect(payload.exp - payload.iat).toBe(30); // 30 seconds TTL
+  });
+
+  it("returns 403 when MCP connection limit is reached", async () => {
+    setupAuth(mockUser({ id: "user-123" }));
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "memberships") {
+        return mockQueryChain({ data: { role: "owner" }, error: null });
+      }
+      if (table === "subscriptions") {
+        const chain: any = {};
+        chain.select = vi.fn().mockReturnValue(chain);
+        chain.eq = vi.fn().mockReturnValue(chain);
+        chain.maybeSingle = vi.fn().mockResolvedValue({
+          data: { max_mcp_connections: 1 },
+          error: null,
+        });
+        return chain;
+      }
+      if (table === "oauth_connections") {
+        return mockHeadCountChain(1);
+      }
+      return mockQueryChain({ data: null, error: null });
+    });
+
+    const res = await handler.POST(
+      new Request("http://localhost/api/oauth/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          request_id: "req-1",
+          workspace_id: "ws-1",
+          user_id: "user-123",
+          oauth_client_id: "client_new",
+        }),
+      })
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain("MCP connection limit reached");
   });
 });

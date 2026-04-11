@@ -5,6 +5,7 @@ import {
   ensureActPrefix,
   textResult,
   centsToAmount,
+  sanitizeMetaApiPayloadForClient,
 } from "../meta-api";
 
 describe("ensureActPrefix", () => {
@@ -47,6 +48,36 @@ describe("centsToAmount", () => {
   });
 });
 
+describe("sanitizeMetaApiPayloadForClient", () => {
+  it("removes paging.next and paging.previous but keeps cursors", () => {
+    const raw = {
+      data: [{ id: "1" }],
+      paging: {
+        cursors: { before: "abc", after: "def" },
+        next: "https://graph.facebook.com/v24.0/act_1/ads?access_token=SECRET&after=def",
+        previous: "https://graph.facebook.com/v24.0/act_1/ads?access_token=SECRET&before=abc",
+      },
+    };
+    expect(sanitizeMetaApiPayloadForClient(raw)).toEqual({
+      data: [{ id: "1" }],
+      paging: {
+        cursors: { before: "abc", after: "def" },
+      },
+    });
+  });
+
+  it("sanitizes nested paging objects", () => {
+    const raw = {
+      outer: {
+        paging: { next: "https://example.com?access_token=x", cursors: {} },
+      },
+    };
+    const out = sanitizeMetaApiPayloadForClient(raw) as typeof raw;
+    expect(out.outer.paging).not.toHaveProperty("next");
+    expect(out.outer.paging).toEqual({ cursors: {} });
+  });
+});
+
 describe("textResult", () => {
   it("wraps object as JSON text content", () => {
     const result = textResult({ ok: true });
@@ -54,6 +85,19 @@ describe("textResult", () => {
     expect(result.content[0].type).toBe("text");
     expect(JSON.parse(result.content[0].text)).toEqual({ ok: true });
     expect(result.isError).toBe(false);
+  });
+
+  it("strips tokenized paging URLs from serialized objects", () => {
+    const result = textResult({
+      paging: {
+        cursors: { after: "cursor1" },
+        next: "https://graph.facebook.com/v24.0/x?access_token=LEAK",
+      },
+    });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.paging).toEqual({ cursors: { after: "cursor1" } });
+    expect(JSON.stringify(parsed)).not.toContain("LEAK");
+    expect(JSON.stringify(parsed)).not.toContain("access_token");
   });
 
   it("wraps string as text content directly", () => {

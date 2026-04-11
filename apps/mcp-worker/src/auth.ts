@@ -112,6 +112,106 @@ export async function getMetaToken(
   return token;
 }
 
+const MCP_CONN_COUNT_CACHE_TTL = 60;
+
+/**
+ * True if the workspace cannot add another OAuth MCP connection for this client
+ * (other apps already use all slots). Excludes oauthClientId from the count so
+ * reconnecting the same app does not consume an extra slot.
+ */
+async function mcpConnectionLimitExceededMessage(
+  workspaceId: string,
+  oauthClientId: string,
+  maxMcpConnections: number,
+  tier: string,
+  env: Env
+): Promise<string | null> {
+  if (maxMcpConnections === -1) return null;
+
+  const connCacheKey = `mcp_conn:${workspaceId}:${hashForCache(oauthClientId)}`;
+  let connCount: number | null = null;
+  const cachedCount = await env.CACHE_KV.get(connCacheKey);
+  if (cachedCount !== null) {
+    connCount = parseInt(cachedCount, 10);
+  } else {
+    const countResp = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/oauth_connections?workspace_id=eq.${workspaceId}&is_active=eq.true&client_id=neq.${encodeURIComponent(oauthClientId)}&select=id`,
+      {
+        headers: {
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+      }
+    );
+    if (countResp.ok) {
+      const connRows = (await countResp.json()) as unknown[];
+      connCount = connRows.length;
+      await env.CACHE_KV.put(connCacheKey, String(connCount), {
+        expirationTtl: MCP_CONN_COUNT_CACHE_TTL,
+      });
+    }
+  }
+
+  console.log("[oauth] conn limit check: count=", connCount, "max=", maxMcpConnections);
+  if (connCount !== null && connCount >= maxMcpConnections) {
+    return `MCP connection limit reached (${maxMcpConnections} allowed on ${tier} plan). Revoke an existing connection at vibefly.app/dashboard to reconnect.`;
+  }
+  return null;
+}
+
+/**
+ * Used before issuing tokens for a new authorization_code grant so the user sees
+ * a clear OAuth error instead of succeeding then failing on the first /mcp call.
+ */
+export async function assertOauthNewConnectionAllowed(
+  workspaceId: string,
+  oauthClientId: string,
+  env: Env
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/rpc/get_workspace_context`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({ p_workspace_id: workspaceId }),
+    }
+  );
+
+  if (!response.ok) {
+    console.error(
+      "[oauth] get_workspace_context error:",
+      response.status,
+      await response.text()
+    );
+    return { ok: false, error: "Could not verify workspace limits. Please try again." };
+  }
+
+  const rows = (await response.json()) as Array<{
+    workspace_id: string;
+    tier: "free" | "pro" | "max" | "enterprise";
+    max_mcp_connections: number;
+  }>;
+
+  if (!rows || rows.length === 0) {
+    return { ok: false, error: "Workspace not found or inactive." };
+  }
+
+  const row = rows[0];
+  const msg = await mcpConnectionLimitExceededMessage(
+    workspaceId,
+    oauthClientId,
+    row.max_mcp_connections,
+    row.tier,
+    env
+  );
+  if (msg) return { ok: false, error: msg };
+  return { ok: true };
+}
+
 /**
  * Verifies an OAuth access token and returns the workspace context.
  * Returns a descriptive error string on failure so callers can surface it to the user.
@@ -175,40 +275,16 @@ export async function verifyOAuthAccessToken(
 
   const row = rows[0];
 
-  // Check MCP concurrent connection limit
-  if (row.max_mcp_connections !== -1) {
-    const connCacheKey = `mcp_conn:${stored.workspace_id}`;
-    let connCount: number | null = null;
-    const cachedCount = await env.CACHE_KV.get(connCacheKey);
-    if (cachedCount !== null) {
-      connCount = parseInt(cachedCount, 10);
-    } else {
-      // Exclude current client from count — it's reconnecting, not adding a new slot
-      const countResp = await fetch(
-        `${env.SUPABASE_URL}/rest/v1/oauth_connections?workspace_id=eq.${stored.workspace_id}&is_active=eq.true&client_id=neq.${encodeURIComponent(stored.client_id)}&select=id`,
-        {
-          headers: {
-            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-          },
-        }
-      );
-      if (countResp.ok) {
-        const connRows = (await countResp.json()) as unknown[];
-        connCount = connRows.length;
-        await env.CACHE_KV.put(connCacheKey, String(connCount), {
-          expirationTtl: 60,
-        });
-      }
-    }
-    console.log("[oauth] conn limit check: count=", connCount, "max=", row.max_mcp_connections);
-    if (connCount !== null && connCount >= row.max_mcp_connections) {
-      console.log("[oauth] connection limit exceeded");
-      return {
-        ok: false,
-        error: `MCP connection limit reached (${row.max_mcp_connections} allowed on ${row.tier} plan). Revoke an existing connection at vibefly.app/dashboard to reconnect.`,
-      };
-    }
+  const limitMsg = await mcpConnectionLimitExceededMessage(
+    stored.workspace_id,
+    stored.client_id,
+    row.max_mcp_connections,
+    row.tier,
+    env
+  );
+  if (limitMsg) {
+    console.log("[oauth] connection limit exceeded");
+    return { ok: false, error: limitMsg };
   }
 
   // Check Supabase for the latest connection state (allowed_accounts + is_active).

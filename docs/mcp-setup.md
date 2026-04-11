@@ -80,6 +80,22 @@ Get your API key from the **API Keys** page inside the Vibefly dashboard.
 
 ---
 
+## Web app (Vercel / Next.js) — required for OAuth login
+
+After the user approves access in the browser, the web app redirects to **`{MCP_WORKER}/oauth/callback`** with a signed JWT. If these are wrong, Claude/Cursor will show **failed** right after login.
+
+Set on the **same** deployment that serves `/oauth/authorize`:
+
+| Variable | Purpose |
+|----------|---------|
+| `OAUTH_SIGNING_SECRET` | **Must be identical** to the worker’s `OAUTH_SIGNING_SECRET` (min. 16 characters). If they differ, the callback page shows a verification error. |
+| `MCP_GATEWAY_URL` | **Recommended.** Base URL of the MCP worker, no trailing slash (e.g. `https://mcp-worker.example.workers.dev`). Used server-side for the callback redirect. |
+| `NEXT_PUBLIC_MCP_GATEWAY_URL` | Same base URL, for client-side setup copy blocks. If you only set one, prefer `MCP_GATEWAY_URL` for the callback so production never falls back to `http://localhost:8787`. |
+
+The callback must hit the **same** Cloudflare Worker that handled `/authorize` (same `OAUTH_KV`). Pointing the web app at a different host loses the pending request and breaks OAuth.
+
+---
+
 ## Server Setup (for developers / self-hosting)
 
 ### Prerequisites

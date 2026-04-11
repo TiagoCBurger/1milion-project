@@ -58,11 +58,53 @@ export function ensureActPrefix(accountId: string): string {
 }
 
 /**
+ * Meta Graph API includes the caller's `access_token` in `paging.next` and
+ * `paging.previous` URLs so clients can follow links with a raw GET. MCP tools
+ * must not forward those strings: they end up in chat logs, analytics, and any
+ * UI that displays tool output — a full user token leak.
+ *
+ * Cursor values under `paging.cursors` are opaque identifiers, not secrets;
+ * the next page is fetched by passing `after` / `before` to the same endpoint
+ * (see tool params like `get_campaigns.after`).
+ */
+export function sanitizeMetaApiPayloadForClient(value: unknown): unknown {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(sanitizeMetaApiPayloadForClient);
+  }
+  const obj = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (
+      key === "paging" &&
+      val !== null &&
+      typeof val === "object" &&
+      !Array.isArray(val)
+    ) {
+      const p = val as Record<string, unknown>;
+      const safe: Record<string, unknown> = {};
+      for (const [pk, pv] of Object.entries(p)) {
+        if (pk === "next" || pk === "previous") continue;
+        safe[pk] = sanitizeMetaApiPayloadForClient(pv);
+      }
+      out[key] = safe;
+    } else {
+      out[key] = sanitizeMetaApiPayloadForClient(val);
+    }
+  }
+  return out;
+}
+
+/**
  * Wrap a result string as an MCP text content response.
  */
 export function textResult(data: unknown, isError = false) {
   const text =
-    typeof data === "string" ? data : JSON.stringify(data, null, 2);
+    typeof data === "string"
+      ? data
+      : JSON.stringify(sanitizeMetaApiPayloadForClient(data), null, 2);
   return {
     content: [{ type: "text" as const, text }],
     isError,

@@ -3,12 +3,16 @@ import { createClient } from "@/lib/supabase/server";
 import { OAuthConsentForm } from "./consent-form";
 
 interface PageProps {
-  searchParams: Promise<{ request_id?: string; client_name?: string }>;
+  searchParams: Promise<{
+    request_id?: string;
+    client_id?: string;
+    client_name?: string;
+  }>;
 }
 
 export default async function OAuthAuthorizePage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const { request_id, client_name } = params;
+  const { request_id, client_id: oauthClientId, client_name } = params;
 
   if (!request_id) {
     return (
@@ -24,7 +28,11 @@ export default async function OAuthAuthorizePage({ searchParams }: PageProps) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(`/login?next=/oauth/authorize?request_id=${request_id}&client_name=${encodeURIComponent(client_name || "")}`);
+    const nextQs = new URLSearchParams();
+    nextQs.set("request_id", request_id);
+    if (oauthClientId) nextQs.set("client_id", oauthClientId);
+    if (client_name) nextQs.set("client_name", client_name);
+    redirect(`/login?next=${encodeURIComponent(`/oauth/authorize?${nextQs.toString()}`)}`);
   }
 
   // Fetch user's workspaces with their BMs and ad accounts
@@ -106,6 +114,50 @@ export default async function OAuthAuthorizePage({ searchParams }: PageProps) {
       };
     }) ?? [];
 
+  const workspaceIds = workspaces.map((w) => w.id);
+  const { data: subsRows } =
+    workspaceIds.length > 0
+      ? await supabase
+          .from("subscriptions")
+          .select("workspace_id, max_mcp_connections")
+          .in("workspace_id", workspaceIds)
+          .eq("status", "active")
+      : { data: [] as { workspace_id: string; max_mcp_connections: number }[] };
+
+  const maxByWorkspace: Record<string, number> = {};
+  for (const s of subsRows ?? []) {
+    maxByWorkspace[s.workspace_id] = s.max_mcp_connections;
+  }
+
+  let activeConnections: { workspace_id: string; client_id: string }[] = [];
+  if (workspaceIds.length > 0) {
+    const { data: connData } = await supabase
+      .from("oauth_connections")
+      .select("workspace_id, client_id")
+      .in("workspace_id", workspaceIds)
+      .eq("is_active", true);
+    activeConnections = (connData ?? []) as { workspace_id: string; client_id: string }[];
+  }
+
+  function otherActiveConnectionCount(workspaceId: string): number {
+    return activeConnections.filter(
+      (c) =>
+        c.workspace_id === workspaceId &&
+        (!oauthClientId || c.client_id !== oauthClientId)
+    ).length;
+  }
+
+  const mcpLimitByWorkspace: Record<
+    string,
+    { max: number; usedOthers: number; atLimit: boolean }
+  > = {};
+  for (const w of workspaces) {
+    const max = maxByWorkspace[w.id] ?? 1;
+    const usedOthers = otherActiveConnectionCount(w.id);
+    const atLimit = max !== -1 && usedOthers >= max;
+    mcpLimitByWorkspace[w.id] = { max, usedOthers, atLimit };
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-lg rounded-lg border bg-white p-8 shadow-sm">
@@ -122,7 +174,9 @@ export default async function OAuthAuthorizePage({ searchParams }: PageProps) {
         ) : (
           <OAuthConsentForm
             requestId={request_id}
+            oauthClientId={oauthClientId ?? ""}
             workspaces={workspaces}
+            mcpLimitByWorkspace={mcpLimitByWorkspace}
             userId={user.id}
           />
         )}

@@ -25,13 +25,27 @@ interface Workspace {
   businessManagers: BusinessManagerInfo[];
 }
 
+interface McpLimitInfo {
+  max: number;
+  usedOthers: number;
+  atLimit: boolean;
+}
+
 interface Props {
   requestId: string;
+  oauthClientId: string;
   workspaces: Workspace[];
+  mcpLimitByWorkspace: Record<string, McpLimitInfo>;
   userId: string;
 }
 
-export function OAuthConsentForm({ requestId, workspaces, userId }: Props) {
+export function OAuthConsentForm({
+  requestId,
+  oauthClientId,
+  workspaces,
+  mcpLimitByWorkspace,
+  userId,
+}: Props) {
   const [selectedWorkspace, setSelectedWorkspace] = useState(
     workspaces.length === 1 ? workspaces[0].id : ""
   );
@@ -44,6 +58,10 @@ export function OAuthConsentForm({ requestId, workspaces, userId }: Props) {
     () => workspaces.find((ws) => ws.id === selectedWorkspace),
     [workspaces, selectedWorkspace]
   );
+
+  const mcpLimit = selectedWorkspace
+    ? mcpLimitByWorkspace[selectedWorkspace]
+    : undefined;
 
   const hasBms = (currentWorkspace?.businessManagers.length ?? 0) > 0;
 
@@ -105,13 +123,21 @@ export function OAuthConsentForm({ requestId, workspaces, userId }: Props) {
           request_id: requestId,
           workspace_id: selectedWorkspace,
           user_id: userId,
+          oauth_client_id: oauthClientId || undefined,
           allowed_accounts: Array.from(selectedAccounts),
         }),
       });
 
       if (!res.ok) {
-        const err = await res.text();
-        alert(`Error: ${err}`);
+        const text = await res.text();
+        let message = text || `Request failed (${res.status})`;
+        try {
+          const data = JSON.parse(text) as { error?: string };
+          if (data.error) message = data.error;
+        } catch {
+          /* keep raw text */
+        }
+        alert(message);
         setLoading(false);
         return;
       }
@@ -125,10 +151,33 @@ export function OAuthConsentForm({ requestId, workspaces, userId }: Props) {
   }
 
   const canApprove =
-    selectedWorkspace && (!hasBms || selectedAccounts.size > 0);
+    selectedWorkspace &&
+    (!hasBms || selectedAccounts.size > 0) &&
+    !mcpLimit?.atLimit;
 
   return (
     <div className="mt-6 space-y-4">
+      {mcpLimit?.atLimit && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-medium">MCP connection limit reached</p>
+          <p className="mt-1 text-amber-800">
+            This workspace allows <strong>{mcpLimit.max}</strong> concurrent MCP
+            connection{mcpLimit.max === 1 ? "" : "s"} ({mcpLimit.usedOthers} other
+            app{mcpLimit.usedOthers === 1 ? "" : "s"} already connected). Revoke one in{" "}
+            <a
+              href={
+                currentWorkspace
+                  ? `/dashboard/${currentWorkspace.slug}/connections`
+                  : "/dashboard"
+              }
+              className="font-medium text-amber-950 underline hover:no-underline"
+            >
+              Dashboard → Connections
+            </a>
+            {" to connect this app."}
+          </p>
+        </div>
+      )}
       {/* Workspace selector */}
       <div>
         <label

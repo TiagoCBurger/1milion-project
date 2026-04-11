@@ -4,6 +4,7 @@ import type {
   StoredAccessToken,
   StoredRefreshToken,
 } from "./types";
+import { assertOauthNewConnectionAllowed } from "../auth";
 import { getClient } from "./clients";
 import {
   generateToken,
@@ -83,9 +84,6 @@ async function handleAuthorizationCodeGrant(
     return oauthError("invalid_grant", "Invalid or expired authorization code");
   }
 
-  // Delete code immediately (single-use)
-  await env.OAUTH_KV.delete(`oauth:code:${codeHash}`);
-
   // Validate client matches
   if (storedCode.client_id !== clientId) {
     return oauthError("invalid_grant", "Code was issued to a different client");
@@ -101,6 +99,18 @@ async function handleAuthorizationCodeGrant(
   if (!pkceValid) {
     return oauthError("invalid_grant", "PKCE verification failed");
   }
+
+  const limit = await assertOauthNewConnectionAllowed(
+    storedCode.workspace_id,
+    clientId,
+    env
+  );
+  if (!limit.ok) {
+    return oauthError("invalid_grant", limit.error);
+  }
+
+  // Delete code only after checks pass (user can retry exchange after freeing a slot)
+  await env.OAUTH_KV.delete(`oauth:code:${codeHash}`);
 
   // Issue tokens
   return issueTokens(clientId, storedCode.workspace_id, storedCode.user_id, storedCode.scope, storedCode.allowed_accounts, env);

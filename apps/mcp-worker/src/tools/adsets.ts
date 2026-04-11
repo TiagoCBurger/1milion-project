@@ -23,8 +23,14 @@ export function registerAdsetTools(ctx: ToolContext) {
         .string()
         .optional()
         .describe("If provided, only return ad sets for this campaign"),
+      after: z
+        .string()
+        .default("")
+        .describe(
+          "Pagination cursor from paging.cursors.after of a previous response.",
+        ),
     },
-    async ({ account_id, limit, campaign_id }) => {
+    async ({ account_id, limit, campaign_id, after }) => {
       if (!isAccountAllowed(account_id, allowedAccounts)) {
         return accountBlockedResult(account_id);
       }
@@ -39,7 +45,10 @@ export function registerAdsetTools(ctx: ToolContext) {
         "frequency_control_specs{event,interval_days,max_frequency}",
       ].join(",");
 
-      const data = await metaApiGet(endpoint, token, { fields, limit });
+      const params: Record<string, unknown> = { fields, limit };
+      if (after) params.after = after;
+
+      const data = await metaApiGet(endpoint, token, params);
       return textResult(data);
     }
   );

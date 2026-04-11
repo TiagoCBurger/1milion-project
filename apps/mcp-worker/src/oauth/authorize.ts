@@ -86,9 +86,10 @@ export async function handleAuthorize(
     { expirationTtl: AUTH_REQUEST_TTL }
   );
 
-  // Redirect to web app consent page
+  // Redirect to web app consent page (client_id lets the web app enforce plan limits before approve)
   const consentUrl = new URL(`${env.WEB_APP_URL}/oauth/authorize`);
   consentUrl.searchParams.set("request_id", requestId);
+  consentUrl.searchParams.set("client_id", clientId);
   consentUrl.searchParams.set("client_name", client.client_name || clientId);
 
   return Response.redirect(consentUrl.toString(), 302);
@@ -106,16 +107,31 @@ export async function handleOAuthCallback(
   const token = url.searchParams.get("token");
 
   if (!token) {
-    return new Response("Missing token parameter", { status: 400 });
+    return oauthCallbackErrorPage(
+      "Missing authorization data",
+      "The link is incomplete. Close this tab and start again from your AI app (Claude, Cursor, etc.)."
+    );
+  }
+
+  const signingSecret = env.OAUTH_SIGNING_SECRET?.trim();
+  if (!signingSecret || signingSecret.length < 16) {
+    console.error("[oauth/callback] OAUTH_SIGNING_SECRET missing or too short on worker");
+    return oauthCallbackErrorPage(
+      "Server configuration error",
+      "The MCP worker OAuth secret is not configured. The operator must set OAUTH_SIGNING_SECRET on the worker to match the web app."
+    );
   }
 
   // Verify JWT from web app
-  const payload = await verifyJwt<CallbackJwtPayload>(
-    token,
-    env.OAUTH_SIGNING_SECRET
-  );
+  const payload = await verifyJwt<CallbackJwtPayload>(token, signingSecret);
   if (!payload) {
-    return new Response("Invalid or expired callback token", { status: 400 });
+    console.error(
+      "[oauth/callback] JWT verify failed (expired, bad signature, or OAUTH_SIGNING_SECRET mismatch between web and worker)"
+    );
+    return oauthCallbackErrorPage(
+      "Could not verify authorization",
+      "This link is invalid or expired. Close this tab and connect again from your AI app. If it keeps failing, the signing secret on the web app and MCP worker must be identical, and the web app must redirect to the same worker URL that started the login (check MCP_GATEWAY_URL / NEXT_PUBLIC_MCP_GATEWAY_URL)."
+    );
   }
 
   // Fetch stored auth request
@@ -124,9 +140,13 @@ export async function handleOAuthCallback(
     "json"
   );
   if (!authRequest) {
-    return new Response("Authorization request expired or not found", {
-      status: 400,
-    });
+    console.error(
+      "[oauth/callback] auth request not in KV (expired, already used, or callback hit a different worker than /authorize)"
+    );
+    return oauthCallbackErrorPage(
+      "Login session expired or wrong server",
+      "The authorization step timed out or this browser opened a different MCP server than the one that started login. Close this tab, wait a minute, and try again from your AI app. In production, set the web app’s MCP_GATEWAY_URL to your worker’s base URL (same host as in your MCP config)."
+    );
   }
 
   // Delete auth request (single-use)
@@ -161,6 +181,41 @@ export async function handleOAuthCallback(
   }
 
   return Response.redirect(redirectUrl.toString(), 302);
+}
+
+function oauthCallbackErrorPage(title: string, detail: string): Response {
+  const safeTitle = escapeHtml(title);
+  const safeDetail = escapeHtml(detail);
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${safeTitle}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; color: #1a1a1a; }
+    h1 { font-size: 1.25rem; }
+    p { color: #444; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <h1>${safeTitle}</h1>
+  <p>${safeDetail}</p>
+  <p>You can close this window.</p>
+</body>
+</html>`;
+  return new Response(html, {
+    status: 400,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function errorRedirect(

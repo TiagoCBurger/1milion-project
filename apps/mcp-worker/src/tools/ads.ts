@@ -27,8 +27,14 @@ export function registerAdTools(ctx: ToolContext) {
         .string()
         .optional()
         .describe("If provided, only return ads for this ad set (takes priority over campaign_id)"),
+      after: z
+        .string()
+        .default("")
+        .describe(
+          "Pagination cursor from paging.cursors.after of a previous response.",
+        ),
     },
-    async ({ account_id, limit, campaign_id, adset_id }) => {
+    async ({ account_id, limit, campaign_id, adset_id, after }) => {
       if (!isAccountAllowed(account_id, allowedAccounts)) {
         return accountBlockedResult(account_id);
       }
@@ -49,7 +55,10 @@ export function registerAdTools(ctx: ToolContext) {
         "tracking_specs",
       ].join(",");
 
-      const data = await metaApiGet(endpoint, token, { fields, limit });
+      const params: Record<string, unknown> = { fields, limit };
+      if (after) params.after = after;
+
+      const data = await metaApiGet(endpoint, token, params);
       return textResult(data);
     }
   );

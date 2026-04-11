@@ -13,11 +13,25 @@ const MCP_GATEWAY_URL =
   process.env.NEXT_PUBLIC_MCP_GATEWAY_URL ||
   "https://mcp-worker.ticburger.workers.dev";
 
+/** Claude Code / Claude Desktop (root `.mcp.json`); includes transport hint. */
 const OAUTH_MCP_CONFIG = JSON.stringify(
   {
     mcpServers: {
       vibefly: {
         type: "http",
+        url: `${MCP_GATEWAY_URL}/mcp`,
+      },
+    },
+  },
+  null,
+  2
+);
+
+/** Cursor reads project MCP from `.cursor/mcp.json` (see cursor.com/docs/mcp). */
+const CURSOR_OAUTH_MCP_CONFIG = JSON.stringify(
+  {
+    mcpServers: {
+      vibefly: {
         url: `${MCP_GATEWAY_URL}/mcp`,
       },
     },
@@ -55,7 +69,7 @@ export default function SetupPage() {
     loadKey();
   }, [slug, supabase]);
 
-  const apiKeyConfig = JSON.stringify(
+  const claudeApiKeyConfig = JSON.stringify(
     {
       mcpServers: {
         [`meta-ads-${slug}`]: {
@@ -71,10 +85,25 @@ export default function SetupPage() {
     2
   );
 
+  const cursorApiKeyConfig = JSON.stringify(
+    {
+      mcpServers: {
+        [`meta-ads-${slug}`]: {
+          url: `${MCP_GATEWAY_URL}/mcp`,
+          headers: {
+            Authorization: `Bearer ${apiKeyPrefix}`,
+          },
+        },
+      },
+    },
+    null,
+    2
+  );
+
   const configs: Record<string, string> = {
     oauth: OAUTH_MCP_CONFIG,
-    claude: apiKeyConfig,
-    cursor: apiKeyConfig,
+    claude: claudeApiKeyConfig,
+    cursor: cursorApiKeyConfig,
     http: `curl -X POST ${MCP_GATEWAY_URL}/mcp \\
   -H "Content-Type: application/json" \\
   -H "Accept: application/json, text/event-stream" \\
@@ -134,9 +163,42 @@ export default function SetupPage() {
               </CardContent>
             </Card>
             <p className="mt-3 text-sm text-muted-foreground">
-              Paste this into your project&apos;s <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">.mcp.json</code>.
-              No API key needed — Claude Code will open a browser window for you to log in and select
-              your workspace on first connection. Tokens renew automatically.
+              <strong className="font-medium text-foreground">Claude Code:</strong> save as{" "}
+              <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">.mcp.json</code> at the
+              project root (or use the CLI below).{" "}
+              <strong className="font-medium text-foreground">Cursor:</strong> save as{" "}
+              <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">.cursor/mcp.json</code>{" "}
+              — Cursor does not read root <code className="bg-muted px-1 rounded text-xs font-mono">.mcp.json</code>.
+              Use the Cursor-specific JSON (no API key):{" "}
+            </p>
+            <Card className="mt-3">
+              <CardContent className="p-0 relative">
+                <pre className="rounded-xl bg-neutral-950 text-neutral-100 p-5 text-sm overflow-x-auto font-mono">
+                  <code>{CURSOR_OAUTH_MCP_CONFIG}</code>
+                </pre>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(CURSOR_OAUTH_MCP_CONFIG);
+                    setCopied("cursor-oauth");
+                    setTimeout(() => setCopied(null), 2000);
+                  }}
+                  className="absolute top-3 right-3"
+                >
+                  {copied === "cursor-oauth" ? (
+                    <Check className="h-3 w-3 mr-1" />
+                  ) : (
+                    <Copy className="h-3 w-3 mr-1" />
+                  )}
+                  {copied === "cursor-oauth" ? "Copied" : "Copy for Cursor"}
+                </Button>
+              </CardContent>
+            </Card>
+                       <p className="mt-3 text-sm text-muted-foreground">
+              No API key needed — your app will open a browser on first connection so you can log in and
+              select your workspace. Quit and reopen Cursor after editing{" "}
+              <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">.cursor/mcp.json</code>.
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
               Or add via CLI:{" "}
@@ -147,7 +209,7 @@ export default function SetupPage() {
           </TabsContent>
 
           {/* API key tabs */}
-          {(["claude", "cursor", "http"] as const).map((tabId) => (
+          {(["claude", "http"] as const).map((tabId) => (
             <TabsContent key={tabId} value={tabId}>
               <Card>
                 <CardContent className="p-0 relative">
@@ -167,6 +229,32 @@ export default function SetupPage() {
               </Card>
             </TabsContent>
           ))}
+          <TabsContent value="cursor">
+            <p className="text-sm text-muted-foreground mb-3">
+              Create{" "}
+              <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">.cursor/mcp.json</code> in
+              your project (folder <code className="bg-muted px-1 rounded text-xs font-mono">.cursor</code> at
+              the repo root), paste the JSON below, then fully quit and reopen Cursor. If the server does not
+              appear, check{" "}
+              <strong className="font-medium text-foreground">Output → MCP Logs</strong> in Cursor.
+            </p>
+            <Card>
+              <CardContent className="p-0 relative">
+                <pre className="rounded-xl bg-neutral-950 text-neutral-100 p-5 text-sm overflow-x-auto font-mono">
+                  <code>{configs.cursor}</code>
+                </pre>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => copyConfig("cursor")}
+                  className="absolute top-3 right-3"
+                >
+                  {copied === "cursor" ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                  {copied === "cursor" ? "Copied" : "Copy"}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         {/* API key note — only relevant for non-OAuth tabs */}
