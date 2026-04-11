@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { createToolCapture, parseToolResult, createMockEnv } from "../helpers";
 import { registerAllTools } from "../../tools";
-import { registerHotmartTools } from "../../tools/hotmart";
+import { registerCommerceTools } from "../../tools/commerce";
 import * as workerAuth from "../../auth";
 import {
   FREE_TIER_TOOLS,
@@ -68,18 +68,18 @@ const WRITE_TOOLS = new Set([
   "create_ad_creative",
   "update_ad_creative",
   "create_budget_schedule",
-  "hotmart_trigger_sync",
+  "commerce_trigger_sync",
 ]);
 
-/** Hotmart MCP tools (paid tier; local DB reads + sync). */
-const HOTMART_READ_TOOLS = new Set([
-  "hotmart_list_products",
-  "hotmart_get_product",
-  "hotmart_list_customers",
-  "hotmart_get_customer",
-  "hotmart_list_sales",
-  "hotmart_get_sale",
-  "hotmart_list_refunds",
+/** Commerce MCP tools (paid tier; local DB reads + sync, provider-agnostic). */
+const COMMERCE_READ_TOOLS = new Set([
+  "commerce_list_products",
+  "commerce_get_product",
+  "commerce_list_customers",
+  "commerce_get_customer",
+  "commerce_list_sales",
+  "commerce_get_sale",
+  "commerce_list_refunds",
 ]);
 
 describe("Tier Enforcement", () => {
@@ -109,13 +109,13 @@ describe("Tier Enforcement", () => {
       },
     };
     registerAllTools({ server: nameCapture as any, token: "tok", tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
-    registerHotmartTools({ server: nameCapture as any, token: "tok", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
+    registerCommerceTools({ server: nameCapture as any, token: "tok", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
     for (const name of names) {
       expect(
         FREE_TIER_TOOLS.has(name) ||
           WRITE_TOOLS.has(name) ||
-          HOTMART_READ_TOOLS.has(name),
+          COMMERCE_READ_TOOLS.has(name),
       ).toBe(true);
     }
   });
@@ -125,7 +125,7 @@ describe("Tier Enforcement", () => {
       vi.clearAllMocks();
       const capture = createToolCapture();
       registerAllTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
-      registerHotmartTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
+      registerCommerceTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
 
       // Build a minimal valid args object for each tool
       const args = getMinimalArgs(toolName);
@@ -144,7 +144,7 @@ describe("Tier Enforcement", () => {
       stubFetchForHotmart();
       const capture = createToolCapture();
       registerAllTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
-      registerHotmartTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
+      registerCommerceTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
       const args = getMinimalArgs(toolName);
       const result = await capture.callTool(toolName, args);
@@ -157,11 +157,11 @@ describe("Tier Enforcement", () => {
     }
   });
 
-  it("free tier blocks Hotmart tools", async () => {
-    for (const toolName of [...HOTMART_READ_TOOLS, "hotmart_trigger_sync"]) {
+  it("free tier blocks commerce tools", async () => {
+    for (const toolName of [...COMMERCE_READ_TOOLS, "commerce_trigger_sync"]) {
       vi.clearAllMocks();
       const capture = createToolCapture();
-      registerHotmartTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
+      registerCommerceTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
       const args = getMinimalArgs(toolName);
       const result = await capture.callTool(toolName, args);
       const text = (result as any).content?.[0]?.text ?? "";
@@ -325,12 +325,12 @@ function getMinimalArgs(toolName: string): Record<string, unknown> {
       time_start: 1700000000,
       time_end: 1700086400,
     },
-    hotmart_trigger_sync: { entity: "all" },
-    hotmart_list_products: { limit: 10, offset: 0, status: "", search: "" },
-    hotmart_get_product: { product_id: "00000000-0000-4000-8000-000000000001" },
-    hotmart_list_customers: { limit: 10, offset: 0, search: "", email: "" },
-    hotmart_get_customer: { customer_id: "00000000-0000-4000-8000-000000000002", email: "" },
-    hotmart_list_sales: {
+    commerce_trigger_sync: { provider: "hotmart", entity: "all" },
+    commerce_list_products: { limit: 10, offset: 0, status: "", search: "" },
+    commerce_get_product: { product_id: "00000000-0000-4000-8000-000000000001" },
+    commerce_list_customers: { limit: 10, offset: 0, search: "", email: "" },
+    commerce_get_customer: { customer_id: "00000000-0000-4000-8000-000000000002", email: "" },
+    commerce_list_sales: {
       limit: 10,
       offset: 0,
       start_date: "",
@@ -339,8 +339,8 @@ function getMinimalArgs(toolName: string): Record<string, unknown> {
       customer_email: "",
       status: "",
     },
-    hotmart_get_sale: { transaction_id: "HP1" },
-    hotmart_list_refunds: {
+    commerce_get_sale: { transaction_id: "HP1" },
+    commerce_list_refunds: {
       limit: 10,
       offset: 0,
       start_date: "",

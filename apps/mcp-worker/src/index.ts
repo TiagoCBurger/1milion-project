@@ -5,7 +5,7 @@ import { validateApiKey, getMetaToken, verifyOAuthAccessToken, type AuthResult }
 import { checkRateLimit } from "./rate-limit";
 import { logUsage } from "./usage";
 import { registerAllTools } from "./tools";
-import { registerHotmartTools } from "./tools/hotmart";
+import { registerCommerceTools } from "./tools/commerce";
 import { routeOAuth } from "./oauth/router";
 import type { Env, WorkspaceContext } from "./types";
 
@@ -179,7 +179,7 @@ function buildServer(
         isError: true,
       })
     );
-    registerHotmartTools({
+    registerCommerceTools({
       server,
       token: "",
       tier: workspace.tier,
@@ -198,7 +198,7 @@ function buildServer(
     enableMetaMutations: workspace.enableMetaMutations,
     allowedAccounts: workspace.allowedAccounts,
   });
-  registerHotmartTools({
+  registerCommerceTools({
     server,
     token: metaToken,
     tier: workspace.tier,

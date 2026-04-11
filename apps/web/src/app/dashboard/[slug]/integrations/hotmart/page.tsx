@@ -18,7 +18,15 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { ExternalLink, Loader2, Copy, Check, RefreshCw, Unplug } from "lucide-react";
+import {
+  ExternalLink,
+  Loader2,
+  Copy,
+  Check,
+  RefreshCw,
+  Unplug,
+  BookOpen,
+} from "lucide-react";
 
 type StatusPayload = {
   connected: boolean;
@@ -54,6 +62,8 @@ export default function HotmartIntegrationPage() {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [basicToken, setBasicToken] = useState("");
+  /** Hottok exibido pela Hotmart em "Hottok de verificação" — o mesmo enviado no corpo das notificações. */
+  const [verificationHottok, setVerificationHottok] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
@@ -108,6 +118,7 @@ export default function HotmartIntegrationPage() {
           client_id: clientId,
           client_secret: clientSecret,
           basic_token: basicToken,
+          verification_hottok: verificationHottok,
         }),
       });
       const data = await res.json();
@@ -117,6 +128,7 @@ export default function HotmartIntegrationPage() {
       }
       setClientSecret("");
       setBasicToken("");
+      setVerificationHottok("");
       await refreshStatus();
     } catch {
       setError("Erro de rede");
@@ -243,12 +255,137 @@ export default function HotmartIntegrationPage() {
           </div>
         ) : null}
 
+        <Card className="border-violet-brand/20 bg-violet-brand/[0.03] dark:bg-violet-brand/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <BookOpen className="h-4 w-4 text-violet-brand" />
+              Como conectar a Hotmart
+            </CardTitle>
+            <CardDescription>
+              Fluxo em três partes: credenciais de API no portal da Hotmart, conexão aqui no painel e
+              cadastro manual do postback (a Hotmart não oferece API para criar webhooks).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5 text-sm leading-relaxed text-foreground">
+            <div className="rounded-lg border border-border/60 bg-background/60 px-4 py-3 text-muted-foreground">
+              <p className="font-medium text-foreground">Antes de começar</p>
+              <ul className="mt-2 list-disc space-y-1 pl-4">
+                <li>
+                  A integração Hotmart está disponível em{" "}
+                  <span className="text-foreground">planos pagos</span> (Pro, Max ou Enterprise).
+                </li>
+                <li>
+                  Você precisa ser <span className="text-foreground">administrador</span> deste
+                  espaço de trabalho para salvar credenciais.
+                </li>
+              </ul>
+            </div>
+
+            <ol className="list-decimal space-y-4 pl-4 marker:font-semibold marker:text-violet-brand">
+              <li>
+                <span className="font-medium text-foreground">
+                  Obter Client ID, Client Secret e Token Basic
+                </span>
+                <p className="mt-1 text-muted-foreground">
+                  Acesse o{" "}
+                  <a
+                    href="https://developers.hotmart.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-violet-brand"
+                  >
+                    portal de desenvolvedores da Hotmart
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                  , crie um aplicativo (ou use um existente) e abra a área de credenciais — em geral
+                  &quot;Minhas credenciais&quot;. Copie os três valores:{" "}
+                  <strong className="font-medium text-foreground">Client ID</strong>,{" "}
+                  <strong className="font-medium text-foreground">Client Secret</strong> e o{" "}
+                  <strong className="font-medium text-foreground">Token Basic</strong> (usado no
+                  cabeçalho <code className="rounded bg-muted px-1 text-xs">Authorization: Basic</code>{" "}
+                  na autenticação OAuth2).
+                </p>
+              </li>
+              <li>
+                <span className="font-medium text-foreground">
+                  Copiar o hottok de verificação na Hotmart
+                </span>
+                <p className="mt-1 text-muted-foreground">
+                  No painel da Hotmart, abra a tela{" "}
+                  <strong className="font-medium text-foreground">Hottok de verificação</strong>. O
+                  token exibido lá é{" "}
+                  <strong className="font-medium text-foreground">fornecido pela Hotmart</strong> — não
+                  invente nem gere outro valor aqui. Use o botão de copiar e guarde o token com
+                  cuidado; é o mesmo que a Hotmart inclui no campo{" "}
+                  <code className="rounded bg-muted px-1 text-xs">hottok</code> de cada notificação de
+                  postback.
+                </p>
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Conectar neste painel</span>
+                <p className="mt-1 text-muted-foreground">
+                  {connected ? (
+                    <>
+                      As credenciais e o hottok já estão salvos neste espaço. Se a Hotmart gerar um
+                      novo hottok ou você trocar de conta, desconecte e informe tudo de novo.
+                    </>
+                  ) : (
+                    <>
+                      Cole as credenciais de API e o{" "}
+                      <strong className="font-medium text-foreground">hottok de verificação</strong>{" "}
+                      no formulário abaixo e clique em{" "}
+                      <strong className="font-medium text-foreground">Conectar</strong>. Validamos
+                      as chaves com a Hotmart e guardamos o hottok para conferir cada webhook.
+                      Em seguida iniciamos a{" "}
+                      <strong className="font-medium text-foreground">importação inicial</strong> em
+                      segundo plano (produtos, vendas, clientes e estornos).
+                    </>
+                  )}
+                </p>
+              </li>
+              <li>
+                <span className="font-medium text-foreground">
+                  Configurar o Postback 2.0 (webhook)
+                </span>
+                <p className="mt-1 text-muted-foreground">
+                  Não é possível registrar o webhook por API. Após a conexão, abra a aba{" "}
+                  <strong className="font-medium text-foreground">Webhook</strong> nesta página e
+                  copie somente a <strong className="font-medium text-foreground">URL</strong> do
+                  endpoint. No painel{" "}
+                  <a
+                    href="https://app-postback.hotmart.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-violet-brand"
+                  >
+                    app-postback.hotmart.com
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                  , cadastre essa URL. O hottok continua sendo o da Hotmart: nós já o temos do passo
+                  anterior e comparamos com o{" "}
+                  <code className="rounded bg-muted px-1 text-xs">hottok</code> enviado em cada POST.
+                  Quando o primeiro evento válido chegar, o status passa a mostrar que os eventos estão
+                  sendo recebidos.
+                </p>
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Manter os dados atualizados</span>
+                <p className="mt-1 text-muted-foreground">
+                  O webhook atualiza vendas e clientes em tempo quase real. Use{" "}
+                  <strong className="font-medium text-foreground">Sincronizar agora</strong> quando
+                  quiser forçar uma reconciliação completa com a API da Hotmart.
+                </p>
+              </li>
+            </ol>
+          </CardContent>
+        </Card>
+
         {!connected ? (
           <Card>
             <CardHeader>
               <CardTitle>Conecte sua conta de produtor</CardTitle>
               <CardDescription>
-                Crie um app em{" "}
+                Credenciais de API em{" "}
                 <a
                   href="https://developers.hotmart.com"
                   target="_blank"
@@ -258,7 +395,8 @@ export default function HotmartIntegrationPage() {
                   developers.hotmart.com
                   <ExternalLink className="h-3 w-3" />
                 </a>{" "}
-                e cole o Client ID, Client Secret e token Basic de &quot;Minhas credenciais&quot;.
+                e o <strong className="font-medium text-foreground">hottok de verificação</strong> na
+                tela homônima da Hotmart (copie o valor exibido por eles, não gere outro).
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -294,6 +432,22 @@ export default function HotmartIntegrationPage() {
                     autoComplete="off"
                     required
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hm-hottok">Hottok de verificação (Hotmart)</Label>
+                  <Input
+                    id="hm-hottok"
+                    type="password"
+                    value={verificationHottok}
+                    onChange={(e) => setVerificationHottok(e.target.value)}
+                    autoComplete="off"
+                    placeholder='Cole o token da tela "Hottok de verificação"'
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Esse valor vem do painel da Hotmart (botão copiar). É o mesmo enviado no campo{" "}
+                    <code className="rounded bg-muted px-1">hottok</code> das notificações.
+                  </p>
                 </div>
                 <Button type="submit" disabled={busy === "connect" || !workspaceId}>
                   {busy === "connect" ? (
@@ -419,8 +573,10 @@ export default function HotmartIntegrationPage() {
                       app-postback.hotmart.com
                       <ExternalLink className="h-3 w-3" />
                     </a>
-                    , cadastre a URL abaixo. O segredo deve ser o mesmo que a Hotmart envia como{" "}
-                    <code className="rounded bg-muted px-1 text-xs">hottok</code>.
+                    , cadastre a URL abaixo. O{" "}
+                    <code className="rounded bg-muted px-1 text-xs">hottok</code> nas notificações é
+                    o da Hotmart; você já informou esse valor ao conectar — usamos a cópia salva para
+                    validar cada POST.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -450,7 +606,7 @@ export default function HotmartIntegrationPage() {
                   </div>
                   <Separator />
                   <div className="space-y-2">
-                    <Label>Segredo do webhook (hottok)</Label>
+                    <Label>Hottok de verificação (referência)</Label>
                     <div className="flex gap-2">
                       <code className="flex-1 break-all rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-xs leading-relaxed">
                         {status?.webhook_hottok ?? "—"}

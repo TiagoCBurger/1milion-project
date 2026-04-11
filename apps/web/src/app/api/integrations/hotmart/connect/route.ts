@@ -1,4 +1,3 @@
-import { randomBytes } from "crypto";
 import { after } from "next/server";
 import { hotmartAuth, runHotmartInitialBackfill } from "@vibefly/hotmart";
 import { requireHotmartWorkspaceAdmin } from "@/lib/hotmart-api-guards";
@@ -32,16 +31,22 @@ export async function POST(request: Request) {
     client_id?: string;
     client_secret?: string;
     basic_token?: string;
+    /** Hottok shown in the Hotmart dashboard ("Hottok de verificação"); sent in webhook payloads. */
+    verification_hottok?: string;
   };
 
   const workspaceId = body.workspace_id;
   const clientId = body.client_id?.trim();
   const clientSecret = body.client_secret?.trim();
   const basicToken = body.basic_token?.trim();
+  const verificationHottok = body.verification_hottok?.trim();
 
-  if (!workspaceId || !clientId || !clientSecret || !basicToken) {
+  if (!workspaceId || !clientId || !clientSecret || !basicToken || !verificationHottok) {
     return Response.json(
-      { error: "workspace_id, client_id, client_secret, and basic_token are required" },
+      {
+        error:
+          "Preencha Client ID, Client Secret, Token Basic e o hottok de verificação copiado na Hotmart (tela \"Hottok de verificação\").",
+      },
       { status: 400 }
     );
   }
@@ -59,7 +64,6 @@ export async function POST(request: Request) {
 
   const base = appBaseUrl(request);
   const webhookUrl = `${base}/api/integrations/hotmart/webhook/${workspaceId}`;
-  const webhookHottok = randomBytes(32).toString("hex");
 
   const expiresIso = new Date(auth.expiresAtMs).toISOString();
 
@@ -71,7 +75,7 @@ export async function POST(request: Request) {
     p_basic_token: basicToken,
     p_access_token: auth.accessToken,
     p_token_expires_at: expiresIso,
-    p_webhook_hottok: webhookHottok,
+    p_webhook_hottok: verificationHottok,
     p_webhook_url: webhookUrl,
   });
 
@@ -104,8 +108,8 @@ export async function POST(request: Request) {
   return Response.json({
     success: true,
     webhook_url: webhookUrl,
-    webhook_hottok: webhookHottok,
+    webhook_hottok: verificationHottok,
     message:
-      "Copy the webhook URL and secret into app-postback.hotmart.com. Initial import runs in the background.",
+      "Register the webhook URL in app-postback.hotmart.com. Initial import runs in the background.",
   });
 }

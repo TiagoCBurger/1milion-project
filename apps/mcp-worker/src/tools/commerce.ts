@@ -16,10 +16,12 @@ import type { ToolContext } from "./index";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function stubHotmartError() {
+type CommerceProvider = (typeof INTEGRATION_PROVIDERS)[keyof typeof INTEGRATION_PROVIDERS];
+
+function paidPlanError() {
   return textResult(
     {
-      error: "Hotmart integration requires a paid plan (Pro, Max, or Enterprise).",
+      error: "Commerce integration requires a paid plan (Pro, Max, or Enterprise).",
     },
     true
   );
@@ -36,7 +38,9 @@ async function sbGet<T>(ctx: ToolContext, path: string): Promise<T | null> {
   return (await res.json()) as T;
 }
 
-async function isHotmartConnected(ctx: ToolContext): Promise<boolean> {
+// Check whether *any* commerce provider is connected for this workspace.
+// Today only Hotmart is supported; add future providers here as they land.
+async function hasConnectedProvider(ctx: ToolContext): Promise<boolean> {
   const rows = await sbGet<Array<{ id: string }>>(
     ctx,
     `hotmart_credentials?workspace_id=eq.${ctx.workspaceId}&is_active=eq.true&select=id`
@@ -48,7 +52,7 @@ function notConnected() {
   return textResult(
     {
       error:
-        "Hotmart is not connected. Open the dashboard → Hotmart and connect your credentials.",
+        "No commerce integration is connected. Open the dashboard → Integrations and connect a provider.",
     },
     true
   );
@@ -58,8 +62,9 @@ function mapProductRow(row: Record<string, unknown>) {
   const product = (row.product ?? {}) as Record<string, unknown>;
   return {
     ...(product as object),
-    hotmart_id: row.external_id,
-    ucode: row.external_code,
+    provider: row.integration_provider,
+    external_id: row.external_id,
+    external_code: row.external_code,
     source_synced_at: row.synced_at,
   };
 }
@@ -68,8 +73,9 @@ function mapSaleRow(row: Record<string, unknown>) {
   const sale = (row.sale ?? {}) as Record<string, unknown>;
   return {
     ...(sale as object),
+    provider: row.integration_provider,
     transaction_id: row.external_transaction_id,
-    hotmart_product_id: row.external_product_id,
+    external_product_id: row.external_product_id,
     source_synced_at: row.synced_at,
   };
 }
@@ -78,12 +84,24 @@ function mapRefundRow(row: Record<string, unknown>) {
   const refund = (row.refund ?? {}) as Record<string, unknown>;
   return {
     ...(refund as object),
+    provider: row.integration_provider,
     transaction_id: row.external_transaction_id,
     source_synced_at: row.synced_at,
   };
 }
 
-export function registerHotmartTools(ctx: ToolContext): void {
+const PROVIDER_VALUES = Object.values(INTEGRATION_PROVIDERS) as [
+  CommerceProvider,
+  ...CommerceProvider[],
+];
+
+function providerFilter(provider?: CommerceProvider): string {
+  return provider
+    ? `&integration_provider=eq.${encodeURIComponent(provider)}`
+    : "";
+}
+
+export function registerCommerceTools(ctx: ToolContext): void {
   const { server, tier } = ctx;
   const paid = isHotmartIntegrationEnabled(tier as SubscriptionTier);
 
@@ -92,26 +110,31 @@ export function registerHotmartTools(ctx: ToolContext): void {
       fn: (args: Record<string, unknown>) => Promise<ReturnType<typeof textResult>>
     ) =>
     async (args: Record<string, unknown>) => {
-      if (!paid) return stubHotmartError();
-      if (!(await isHotmartConnected(ctx))) return notConnected();
+      if (!paid) return paidPlanError();
+      if (!(await hasConnectedProvider(ctx))) return notConnected();
       return fn(args);
     };
 
   server.tool(
-    "hotmart_list_products",
-    "List Hotmart products synced for this workspace (local database).",
+    "commerce_list_products",
+    "List commerce products synced for this workspace (local database, provider-agnostic).",
     {
       limit: z.number().min(1).max(500).default(50),
       offset: z.number().min(0).default(0),
+      provider: z
+        .enum(PROVIDER_VALUES)
+        .optional()
+        .describe("Filter by integration provider (e.g. hotmart)."),
       status: z.string().optional().describe("Filter by status (e.g. ACTIVE)."),
       search: z.string().optional().describe("Case-insensitive name search."),
     },
     wrap(async (args) => {
       const limit = args.limit as number;
       const offset = args.offset as number;
+      const provider = args.provider as CommerceProvider | undefined;
       const status = args.status as string | undefined;
       const search = args.search as string | undefined;
-      let path = `commerce_product_sources?workspace_id=eq.${ctx.workspaceId}&integration_provider=eq.${INTEGRATION_PROVIDERS.HOTMART}&select=external_id,external_code,synced_at,product:commerce_products!inner(*)&order=synced_at.desc.nullslast&limit=${limit}&offset=${offset}`;
+      let path = `commerce_product_sources?workspace_id=eq.${ctx.workspaceId}${providerFilter(provider)}&select=integration_provider,external_id,external_code,synced_at,product:commerce_products!inner(*)&order=synced_at.desc.nullslast&limit=${limit}&offset=${offset}`;
       if (status) {
         path += `&product.status=eq.${encodeURIComponent(status)}`;
       }
@@ -127,16 +150,21 @@ export function registerHotmartTools(ctx: ToolContext): void {
   );
 
   server.tool(
-    "hotmart_get_product",
-    "Get one Hotmart product by local UUID or Hotmart numeric id.",
+    "commerce_get_product",
+    "Get one commerce product by local UUID or provider external id.",
     {
       product_id: z
         .string()
-        .describe("Local UUID from commerce_products.id or Hotmart product id."),
+        .describe("Local UUID from commerce_products.id or provider external id."),
+      provider: z
+        .enum(PROVIDER_VALUES)
+        .optional()
+        .describe("Required when product_id is an external id."),
     },
     wrap(async (args) => {
       const id = args.product_id as string;
-      let path = `commerce_product_sources?workspace_id=eq.${ctx.workspaceId}&integration_provider=eq.${INTEGRATION_PROVIDERS.HOTMART}&select=external_id,external_code,synced_at,product:commerce_products!inner(*)&limit=1`;
+      const provider = args.provider as CommerceProvider | undefined;
+      let path = `commerce_product_sources?workspace_id=eq.${ctx.workspaceId}${providerFilter(provider)}&select=integration_provider,external_id,external_code,synced_at,product:commerce_products!inner(*)&limit=1`;
       if (UUID_RE.test(id)) {
         path += `&product_id=eq.${id}`;
       } else {
@@ -152,8 +180,8 @@ export function registerHotmartTools(ctx: ToolContext): void {
   );
 
   server.tool(
-    "hotmart_list_customers",
-    "List Hotmart customers (buyers) synced for this workspace.",
+    "commerce_list_customers",
+    "List commerce customers (buyers) synced for this workspace.",
     {
       limit: z.number().min(1).max(500).default(50),
       offset: z.number().min(0).default(0),
@@ -178,8 +206,8 @@ export function registerHotmartTools(ctx: ToolContext): void {
   );
 
   server.tool(
-    "hotmart_get_customer",
-    "Get a Hotmart customer by local UUID or email.",
+    "commerce_get_customer",
+    "Get a commerce customer by local UUID or email.",
     {
       customer_id: z
         .string()
@@ -212,11 +240,15 @@ export function registerHotmartTools(ctx: ToolContext): void {
   );
 
   server.tool(
-    "hotmart_list_sales",
-    "List Hotmart sales synced for this workspace with optional filters.",
+    "commerce_list_sales",
+    "List commerce sales synced for this workspace with optional filters.",
     {
       limit: z.number().min(1).max(500).default(50),
       offset: z.number().min(0).default(0),
+      provider: z
+        .enum(PROVIDER_VALUES)
+        .optional()
+        .describe("Filter by integration provider."),
       start_date: z.string().optional().describe("ISO date lower bound (purchase_date)."),
       end_date: z.string().optional().describe("ISO date upper bound (purchase_date)."),
       product_id: z.string().optional().describe("Local commerce_products.id UUID."),
@@ -226,7 +258,8 @@ export function registerHotmartTools(ctx: ToolContext): void {
     wrap(async (args) => {
       const limit = args.limit as number;
       const offset = args.offset as number;
-      let path = `commerce_sale_sources?workspace_id=eq.${ctx.workspaceId}&integration_provider=eq.${INTEGRATION_PROVIDERS.HOTMART}&select=external_transaction_id,external_product_id,synced_at,sale:commerce_sales!inner(*)&order=sale(purchase_date).desc.nullslast&limit=${limit}&offset=${offset}`;
+      const provider = args.provider as CommerceProvider | undefined;
+      let path = `commerce_sale_sources?workspace_id=eq.${ctx.workspaceId}${providerFilter(provider)}&select=integration_provider,external_transaction_id,external_product_id,synced_at,sale:commerce_sales!inner(*)&order=sale(purchase_date).desc.nullslast&limit=${limit}&offset=${offset}`;
       const start = args.start_date as string | undefined;
       const end = args.end_date as string | undefined;
       const productId = args.product_id as string | undefined;
@@ -265,16 +298,21 @@ export function registerHotmartTools(ctx: ToolContext): void {
   );
 
   server.tool(
-    "hotmart_get_sale",
-    "Get a Hotmart sale by transaction_id (e.g. HP…).",
+    "commerce_get_sale",
+    "Get a commerce sale by provider transaction id (e.g. HP… for Hotmart).",
     {
       transaction_id: z.string(),
+      provider: z
+        .enum(PROVIDER_VALUES)
+        .optional()
+        .describe("Filter by integration provider."),
     },
     wrap(async (args) => {
       const tid = args.transaction_id as string;
+      const provider = args.provider as CommerceProvider | undefined;
       const rows = await sbGet<Record<string, unknown>[]>(
         ctx,
-        `commerce_sale_sources?workspace_id=eq.${ctx.workspaceId}&integration_provider=eq.${INTEGRATION_PROVIDERS.HOTMART}&external_transaction_id=eq.${encodeURIComponent(tid)}&select=external_transaction_id,external_product_id,synced_at,sale:commerce_sales!inner(*)&limit=1`
+        `commerce_sale_sources?workspace_id=eq.${ctx.workspaceId}${providerFilter(provider)}&external_transaction_id=eq.${encodeURIComponent(tid)}&select=integration_provider,external_transaction_id,external_product_id,synced_at,sale:commerce_sales!inner(*)&limit=1`
       );
       const row = rows?.[0];
       if (!row) {
@@ -285,11 +323,15 @@ export function registerHotmartTools(ctx: ToolContext): void {
   );
 
   server.tool(
-    "hotmart_list_refunds",
-    "List Hotmart refunds synced for this workspace.",
+    "commerce_list_refunds",
+    "List commerce refunds synced for this workspace.",
     {
       limit: z.number().min(1).max(500).default(50),
       offset: z.number().min(0).default(0),
+      provider: z
+        .enum(PROVIDER_VALUES)
+        .optional()
+        .describe("Filter by integration provider."),
       start_date: z.string().optional(),
       end_date: z.string().optional(),
       product_id: z.string().optional().describe("Local product UUID filters via sale."),
@@ -297,8 +339,9 @@ export function registerHotmartTools(ctx: ToolContext): void {
     wrap(async (args) => {
       const limit = args.limit as number;
       const offset = args.offset as number;
+      const provider = args.provider as CommerceProvider | undefined;
       const productId = args.product_id as string | undefined;
-      let path = `commerce_refund_sources?workspace_id=eq.${ctx.workspaceId}&integration_provider=eq.${INTEGRATION_PROVIDERS.HOTMART}&select=external_transaction_id,synced_at,refund:commerce_refunds!inner(*,sale:commerce_sales(product_id))&order=refund(refund_date).desc.nullslast&limit=${limit}&offset=${offset}`;
+      let path = `commerce_refund_sources?workspace_id=eq.${ctx.workspaceId}${providerFilter(provider)}&select=integration_provider,external_transaction_id,synced_at,refund:commerce_refunds!inner(*,sale:commerce_sales(product_id))&order=refund(refund_date).desc.nullslast&limit=${limit}&offset=${offset}`;
       const start = args.start_date as string | undefined;
       const end = args.end_date as string | undefined;
       if (start) {
@@ -319,22 +362,37 @@ export function registerHotmartTools(ctx: ToolContext): void {
   );
 
   server.tool(
-    "hotmart_trigger_sync",
-    "Trigger a Hotmart sync (API → local database). Use entity=all or a single entity.",
+    "commerce_trigger_sync",
+    "Trigger a commerce sync (provider API → local database). Use entity=all or a single entity.",
     {
+      provider: z
+        .enum(PROVIDER_VALUES)
+        .default(INTEGRATION_PROVIDERS.HOTMART)
+        .describe("Integration provider to sync."),
       entity: z
         .enum(["all", "products", "sales", "customers", "refunds"])
         .default("all"),
     },
     wrap(async (args) => {
-      const token = await getHotmartAccessToken(ctx.workspaceId, ctx.env);
-      if (!token) {
+      const provider =
+        (args.provider as CommerceProvider | undefined) ??
+        INTEGRATION_PROVIDERS.HOTMART;
+      const entity = args.entity as HotmartEntity | "all";
+
+      if (provider !== INTEGRATION_PROVIDERS.HOTMART) {
         return textResult(
-          { error: "Could not load Hotmart credentials" },
+          { error: `Provider '${provider}' sync is not implemented yet` },
           true
         );
       }
-      const entity = args.entity as HotmartEntity | "all";
+
+      const token = await getHotmartAccessToken(ctx.workspaceId, ctx.env);
+      if (!token) {
+        return textResult(
+          { error: `Could not load ${provider} credentials` },
+          true
+        );
+      }
       const rest = {
         supabaseUrl: ctx.env.SUPABASE_URL,
         serviceRoleKey: ctx.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -347,6 +405,7 @@ export function registerHotmartTools(ctx: ToolContext): void {
           "manual"
         );
         return textResult({
+          provider,
           success: result.ok,
           errors: result.errors,
         });
@@ -359,6 +418,7 @@ export function registerHotmartTools(ctx: ToolContext): void {
         "manual"
       );
       return textResult({
+        provider,
         success: !one.error,
         sync_id: one.syncLogId,
         records_synced: one.recordsSynced,
