@@ -64,6 +64,8 @@ export default function HotmartIntegrationPage() {
   const [basicToken, setBasicToken] = useState("");
   /** Hottok exibido pela Hotmart em "Hottok de verificação" — o mesmo enviado no corpo das notificações. */
   const [verificationHottok, setVerificationHottok] = useState("");
+  /** Rascunho do hottok na aba Webhook (editável após conectar). */
+  const [hottokDraft, setHottokDraft] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,7 +94,9 @@ export default function HotmartIntegrationPage() {
         setStatus(null);
         return;
       }
-      setStatus(data as StatusPayload);
+      const payload = data as StatusPayload;
+      setStatus(payload);
+      setHottokDraft(payload.webhook_hottok ?? "");
     } catch {
       setError("Erro de rede");
     } finally {
@@ -160,6 +164,37 @@ export default function HotmartIntegrationPage() {
     }
   }
 
+  async function handleSaveVerificationHottok() {
+    if (!workspaceId) return;
+    const trimmed = hottokDraft.trim();
+    if (!trimmed) {
+      setError("Cole o hottok de verificação da Hotmart.");
+      return;
+    }
+    setBusy("hottok");
+    setError("");
+    try {
+      const res = await fetch("/api/integrations/hotmart/verification-hottok", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          verification_hottok: trimmed,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Falha ao salvar o hottok");
+        return;
+      }
+      await refreshStatus();
+    } catch {
+      setError("Erro de rede");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function handleDisconnect() {
     if (!workspaceId) return;
     if (
@@ -197,6 +232,8 @@ export default function HotmartIntegrationPage() {
   }
 
   const connected = status?.connected;
+  const hottokDirty =
+    (status?.webhook_hottok ?? "").trim() !== hottokDraft.trim();
 
   return (
     <>
@@ -326,8 +363,9 @@ export default function HotmartIntegrationPage() {
                 <p className="mt-1 text-muted-foreground">
                   {connected ? (
                     <>
-                      As credenciais e o hottok já estão salvos neste espaço. Se a Hotmart gerar um
-                      novo hottok ou você trocar de conta, desconecte e informe tudo de novo.
+                      As credenciais e o hottok já estão salvos neste espaço.                       Se a Hotmart gerar um novo hottok, atualize na aba{" "}
+                      <strong className="font-medium text-foreground">Webhook</strong> sem
+                      desconectar. Para trocar de conta de produtor, desconecte e conecte de novo.
                     </>
                   ) : (
                     <>
@@ -575,8 +613,9 @@ export default function HotmartIntegrationPage() {
                     </a>
                     , cadastre a URL abaixo. O{" "}
                     <code className="rounded bg-muted px-1 text-xs">hottok</code> nas notificações é
-                    o da Hotmart; você já informou esse valor ao conectar — usamos a cópia salva para
-                    validar cada POST.
+                    o da Hotmart. Você pode colar ou atualizar o valor abaixo quando a Hotmart gerar
+                    um novo token; ao salvar, revalidamos os próximos POSTs e o aviso de confirmação
+                    é zerado até o próximo evento válido.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -605,30 +644,61 @@ export default function HotmartIntegrationPage() {
                     </div>
                   </div>
                   <Separator />
-                  <div className="space-y-2">
-                    <Label>Hottok de verificação (referência)</Label>
-                    <div className="flex gap-2">
-                      <code className="flex-1 break-all rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-xs leading-relaxed">
-                        {status?.webhook_hottok ?? "—"}
-                      </code>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="shrink-0"
-                        onClick={() =>
-                          status?.webhook_hottok &&
-                          void copyField("tok", status.webhook_hottok)
-                        }
-                        disabled={!status?.webhook_hottok}
-                      >
-                        {copied === "tok" ? (
-                          <Check className="h-4 w-4" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
+                  <div className="space-y-3">
+                    <Label htmlFor="hm-hottok-edit">Hottok de verificação (Hotmart)</Label>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                      <Input
+                        id="hm-hottok-edit"
+                        type="password"
+                        autoComplete="off"
+                        value={hottokDraft}
+                        onChange={(e) => setHottokDraft(e.target.value)}
+                        placeholder='Cole o token da tela "Hottok de verificação"'
+                        className="font-mono text-sm sm:flex-1"
+                      />
+                      <div className="flex shrink-0 gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0"
+                          onClick={() =>
+                            hottokDraft.trim() && void copyField("tok-draft", hottokDraft.trim())
+                          }
+                          disabled={!hottokDraft.trim()}
+                          title="Copiar"
+                        >
+                          {copied === "tok-draft" ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => void handleSaveVerificationHottok()}
+                          disabled={
+                            busy === "hottok" ||
+                            !hottokDraft.trim() ||
+                            !hottokDirty
+                          }
+                          className="sm:min-w-[7rem]"
+                        >
+                          {busy === "hottok" ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Salvando…
+                            </>
+                          ) : (
+                            "Salvar hottok"
+                          )}
+                        </Button>
+                      </div>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Deve ser exatamente o valor exibido pela Hotmart. Se alterar na Hotmart,
+                      atualize aqui também.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
