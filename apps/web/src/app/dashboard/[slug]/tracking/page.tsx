@@ -135,9 +135,19 @@ src="https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1"/></noscri
   return (
     <div className="flex-1 p-6 space-y-6">
       <PageHeader
-        title="Tracking & CAPI"
-        description="Configure Meta Pixel and Conversions API for advanced tracking with data enrichment and deduplication."
+        breadcrumbs={[
+          { label: "Workspaces", href: "/dashboard" },
+          { label: slug, href: `/dashboard/${slug}` },
+          { label: "Tracking & CAPI" },
+        ]}
       />
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Tracking & CAPI</h1>
+        <p className="text-muted-foreground mt-1">
+          Configure Meta Pixel and Conversions API for advanced tracking with data enrichment and
+          deduplication.
+        </p>
+      </div>
 
       {/* Config Card */}
       <Card>

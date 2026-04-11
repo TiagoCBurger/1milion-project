@@ -114,7 +114,6 @@ export default async function OAuthAuthorizePage({ searchParams }: PageProps) {
       };
     }) ?? [];
 
-  const workspaceIds = workspaces.map((w) => w.id);
   const { data: subsRows } =
     workspaceIds.length > 0
       ? await supabase
