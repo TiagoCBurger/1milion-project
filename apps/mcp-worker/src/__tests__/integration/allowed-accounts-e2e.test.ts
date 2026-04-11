@@ -164,6 +164,7 @@ describe("E2E: OAuth token with restricted allowedAccounts", () => {
       tier: "pro",
       env: createMockEnv(),
       workspaceId: "test-ws",
+      enableMetaMutations: true,
       allowedAccounts: [ALLOWED],
     });
   });
@@ -259,6 +260,7 @@ describe("E2E: OAuth token with restricted allowedAccounts", () => {
       tier: "pro",
       env: createMockEnv(),
       workspaceId: "test-ws",
+      enableMetaMutations: true,
       allowedAccounts: ["ALLOWED"], // no act_ prefix
     });
 

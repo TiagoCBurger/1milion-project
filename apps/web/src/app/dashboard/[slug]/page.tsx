@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { Link2, Key, BookOpen, Shield, Clock, Wifi } from "lucide-react";
+import { Link2, Key, BookOpen, Shield, Wifi } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -69,8 +69,9 @@ export default async function WorkspacePage({
 
   const isConnected = token?.is_valid === true;
   const canManage = membership?.role === "owner" || membership?.role === "admin";
+  const now = Date.now(); // eslint-disable-line react-hooks/purity -- RSC: token expiry vs wall clock
   const daysUntilExpiry = token?.expires_at
-    ? Math.ceil((new Date(token.expires_at).getTime() - Date.now()) / 86_400_000)
+    ? Math.ceil((new Date(token.expires_at).getTime() - now) / 86_400_000)
     : null;
 
   const totalAdAccounts = (businessManagers ?? []).reduce(
@@ -131,17 +132,17 @@ export default async function WorkspacePage({
         <div className="flex flex-wrap gap-3">
           {!isConnected && (
             <Button asChild>
-              <Link href={`/dashboard/${slug}/connect`}>
+              <Link href={`/dashboard/${slug}/integrations/meta`}>
                 <Link2 className="mr-2 h-4 w-4" />
-                Connect Account
+                Conectar conta
               </Link>
             </Button>
           )}
           {isConnected && (
             <Button asChild variant="outline">
-              <Link href={`/dashboard/${slug}/connect`}>
+              <Link href={`/dashboard/${slug}/integrations/meta`}>
                 <Link2 className="mr-2 h-4 w-4" />
-                Reconnect
+                Reconectar
               </Link>
             </Button>
           )}
@@ -348,7 +349,7 @@ export default async function WorkspacePage({
                 reconnect.
               </p>
               <Button asChild variant="outline" size="sm" className="mt-3">
-                <Link href={`/dashboard/${slug}/connect`}>Reconnect</Link>
+                <Link href={`/dashboard/${slug}/integrations/meta`}>Reconectar</Link>
               </Button>
             </CardContent>
           </Card>

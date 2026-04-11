@@ -1,5 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
-import { getDecryptedToken, metaApiPost, ensureActPrefix } from "@/lib/meta-api";
+import {
+  getDecryptedToken,
+  metaApiPost,
+  ensureActPrefix,
+  getMetaGraphError,
+  metaUserFacingError,
+} from "@/lib/meta-api";
+import { assertWorkspaceCanWrite } from "@/lib/workspace-write-guard";
 
 export async function POST(
   request: Request,
@@ -26,6 +33,9 @@ export async function POST(
   if (!membership) {
     return Response.json({ error: "Not authorized" }, { status: 403 });
   }
+
+  const blocked = await assertWorkspaceCanWrite(supabase, workspaceId);
+  if (blocked) return blocked;
 
   const body = await request.json();
   console.log("[creatives] Request body:", JSON.stringify(body, null, 2));
@@ -89,11 +99,11 @@ export async function POST(
 
   const result = await metaApiPost(`${accountId}/adcreatives`, token, metaParams);
 
-  if ((result as any).error) {
-    const metaError = (result as any).error;
-    const msg = metaError?.error_user_msg || metaError?.message || "Meta API error";
+  const errMsg = metaUserFacingError(result);
+  if (errMsg) {
+    const metaError = getMetaGraphError(result);
     console.error("[creatives] Failed:", JSON.stringify(metaError, null, 2));
-    return Response.json({ error: msg, meta_error: metaError }, { status: 400 });
+    return Response.json({ error: errMsg, meta_error: metaError }, { status: 400 });
   }
 
   return Response.json(result);

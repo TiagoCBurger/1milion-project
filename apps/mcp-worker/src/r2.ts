@@ -1,7 +1,10 @@
 import type { Env } from "./types";
 
 // ============================================================
-// MIME type detection from base64 data
+// MIME type detection from base64 data (images only)
+//
+// Ordered from most-specific prefix to least-specific so the
+// loop short-circuits correctly.
 // ============================================================
 
 export function detectMimeType(base64: string): { mime: string; ext: string } {
@@ -13,15 +16,14 @@ export function detectMimeType(base64: string): { mime: string; ext: string } {
     return { mime, ext };
   }
 
-  // Detect from raw base64 magic bytes
+  // Detect from raw base64 magic bytes (images only).
+  // Prefixes are ordered longest-first so shorter ones don't shadow them.
   const magicMap: [string, string, string][] = [
     ["iVBORw0KGgo", "image/png", "png"],
-    ["/9j/", "image/jpeg", "jpg"],
-    ["R0lGOD", "image/gif", "gif"],
+    ["R0lGODlh", "image/gif", "gif"],
+    ["R0lGODdh", "image/gif", "gif"],
     ["UklGR", "image/webp", "webp"],
-    ["AAAAIG", "video/mp4", "mp4"],
-    ["AAAAH", "video/mp4", "mp4"],
-    ["AAAA", "video/mp4", "mp4"],
+    ["/9j/", "image/jpeg", "jpg"],
   ];
 
   for (const [prefix, mime, ext] of magicMap) {
@@ -53,7 +55,21 @@ export function estimateBase64Size(base64: string): number {
 }
 
 // ============================================================
-// Upload to R2
+// Decode base64 to Uint8Array without Array.from overhead
+// ============================================================
+
+function decodeBase64(raw: string): Uint8Array {
+  const binaryStr = atob(raw);
+  const len = binaryStr.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// ============================================================
+// Upload to R2 (images only — videos must use presigned URL)
 // ============================================================
 
 export interface R2UploadResult {
@@ -65,13 +81,13 @@ export interface R2UploadResult {
 export async function uploadToR2(
   env: Env,
   workspaceId: string,
-  type: "images" | "videos",
+  type: "images",
   name: string,
   base64Data: string
 ): Promise<R2UploadResult> {
   const { mime, ext } = detectMimeType(base64Data);
   const raw = stripDataUri(base64Data);
-  const bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+  const bytes = decodeBase64(raw);
 
   const timestamp = Date.now();
   const safeName = name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);

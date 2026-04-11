@@ -11,6 +11,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@vibefly/hotmart": "workspace:*",
     "@vibefly/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.28.0",
     "agents": "^0.8.7",

@@ -5,10 +5,6 @@ import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
   Megaphone,
-  Layers,
-  FileText,
-  BarChart3,
-  Globe,
   Link2,
   Cable,
   BookOpen,
@@ -19,7 +15,9 @@ import {
   Building2,
   Moon,
   Sun,
-  ImageIcon,
+  Package,
+  Users,
+  ShoppingCart,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -39,6 +37,7 @@ interface Workspace {
   name: string
   slug: string
   meta_business_name: string | null
+  enable_meta_mutations?: boolean
 }
 
 interface AppSidebarProps {
@@ -51,6 +50,20 @@ interface NavItem {
   title: string
   url: string
   icon: React.ComponentType<{ className?: string }>
+  /** @deprecated prefer activePathPrefixes */
+  activePathPrefix?: string
+  activePathPrefixes?: string[]
+}
+
+function isNavActive(pathname: string, item: NavItem): boolean {
+  if (item.activePathPrefixes?.length) {
+    return item.activePathPrefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  }
+  if (item.activePathPrefix) {
+    const p = item.activePathPrefix
+    return pathname === item.url || pathname.startsWith(`${p}/`)
+  }
+  return pathname === item.url
 }
 
 export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarProps) {
@@ -71,24 +84,39 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
     },
   ]
 
-  const metaAdsItems: NavItem[] = slug
+  const operationItems: NavItem[] = slug
     ? [
-        { title: "Campaigns", url: `/dashboard/${slug}/campaigns`, icon: Megaphone },
-        { title: "Ad Sets", url: `/dashboard/${slug}/adsets`, icon: Layers },
-        { title: "Ads", url: `/dashboard/${slug}/ads`, icon: FileText },
-        { title: "Creatives", url: `/dashboard/${slug}/creatives`, icon: ImageIcon },
-        { title: "Insights", url: `/dashboard/${slug}/insights`, icon: BarChart3 },
-        { title: "Pages", url: `/dashboard/${slug}/pages`, icon: Globe },
+        { title: "Produtos", url: `/dashboard/${slug}/produtos`, icon: Package },
+        { title: "Clientes", url: `/dashboard/${slug}/clientes`, icon: Users },
+        { title: "Vendas", url: `/dashboard/${slug}/vendas`, icon: ShoppingCart },
+        {
+          title: "Campanhas",
+          url: `/dashboard/${slug}/campaigns`,
+          icon: Megaphone,
+          activePathPrefixes: [
+            `/dashboard/${slug}/campaigns`,
+            `/dashboard/${slug}/adsets`,
+            `/dashboard/${slug}/ads`,
+            `/dashboard/${slug}/creatives`,
+            `/dashboard/${slug}/insights`,
+            `/dashboard/${slug}/pages`,
+          ],
+        },
       ]
     : []
 
   const settingsItems: NavItem[] = slug
     ? [
-        { title: "Tracking & CAPI", url: `/dashboard/${slug}/tracking`, icon: Radar },
-        { title: "Billing", url: `/dashboard/${slug}/billing`, icon: CreditCard },
-        { title: "MCP Connections", url: `/dashboard/${slug}/connections`, icon: Cable },
-        { title: "Integrations", url: `/dashboard/${slug}/connect`, icon: Link2 },
-        { title: "Setup Guide", url: `/dashboard/${slug}/setup`, icon: BookOpen },
+        {
+          title: "Integrações",
+          url: `/dashboard/${slug}/integrations`,
+          icon: Link2,
+          activePathPrefix: `/dashboard/${slug}/integrations`,
+        },
+        { title: "Rastreamento & CAPI", url: `/dashboard/${slug}/tracking`, icon: Radar },
+        { title: "Assinatura", url: `/dashboard/${slug}/billing`, icon: CreditCard },
+        { title: "Conexões MCP", url: `/dashboard/${slug}/connections`, icon: Cable },
+        { title: "Guia de Setup", url: `/dashboard/${slug}/setup`, icon: BookOpen },
       ]
     : []
 
@@ -98,7 +126,6 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header: Logo */}
       <div className="p-4 pb-2">
         <Link href="/dashboard" className="flex items-center gap-2">
           <span className="text-lg font-light tracking-tight font-display bg-gradient-to-r from-violet-brand to-cyan-brand bg-clip-text text-transparent">
@@ -107,7 +134,6 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
         </Link>
       </div>
 
-      {/* Workspace Switcher */}
       {workspaces.length > 0 && (
         <div className="px-3 pb-2">
           <DropdownMenu>
@@ -118,7 +144,7 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold truncate">
-                    {currentWorkspace?.name ?? "Select workspace"}
+                    {currentWorkspace?.name ?? "Selecionar espaço"}
                   </p>
                   {currentWorkspace?.meta_business_name && (
                     <p className="text-xs text-muted-foreground truncate">
@@ -130,7 +156,7 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="start">
-              <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+              <DropdownMenuLabel>Espaços de trabalho</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {workspaces.map((ws) => (
                 <DropdownMenuItem key={ws.id} asChild>
@@ -143,7 +169,7 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/new" className="text-muted-foreground">
-                  + New Workspace
+                  + Novo espaço
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -153,18 +179,16 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
 
       <div className="mx-3 h-px bg-border" />
 
-      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-6">
-        <NavGroup label="Overview" items={overviewItems} pathname={pathname} />
-        {metaAdsItems.length > 0 && (
-          <NavGroup label="Advertising" items={metaAdsItems} pathname={pathname} />
+        <NavGroup label="Visão geral" items={overviewItems} pathname={pathname} />
+        {operationItems.length > 0 && (
+          <NavGroup label="Operação" items={operationItems} pathname={pathname} />
         )}
         {settingsItems.length > 0 && (
-          <NavGroup label="Settings" items={settingsItems} pathname={pathname} />
+          <NavGroup label="Configurações" items={settingsItems} pathname={pathname} />
         )}
       </nav>
 
-      {/* User footer */}
       <div className="border-t p-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -189,7 +213,7 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
               ) : (
                 <Moon className="h-4 w-4 mr-2" />
               )}
-              {theme === "dark" ? "Light mode" : "Dark mode"}
+              {theme === "dark" ? "Modo claro" : "Modo escuro"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -200,7 +224,7 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
               }}
             >
               <LogOut className="h-4 w-4" />
-              Sign out
+              Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -217,7 +241,7 @@ function NavGroup({ label, items, pathname }: { label: string; items: NavItem[];
       </p>
       <ul className="space-y-0.5">
         {items.map((item) => {
-          const isActive = pathname === item.url
+          const isActive = isNavActive(pathname, item)
           return (
             <li key={item.title}>
               <Link

@@ -1,6 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { createToolCapture, parseToolResult, createMockEnv } from "../helpers";
 import { registerAllTools } from "../../tools";
+import { registerHotmartTools } from "../../tools/hotmart";
+import * as workerAuth from "../../auth";
 import {
   FREE_TIER_TOOLS,
   TIER_LIMITS,
@@ -25,6 +27,35 @@ vi.mock("../../meta-api", async () => {
   };
 });
 
+vi.mock("@vibefly/hotmart", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@vibefly/hotmart")>();
+  return {
+    ...mod,
+    runHotmartInitialBackfill: vi
+      .fn()
+      .mockResolvedValue({ ok: true, errors: [] }),
+    syncHotmartEntity: vi.fn().mockResolvedValue({
+      syncLogId: "test-sync",
+      recordsSynced: 0,
+    }),
+  };
+});
+
+const originalFetch = globalThis.fetch;
+
+function stubFetchForHotmart() {
+  globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("hotmart_credentials?")) {
+      return new Response(JSON.stringify([{ id: "cred" }]), { status: 200 });
+    }
+    if (url.includes("/rest/v1/commerce_")) {
+      return new Response(JSON.stringify([]), { status: 200 });
+    }
+    return originalFetch(input, init);
+  }) as typeof globalThis.fetch;
+}
+
 const WRITE_TOOLS = new Set([
   "create_campaign",
   "update_campaign",
@@ -37,9 +68,25 @@ const WRITE_TOOLS = new Set([
   "create_ad_creative",
   "update_ad_creative",
   "create_budget_schedule",
+  "hotmart_trigger_sync",
+]);
+
+/** Hotmart MCP tools (paid tier; local DB reads + sync). */
+const HOTMART_READ_TOOLS = new Set([
+  "hotmart_list_products",
+  "hotmart_get_product",
+  "hotmart_list_customers",
+  "hotmart_get_customer",
+  "hotmart_list_sales",
+  "hotmart_get_sale",
+  "hotmart_list_refunds",
 ]);
 
 describe("Tier Enforcement", () => {
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
   it("FREE_TIER_TOOLS contains only read-only tools", () => {
     for (const tool of FREE_TIER_TOOLS) {
       expect(WRITE_TOOLS.has(tool)).toBe(false);
@@ -48,7 +95,7 @@ describe("Tier Enforcement", () => {
 
   it("all registered tools are in FREE_TIER_TOOLS or WRITE_TOOLS", () => {
     const capture = createToolCapture();
-    registerAllTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
+    registerAllTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
 
     // Get all registered tool names via the capture's internal handler map
     const allTools = new Set<string>();
@@ -61,11 +108,14 @@ describe("Tier Enforcement", () => {
         names.push(name);
       },
     };
-    registerAllTools({ server: nameCapture as any, token: "tok", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
+    registerAllTools({ server: nameCapture as any, token: "tok", tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+    registerHotmartTools({ server: nameCapture as any, token: "tok", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
     for (const name of names) {
       expect(
-        FREE_TIER_TOOLS.has(name) || WRITE_TOOLS.has(name),
+        FREE_TIER_TOOLS.has(name) ||
+          WRITE_TOOLS.has(name) ||
+          HOTMART_READ_TOOLS.has(name),
       ).toBe(true);
     }
   });
@@ -74,7 +124,8 @@ describe("Tier Enforcement", () => {
     for (const toolName of WRITE_TOOLS) {
       vi.clearAllMocks();
       const capture = createToolCapture();
-      registerAllTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
+      registerAllTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerHotmartTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
 
       // Build a minimal valid args object for each tool
       const args = getMinimalArgs(toolName);
@@ -89,8 +140,11 @@ describe("Tier Enforcement", () => {
   it("pro tier allows ALL write tools (no tier error)", async () => {
     for (const toolName of WRITE_TOOLS) {
       vi.clearAllMocks();
+      vi.spyOn(workerAuth, "getHotmartAccessToken").mockResolvedValue("tok");
+      stubFetchForHotmart();
       const capture = createToolCapture();
-      registerAllTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
+      registerAllTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerHotmartTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
       const args = getMinimalArgs(toolName);
       const result = await capture.callTool(toolName, args);
@@ -103,11 +157,24 @@ describe("Tier Enforcement", () => {
     }
   });
 
+  it("free tier blocks Hotmart tools", async () => {
+    for (const toolName of [...HOTMART_READ_TOOLS, "hotmart_trigger_sync"]) {
+      vi.clearAllMocks();
+      const capture = createToolCapture();
+      registerHotmartTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
+      const args = getMinimalArgs(toolName);
+      const result = await capture.callTool(toolName, args);
+      const text = (result as any).content?.[0]?.text ?? "";
+      expect((result as any).isError).toBe(true);
+      expect(text).toContain("paid plan");
+    }
+  });
+
   it("free tier allows ALL read-only tools", async () => {
     for (const toolName of FREE_TIER_TOOLS) {
       vi.clearAllMocks();
       const capture = createToolCapture();
-      registerAllTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
+      registerAllTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: false });
 
       const args = getMinimalArgs(toolName);
       const result = await capture.callTool(toolName, args);
@@ -184,8 +251,8 @@ describe("FREE_TIER_TOOLS set", () => {
     expect(FREE_TIER_TOOLS.has("upload_ad_image")).toBe(false);
   });
 
-  it("has exactly 24 read-only tools", () => {
-    expect(FREE_TIER_TOOLS.size).toBe(24);
+  it("has exactly 25 read-only tools", () => {
+    expect(FREE_TIER_TOOLS.size).toBe(25);
   });
 });
 
@@ -236,10 +303,17 @@ function getMinimalArgs(toolName: string): Record<string, unknown> {
       account_id: "act_123",
       image_url: "https://example.com/img.jpg",
     },
+    upload_ad_video: {
+      account_id: "act_123",
+      video_url: "https://example.com/video.mp4",
+    },
     create_ad_creative: {
       account_id: "act_123",
       page_id: "page_1",
+      image_hash: "abc123",
+      link_url: "https://example.com",
     },
+    get_video_status: { video_id: "vid_1" },
     update_ad_creative: {
       creative_id: "cr_1",
       name: "Updated",
@@ -250,6 +324,28 @@ function getMinimalArgs(toolName: string): Record<string, unknown> {
       budget_value_type: "ABSOLUTE",
       time_start: 1700000000,
       time_end: 1700086400,
+    },
+    hotmart_trigger_sync: { entity: "all" },
+    hotmart_list_products: { limit: 10, offset: 0, status: "", search: "" },
+    hotmart_get_product: { product_id: "00000000-0000-4000-8000-000000000001" },
+    hotmart_list_customers: { limit: 10, offset: 0, search: "", email: "" },
+    hotmart_get_customer: { customer_id: "00000000-0000-4000-8000-000000000002", email: "" },
+    hotmart_list_sales: {
+      limit: 10,
+      offset: 0,
+      start_date: "",
+      end_date: "",
+      product_id: "",
+      customer_email: "",
+      status: "",
+    },
+    hotmart_get_sale: { transaction_id: "HP1" },
+    hotmart_list_refunds: {
+      limit: 10,
+      offset: 0,
+      start_date: "",
+      end_date: "",
+      product_id: "",
     },
     // Read tools
     get_ad_accounts: { user_id: "me", limit: 10 },

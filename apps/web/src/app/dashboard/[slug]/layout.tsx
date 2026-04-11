@@ -17,7 +17,9 @@ export default async function WorkspaceLayout({
 
   const { data: memberships } = await supabase
     .from("memberships")
-    .select("role, workspace:workspaces(id, name, slug, meta_business_name)")
+    .select(
+      "role, workspace:workspaces(id, name, slug, meta_business_name, enable_meta_mutations)"
+    )
     .eq("user_id", user.id);
 
   const workspaces = memberships?.map((m) => {
@@ -26,6 +28,7 @@ export default async function WorkspaceLayout({
       name: string;
       slug: string;
       meta_business_name: string | null;
+      enable_meta_mutations: boolean;
     };
     return { ...ws };
   }) ?? [];

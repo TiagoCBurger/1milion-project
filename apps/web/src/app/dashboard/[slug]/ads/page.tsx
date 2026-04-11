@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getDecryptedToken, fetchAds, fetchAdSets, fetchCreatives, fetchPages } from "@/lib/meta-api";
 import { getEnabledAdAccounts } from "@/lib/workspace-data";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,7 +40,7 @@ export default async function AdsPage({
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id")
+    .select("id, enable_meta_mutations")
     .eq("slug", slug)
     .single();
   if (!workspace) notFound();
@@ -51,19 +52,20 @@ export default async function AdsPage({
     return (
       <>
         <PageHeader breadcrumbs={[
-          { label: "Workspaces", href: "/dashboard" },
+          { label: "Espaços de trabalho", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
-          { label: "Ads" },
+          { label: "Anúncios" },
         ]} />
+        <CampaignsTopNav slug={slug} active="campaigns" />
         <div className="p-6">
           <EmptyState
             icon={Link2}
-            title={!token ? "Meta account not connected" : "No ad accounts enabled"}
-            description={!token ? "Connect your Meta account to view ads." : "Enable at least one ad account."}
+            title={!token ? "Meta não conectada" : "Nenhuma conta de anúncios ativa"}
+            description={!token ? "Conecte a Meta para ver anúncios." : "Ative pelo menos uma conta de anúncios."}
           >
             <Button asChild>
-              <Link href={`/dashboard/${slug}/${!token ? "connect" : ""}`}>
-                {!token ? "Connect Meta" : "Go to Dashboard"}
+              <Link href={!token ? `/dashboard/${slug}/integrations/meta` : `/dashboard/${slug}`}>
+                {!token ? "Conectar Meta" : "Ir ao dashboard"}
               </Link>
             </Button>
           </EmptyState>
@@ -77,13 +79,20 @@ export default async function AdsPage({
   const { data: adsets } = await fetchAdSets(token, selectedAccount);
   const { data: creatives } = await fetchCreatives(token, selectedAccount);
   const { data: pages } = await fetchPages(token);
-  const adsetOptions = adsets.map((a: any) => ({ id: a.id, name: a.name }));
-  const creativeOptions = creatives.map((c: any) => ({
-    id: c.id,
-    name: c.name || `Creative ${c.id}`,
-    thumbnail_url: c.thumbnail_url,
+  const adsetOptions = adsets.map((a) => ({
+    id: String(a["id"] ?? ""),
+    name: String(a["name"] ?? ""),
   }));
-  const pageOptions = pages.map((p: any) => ({ id: p.id, name: p.name }));
+  const creativeOptions = creatives.map((c) => ({
+    id: String(c["id"] ?? ""),
+    name: String(c["name"] ?? `Creative ${c["id"] ?? ""}`),
+    thumbnail_url:
+      typeof c["thumbnail_url"] === "string" ? c["thumbnail_url"] : undefined,
+  }));
+  const pageOptions = pages.map((p) => ({
+    id: String(p["id"] ?? ""),
+    name: String(p["name"] ?? ""),
+  }));
 
   // Fetch persisted images
   const admin = createAdminClient();
@@ -98,27 +107,30 @@ export default async function AdsPage({
   return (
     <>
       <PageHeader breadcrumbs={[
-        { label: "Workspaces", href: "/dashboard" },
+        { label: "Espaços de trabalho", href: "/dashboard" },
         { label: slug, href: `/dashboard/${slug}` },
-        { label: "Ads" },
+        { label: "Anúncios" },
       ]} />
+      <CampaignsTopNav slug={slug} active="campaigns" />
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Ads</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Anúncios</h1>
             <p className="text-muted-foreground text-sm">
-              {ads.length} ad{ads.length !== 1 ? "s" : ""} found
+              {ads.length === 1 ? "1 anúncio encontrado" : `${ads.length} anúncios encontrados`}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <CreateAdDialog workspaceId={workspace.id} accountId={selectedAccount} adSets={adsetOptions} creatives={creativeOptions} pages={pageOptions} images={images ?? []} />
+            {workspace.enable_meta_mutations && (
+              <CreateAdDialog workspaceId={workspace.id} accountId={selectedAccount} adSets={adsetOptions} creatives={creativeOptions} pages={pageOptions} images={images ?? []} />
+            )}
             <AccountSelector accounts={accounts} current={selectedAccount} />
           </div>
         </div>
 
         {error && (
           <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-            Meta API error: {error}
+            Erro na API Meta: {error}
           </div>
         )}
 
@@ -135,22 +147,34 @@ export default async function AdsPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {ads.map((ad: any) => (
-                    <TableRow key={ad.id}>
+                  {ads.map((ad) => {
+                    const cr = ad["creative"];
+                    const crObj =
+                      cr && typeof cr === "object" && !Array.isArray(cr)
+                        ? (cr as Record<string, unknown>)
+                        : null;
+                    const created = ad["created_time"];
+                    return (
+                    <TableRow key={String(ad["id"] ?? "")}>
                       <TableCell className="font-medium max-w-[250px] truncate">
-                        {ad.name}
+                        {String(ad["name"] ?? "")}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={statusVariant(ad.status)}>{ad.status}</Badge>
+                        <Badge variant={statusVariant(String(ad["status"] ?? ""))}>
+                          {String(ad["status"] ?? "")}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs">
-                        {ad.creative?.name ?? ad.creative?.id ?? "—"}
+                        {String(crObj?.["name"] ?? crObj?.["id"] ?? "—")}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {ad.created_time ? new Date(ad.created_time).toLocaleDateString() : "—"}
+                        {typeof created === "string"
+                          ? new Date(created).toLocaleDateString()
+                          : "—"}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -158,8 +182,8 @@ export default async function AdsPage({
         ) : !error ? (
           <EmptyState
             icon={FileText}
-            title="No ads found"
-            description="This ad account has no ads yet."
+            title="Nenhum anúncio encontrado"
+            description="Esta conta de anúncios ainda não tem anúncios."
           />
         ) : null}
       </div>

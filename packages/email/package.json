@@ -17,6 +17,7 @@
     "resend": "^4.1.0"
   },
   "devDependencies": {
+    "@types/node": "^22.10.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "react-email": "^3.0.0",

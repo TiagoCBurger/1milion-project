@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { verifyOAuthAccessToken } from "../auth";
+import { verifyOAuthAccessToken, type AuthResult } from "../auth";
 import { createMockEnv } from "./helpers";
 import type { Env } from "../types";
+
+function requireAuthOk(result: AuthResult): Extract<AuthResult, { ok: true }> {
+  expect(result.ok).toBe(true);
+  if (!result.ok) {
+    throw new Error("expected auth success");
+  }
+  return result;
+}
 
 /**
  * Tests for verifyOAuthAccessToken with the new Supabase connection checks.
@@ -12,7 +20,7 @@ import type { Env } from "../types";
  * 3. Fetch workspace context via get_workspace_context RPC
  * 4. Fetch oauth connection via get_oauth_connection RPC
  * 5. If connection exists and is_active: use DB allowed_accounts (source of truth)
- * 6. If connection is revoked: return null
+ * 6. If connection is revoked: return { ok: false, error }
  * 7. If no connection record: fall back to KV allowed_accounts
  * 8. Update last_used_at (best-effort)
  */
@@ -62,31 +70,31 @@ describe("verifyOAuthAccessToken — connection checks", () => {
     globalThis.fetch = originalFetch;
   });
 
-  it("returns null for unknown token (not in KV)", async () => {
+  it("returns failure for unknown token (not in KV)", async () => {
     (env.OAUTH_KV.get as any).mockResolvedValue(null);
 
     const result = await verifyOAuthAccessToken("unknown-token", env);
-    expect(result).toBeNull();
+    expect(result.ok).toBe(false);
   });
 
-  it("returns null for expired token", async () => {
+  it("returns failure for expired token", async () => {
     (env.OAUTH_KV.get as any).mockResolvedValue({
       ...STORED_TOKEN,
       expires_at: Math.floor(Date.now() / 1000) - 10, // expired
     });
 
     const result = await verifyOAuthAccessToken("expired-token", env);
-    expect(result).toBeNull();
+    expect(result.ok).toBe(false);
   });
 
-  it("returns null when get_workspace_context returns empty", async () => {
+  it("returns failure when get_workspace_context returns empty", async () => {
     (globalThis.fetch as any).mockResolvedValueOnce({
       ok: true,
       json: async () => [], // no workspace rows
     });
 
     const result = await verifyOAuthAccessToken("test-token", env);
-    expect(result).toBeNull();
+    expect(result.ok).toBe(false);
   });
 
   it("falls back to KV allowed_accounts when no DB connection exists", async () => {
@@ -102,13 +110,12 @@ describe("verifyOAuthAccessToken — connection checks", () => {
       json: async () => [],
     });
 
-    const result = await verifyOAuthAccessToken("test-token", env);
+    const result = requireAuthOk(await verifyOAuthAccessToken("test-token", env));
 
-    expect(result).not.toBeNull();
-    expect(result!.allowedAccounts).toEqual(["act_from_kv"]);
+    expect(result.workspace.allowedAccounts).toEqual(["act_from_kv"]);
   });
 
-  it("returns null when connection is revoked (is_active=false)", async () => {
+  it("returns failure when connection is revoked (is_active=false)", async () => {
     // 1st: workspace context
     (globalThis.fetch as any).mockResolvedValueOnce({
       ok: true,
@@ -128,7 +135,7 @@ describe("verifyOAuthAccessToken — connection checks", () => {
     });
 
     const result = await verifyOAuthAccessToken("test-token", env);
-    expect(result).toBeNull();
+    expect(result.ok).toBe(false);
   });
 
   it("overrides allowed_accounts from DB connection (source of truth)", async () => {
@@ -153,10 +160,9 @@ describe("verifyOAuthAccessToken — connection checks", () => {
     // 3rd: last_used_at PATCH (fire-and-forget)
     (globalThis.fetch as any).mockResolvedValueOnce({ ok: true });
 
-    const result = await verifyOAuthAccessToken("test-token", env);
+    const result = requireAuthOk(await verifyOAuthAccessToken("test-token", env));
 
-    expect(result).not.toBeNull();
-    expect(result!.allowedAccounts).toEqual([
+    expect(result.workspace.allowedAccounts).toEqual([
       "act_from_db_1",
       "act_from_db_2",
     ]);
@@ -175,10 +181,9 @@ describe("verifyOAuthAccessToken — connection checks", () => {
       status: 500,
     });
 
-    const result = await verifyOAuthAccessToken("test-token", env);
+    const result = requireAuthOk(await verifyOAuthAccessToken("test-token", env));
 
-    expect(result).not.toBeNull();
-    expect(result!.allowedAccounts).toEqual(["act_from_kv"]);
+    expect(result.workspace.allowedAccounts).toEqual(["act_from_kv"]);
   });
 
   it("sets apiKeyId to 'oauth:{client_id}'", async () => {
@@ -191,10 +196,9 @@ describe("verifyOAuthAccessToken — connection checks", () => {
       json: async () => [],
     });
 
-    const result = await verifyOAuthAccessToken("test-token", env);
+    const result = requireAuthOk(await verifyOAuthAccessToken("test-token", env));
 
-    expect(result).not.toBeNull();
-    expect(result!.apiKeyId).toBe("oauth:client_abc");
+    expect(result.workspace.apiKeyId).toBe("oauth:client_abc");
   });
 
   it("returns correct tier and rate limits from workspace context", async () => {
@@ -207,13 +211,12 @@ describe("verifyOAuthAccessToken — connection checks", () => {
       json: async () => [],
     });
 
-    const result = await verifyOAuthAccessToken("test-token", env);
+    const result = requireAuthOk(await verifyOAuthAccessToken("test-token", env));
 
-    expect(result).not.toBeNull();
-    expect(result!.workspaceId).toBe("ws-1");
-    expect(result!.tier).toBe("pro");
-    expect(result!.requestsPerHour).toBe(200);
-    expect(result!.requestsPerDay).toBe(1000);
+    expect(result.workspace.workspaceId).toBe("ws-1");
+    expect(result.workspace.tier).toBe("pro");
+    expect(result.workspace.requestsPerHour).toBe(200);
+    expect(result.workspace.requestsPerDay).toBe(1000);
   });
 
   it("fires last_used_at update when connection exists", async () => {

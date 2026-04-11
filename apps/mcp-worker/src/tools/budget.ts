@@ -4,6 +4,8 @@ import type { ToolContext } from "./index";
 
 export function registerBudgetTools(ctx: ToolContext): void {
   const { server, token, tier } = ctx;
+  if (!ctx.enableMetaMutations) return;
+
   server.tool(
     "create_budget_schedule",
     "Create a budget schedule for a campaign to automatically adjust budget at specific times. PRO tier only.",

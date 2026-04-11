@@ -48,6 +48,7 @@ export async function validateApiKey(
     requests_per_hour: number;
     requests_per_day: number;
     max_mcp_connections: number;
+    enable_meta_mutations?: boolean | null;
   }>;
 
   if (!rows || rows.length === 0) {
@@ -62,6 +63,7 @@ export async function validateApiKey(
     requestsPerHour: row.requests_per_hour,
     requestsPerDay: row.requests_per_day,
     maxMcpConnections: row.max_mcp_connections,
+    enableMetaMutations: row.enable_meta_mutations === true,
   };
 
   await env.CACHE_KV.put(cacheKey, JSON.stringify(ctx), {
@@ -108,6 +110,57 @@ export async function getMetaToken(
   }
 
   await env.CACHE_KV.put(cacheKey, token, { expirationTtl: 300 });
+
+  return token;
+}
+
+const HOTMART_TOKEN_CACHE_TTL = 60;
+
+/**
+ * Hotmart bearer token via Edge Function (refreshes when near expiry).
+ */
+export async function getHotmartAccessToken(
+  workspaceId: string,
+  env: Env
+): Promise<string | null> {
+  const cacheKey = `hotmart:token:${workspaceId}`;
+  const cached = await env.CACHE_KV.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const response = await fetch(
+    `${env.SUPABASE_URL}/functions/v1/decrypt-hotmart-credentials`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({ workspaceId }),
+    }
+  );
+
+  if (!response.ok) {
+    console.error(
+      "decrypt-hotmart-credentials error:",
+      response.status,
+      await response.text()
+    );
+    return null;
+  }
+
+  const json = (await response.json()) as {
+    credentials?: { access_token?: string | null };
+  };
+  const token = json.credentials?.access_token;
+  if (!token) {
+    return null;
+  }
+
+  await env.CACHE_KV.put(cacheKey, token, {
+    expirationTtl: HOTMART_TOKEN_CACHE_TTL,
+  });
 
   return token;
 }
@@ -265,6 +318,7 @@ export async function verifyOAuthAccessToken(
     requests_per_hour: number;
     requests_per_day: number;
     max_mcp_connections: number;
+    enable_meta_mutations?: boolean | null;
   }>;
 
   console.log("[oauth] get_workspace_context rows:", rows.length, rows[0] ? JSON.stringify(rows[0]) : "empty");
@@ -375,6 +429,7 @@ export async function verifyOAuthAccessToken(
       requestsPerHour: row.requests_per_hour,
       requestsPerDay: row.requests_per_day,
       maxMcpConnections: row.max_mcp_connections,
+      enableMetaMutations: row.enable_meta_mutations === true,
       allowedAccounts,
     },
   };

@@ -3,6 +3,7 @@
 // ============================================================
 
 import { getResendClient } from "../client";
+import type { ResendBroadcastDetail, ResendBroadcastSummary } from "../resend-shapes";
 
 export async function createBroadcastDraft(opts: {
   audienceId: string;
@@ -30,16 +31,16 @@ export async function sendBroadcastById(broadcastId: string) {
   return data!;
 }
 
-export async function listBroadcasts() {
+export async function listBroadcasts(): Promise<ResendBroadcastSummary[]> {
   const resend = getResendClient();
   const { data, error } = await resend.broadcasts.list();
   if (error) throw new Error(`[email] Failed to list broadcasts: ${error.message}`);
-  return data!.data;
+  return data!.data as ResendBroadcastSummary[];
 }
 
-export async function getBroadcast(broadcastId: string) {
+export async function getBroadcast(broadcastId: string): Promise<ResendBroadcastDetail> {
   const resend = getResendClient();
   const { data, error } = await resend.broadcasts.get(broadcastId);
   if (error) throw new Error(`[email] Failed to get broadcast: ${error.message}`);
-  return data!;
+  return data! as ResendBroadcastDetail;
 }

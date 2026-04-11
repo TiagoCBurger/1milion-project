@@ -5,12 +5,12 @@ import { createClient } from "@/lib/supabase/client";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ChevronRight, Check, Copy } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { IntegrationsTopNav } from "@/components/dashboard/integrations-top-nav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 
-export default function ConnectPage() {
+export default function MetaIntegrationPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -47,11 +47,11 @@ export default function ConnectPage() {
   }, [slug, supabase]);
 
   const errorMessages: Record<string, string> = {
-    denied: "You denied the permissions request. Please try again and accept the required permissions.",
-    invalid_state: "The connection request expired or was invalid. Please try again.",
-    unauthorized: "You need to be logged in to connect your account.",
-    store_failed: "Failed to store the token. Please try again.",
-    exchange_failed: "Failed to complete the Facebook connection. Please try again.",
+    denied: "Você recusou as permissões. Tente novamente e aceite o que for necessário.",
+    invalid_state: "A solicitação expirou ou é inválida. Tente de novo.",
+    unauthorized: "É preciso estar logado para conectar a conta.",
+    store_failed: "Não foi possível salvar o token. Tente novamente.",
+    exchange_failed: "Falha ao concluir a conexão com o Facebook. Tente novamente.",
   };
 
   async function handleManualConnect(e: React.FormEvent) {
@@ -69,13 +69,13 @@ export default function ConnectPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to connect");
+        setError(data.error || "Falha ao conectar");
         return;
       }
       setManualSuccess(data);
       setToken("");
     } catch {
-      setError("Network error");
+      setError("Erro de rede");
     } finally {
       setLoading(false);
     }
@@ -93,7 +93,7 @@ export default function ConnectPage() {
   }
 
   const successData = oauthSuccess
-    ? { meta_user_name: oauthName || "Unknown", api_key: oauthApiKey || undefined }
+    ? { meta_user_name: oauthName || "—", api_key: oauthApiKey || undefined }
     : manualSuccess;
 
   if (successData) {
@@ -101,33 +101,35 @@ export default function ConnectPage() {
       <>
         <PageHeader
           breadcrumbs={[
-            { label: "Workspaces", href: "/dashboard" },
+            { label: "Espaços de trabalho", href: "/dashboard" },
             { label: slug, href: `/dashboard/${slug}` },
-            { label: "Connect" },
+            { label: "Integrações", href: `/dashboard/${slug}/integrations` },
+            { label: "Meta Ads" },
           ]}
         />
-        <div className="p-6 max-w-xl">
+        <IntegrationsTopNav slug={slug} active="meta" />
+        <div className="mx-auto max-w-xl p-6">
           <Card className="bg-emerald-50/60">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
                   <Check className="h-5 w-5 text-emerald-600" />
                 </div>
-                <CardTitle className="text-emerald-800">Connected successfully!</CardTitle>
+                <CardTitle className="text-emerald-800">Conectado com sucesso</CardTitle>
               </div>
               <CardDescription className="text-emerald-700">
-                User: {successData.meta_user_name}
+                Usuário: {successData.meta_user_name}
                 {"meta_business_name" in successData && (
-                  <> &middot; BM: {(successData as typeof manualSuccess)?.meta_business_name}</>
+                  <> · BM: {(successData as typeof manualSuccess)?.meta_business_name}</>
                 )}
               </CardDescription>
             </CardHeader>
             {successData.api_key && (
               <CardContent>
                 <div className="rounded-lg bg-white p-4">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs text-muted-foreground font-medium">
-                      Your API key (save it, shown only once):
+                  <div className="mb-1 flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Sua chave de API (guarde em local seguro, exibida só uma vez):
                     </p>
                     <Button
                       variant="ghost"
@@ -138,25 +140,19 @@ export default function ConnectPage() {
                       {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                     </Button>
                   </div>
-                  <code className="text-sm font-mono break-all select-all block">
+                  <code className="block select-all break-all font-mono text-sm">
                     {successData.api_key}
                   </code>
                 </div>
-                <Button
-                  onClick={() => router.push(`/dashboard/${slug}`)}
-                  className="mt-4 w-full"
-                >
-                  Go to workspace
+                <Button onClick={() => router.push(`/dashboard/${slug}`)} className="mt-4 w-full">
+                  Ir para o espaço
                 </Button>
               </CardContent>
             )}
             {!successData.api_key && (
               <CardContent>
-                <Button
-                  onClick={() => router.push(`/dashboard/${slug}`)}
-                  className="w-full"
-                >
-                  Go to workspace
+                <Button onClick={() => router.push(`/dashboard/${slug}`)} className="w-full">
+                  Ir para o espaço
                 </Button>
               </CardContent>
             )}
@@ -170,81 +166,82 @@ export default function ConnectPage() {
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "Workspaces", href: "/dashboard" },
+          { label: "Espaços de trabalho", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
-          { label: "Connect" },
+          { label: "Integrações", href: `/dashboard/${slug}/integrations` },
+          { label: "Meta Ads" },
         ]}
       />
-      <div className="p-6 max-w-xl">
-        <h1 className="text-2xl font-semibold tracking-tight mb-1">Connect Marketing Account</h1>
-        <p className="text-muted-foreground mb-6">
-          Connect your Facebook account to authorize access to your advertising data and tools.
+      <IntegrationsTopNav slug={slug} active="meta" />
+      <div className="mx-auto max-w-xl p-6">
+        <h1 className="mb-1 text-2xl font-semibold tracking-tight">Conectar conta de anúncios</h1>
+        <p className="mb-6 text-muted-foreground">
+          Conecte sua conta Facebook para autorizar o acesso aos dados e ferramentas de anúncios.
         </p>
 
         {(oauthError || error) && (
-          <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive mb-6">
-            {oauthError ? errorMessages[oauthError] || "An error occurred. Please try again." : error}
+          <div className="mb-6 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            {oauthError ? errorMessages[oauthError] || "Ocorreu um erro. Tente novamente." : error}
           </div>
         )}
 
-        {/* Facebook OAuth Button */}
         <Button
           onClick={handleFacebookConnect}
           disabled={!workspaceId}
           size="lg"
-          className="w-full text-base h-12"
+          className="h-12 w-full text-base"
           style={{ backgroundColor: "#1877F2" }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="white" className="mr-2">
             <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
           </svg>
-          Connect with Facebook
+          Continuar com Facebook
         </Button>
 
-        <p className="text-xs text-muted-foreground mt-2 text-center">
-          We&apos;ll request access to manage your campaigns, read insights, and access your advertising accounts.
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          Solicitamos permissão para gerenciar campanhas, ler insights e acessar contas de anúncios.
         </p>
 
-        {/* Divider */}
         <div className="relative my-8">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-border/30" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="bg-background px-4 text-muted-foreground">or</span>
+            <span className="bg-background px-4 text-muted-foreground">ou</span>
           </div>
         </div>
 
-        {/* Manual Token */}
         <button
+          type="button"
           onClick={() => setShowManual(!showManual)}
-          className="w-full text-left text-sm text-muted-foreground hover:text-foreground transition flex items-center gap-2"
+          className="flex w-full items-center gap-2 text-left text-sm text-muted-foreground transition hover:text-foreground"
         >
           <ChevronRight className={`h-4 w-4 transition-transform ${showManual ? "rotate-90" : ""}`} />
-          Advanced: Paste Token Manually
+          Avançado: colar token manualmente
         </button>
 
         {showManual && (
           <Card className="mt-4">
             <CardContent className="pt-6">
-              <p className="text-xs text-muted-foreground mb-3">
-                Use this if you have a system user token or need to paste a token from the Graph API Explorer.
+              <p className="mb-3 text-xs text-muted-foreground">
+                Use se você tem um token de usuário do sistema ou precisa colar um token do Graph API
+                Explorer.
               </p>
               <form onSubmit={handleManualConnect} className="space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="token">Access Token</Label>
+                  <Label htmlFor="token">Token de acesso</Label>
                   <textarea
                     id="token"
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     required
                     rows={3}
-                    className="flex w-full rounded-xl bg-secondary/60 px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:bg-card"
+                    className="flex w-full rounded-xl bg-secondary/60 px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus-visible:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
                     placeholder="EAAxxxxxxx..."
                   />
                 </div>
                 <Button type="submit" disabled={loading || !workspaceId} variant="secondary" className="w-full">
-                  {loading ? "Validating..." : "Connect Token"}
+                  {loading ? "Validando…" : "Conectar token"}
                 </Button>
               </form>
             </CardContent>

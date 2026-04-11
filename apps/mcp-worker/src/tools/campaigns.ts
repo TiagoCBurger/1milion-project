@@ -107,6 +107,8 @@ export function registerCampaignsTools(ctx: ToolContext): void {
     },
   );
 
+  if (!ctx.enableMetaMutations) return;
+
   // ── create_campaign ──────────────────────────────────────────────────
   server.tool(
     "create_campaign",

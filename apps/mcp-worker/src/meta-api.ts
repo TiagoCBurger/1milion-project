@@ -19,8 +19,12 @@ export async function metaApiGet(
       typeof value === "string" ? value : JSON.stringify(value)
     );
   }
-  const res = await fetch(url.toString());
-  return (await res.json()) as Record<string, unknown>;
+  try {
+    const res = await fetch(url.toString());
+    return (await res.json()) as Record<string, unknown>;
+  } catch (err) {
+    return { error: { message: String(err), type: "NetworkError", code: 0 } };
+  }
 }
 
 /**
@@ -42,12 +46,16 @@ export async function metaApiPost(
       typeof value === "string" ? value : JSON.stringify(value)
     );
   }
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-  return (await res.json()) as Record<string, unknown>;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
+    return (await res.json()) as Record<string, unknown>;
+  } catch (err) {
+    return { error: { message: String(err), type: "NetworkError", code: 0 } };
+  }
 }
 
 /**

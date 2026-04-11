@@ -93,7 +93,7 @@ export async function parseJsonResponse(res: Response): Promise<{ status: number
 
 export function mockMetaFetch(responses: Record<string, unknown>) {
   return vi.fn(async (url: string) => {
-    const urlStr = typeof url === "string" ? url : url.toString();
+    const urlStr = String(url);
     for (const [pattern, response] of Object.entries(responses)) {
       if (urlStr.includes(pattern)) {
         return {

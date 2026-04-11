@@ -21,6 +21,12 @@ describe("R2 Helpers", () => {
       expect(result.ext).toBe("mp4");
     });
 
+    it("detects WebP from data URI", () => {
+      const result = detectMimeType("data:image/webp;base64,UklGR...");
+      expect(result.mime).toBe("image/webp");
+      expect(result.ext).toBe("webp");
+    });
+
     it("detects PNG from raw base64 magic bytes", () => {
       const result = detectMimeType("iVBORw0KGgoAAAANSUh...");
       expect(result.mime).toBe("image/png");
@@ -33,16 +39,34 @@ describe("R2 Helpers", () => {
       expect(result.ext).toBe("jpg");
     });
 
-    it("detects GIF from raw base64", () => {
+    it("detects GIF from raw base64 (GIF87a)", () => {
+      const result = detectMimeType("R0lGODdhAQAB...");
+      expect(result.mime).toBe("image/gif");
+      expect(result.ext).toBe("gif");
+    });
+
+    it("detects GIF from raw base64 (GIF89a)", () => {
       const result = detectMimeType("R0lGODlhAQAB...");
       expect(result.mime).toBe("image/gif");
       expect(result.ext).toBe("gif");
+    });
+
+    it("detects WebP from raw base64 magic bytes", () => {
+      const result = detectMimeType("UklGRlYAAABXRUJQ...");
+      expect(result.mime).toBe("image/webp");
+      expect(result.ext).toBe("webp");
     });
 
     it("returns octet-stream for unknown format", () => {
       const result = detectMimeType("QUJDRA==");
       expect(result.mime).toBe("application/octet-stream");
       expect(result.ext).toBe("bin");
+    });
+
+    it("jpeg prefix does not shadow other prefixes (longer match wins)", () => {
+      // GIF starts with R0lGODlh — must not be misdetected as octet-stream
+      const gif = detectMimeType("R0lGODlhAQABAAAAACH5BAEAAAAALAAAAAABAAEAAAI=");
+      expect(gif.mime).toBe("image/gif");
     });
   });
 

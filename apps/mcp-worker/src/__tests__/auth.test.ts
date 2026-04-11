@@ -27,6 +27,7 @@ describe("validateApiKey", () => {
           requests_per_hour: 200,
           requests_per_day: 1000,
           max_mcp_connections: 3,
+          enable_meta_mutations: true,
         },
       ],
     });
@@ -34,26 +35,30 @@ describe("validateApiKey", () => {
     const result = await validateApiKey("mads_test123", env);
 
     expect(result).toEqual({
-      workspaceId: "ws-1",
-      apiKeyId: "key-1",
-      tier: "pro",
-      requestsPerHour: 200,
-      requestsPerDay: 1000,
-      maxMcpConnections: 3,
+      ok: true,
+      workspace: {
+        workspaceId: "ws-1",
+        apiKeyId: "key-1",
+        tier: "pro",
+        requestsPerHour: 200,
+        requestsPerDay: 1000,
+        maxMcpConnections: 3,
+        enableMetaMutations: true,
+      },
     });
   });
 
-  it("returns null for invalid API key (empty rows)", async () => {
+  it("returns error for invalid API key (empty rows)", async () => {
     (globalThis.fetch as any).mockResolvedValue({
       ok: true,
       json: async () => [],
     });
 
     const result = await validateApiKey("mads_invalid", env);
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, error: "Invalid API key." });
   });
 
-  it("returns null on Supabase error", async () => {
+  it("returns error on Supabase error", async () => {
     (globalThis.fetch as any).mockResolvedValue({
       ok: false,
       status: 500,
@@ -61,7 +66,10 @@ describe("validateApiKey", () => {
     });
 
     const result = await validateApiKey("mads_test", env);
-    expect(result).toBeNull();
+    expect(result).toEqual({
+      ok: false,
+      error: "Internal error validating API key.",
+    });
   });
 
   it("returns cached result on second call", async () => {
@@ -75,13 +83,14 @@ describe("validateApiKey", () => {
           requests_per_hour: 20,
           requests_per_day: 20,
           max_mcp_connections: 1,
+          enable_meta_mutations: false,
         },
       ],
     });
 
     // First call: hits Supabase
     const result1 = await validateApiKey("mads_cached", env);
-    expect(result1).not.toBeNull();
+    expect(result1.ok).toBe(true);
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
 
     // Second call: should get from KV cache

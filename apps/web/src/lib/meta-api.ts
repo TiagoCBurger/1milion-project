@@ -40,6 +40,32 @@ function ttlForEndpoint(endpoint: string): number {
   return TTL.default;
 }
 
+/** Meta Graph `{ error: { message?, error_user_msg?, ... } }` payload */
+export function getMetaGraphError(
+  result: Record<string, unknown>
+): Record<string, unknown> | undefined {
+  const e = result.error;
+  if (e !== null && e !== undefined && typeof e === "object") {
+    return e as Record<string, unknown>;
+  }
+  return undefined;
+}
+
+export function metaUserFacingError(result: Record<string, unknown>): string | null {
+  const e = getMetaGraphError(result);
+  if (!e) return null;
+  const userMsg = e.error_user_msg;
+  const msg = e.message;
+  if (typeof userMsg === "string" && userMsg.length > 0) return userMsg;
+  if (typeof msg === "string" && msg.length > 0) return msg;
+  return "Meta API error";
+}
+
+function metaListData(result: Record<string, unknown>): Record<string, unknown>[] {
+  const d = result.data;
+  return Array.isArray(d) ? (d as Record<string, unknown>[]) : [];
+}
+
 function getCached(key: string): Record<string, unknown> | null {
   const entry = cache.get(key);
   if (!entry) return null;
@@ -89,11 +115,10 @@ export async function getDecryptedToken(workspaceId: string): Promise<string | n
     console.error("[meta-api] decrypt_meta_token RPC error:", error.message);
     return null;
   }
+  // null = no row or token invalid/expired — normal when Meta is not connected
   if (!data) {
-    console.error("[meta-api] decrypt_meta_token returned null for workspace:", workspaceId);
     return null;
   }
-  console.log("[meta-api] Token decrypted successfully, length:", (data as string).length);
   setCache(tokenCacheKey, { _token: data as string }, TTL.token);
   return data as string;
 }
@@ -121,8 +146,8 @@ export async function metaApiGet(
   console.log("[meta-api] GET", endpoint);
   const res = await fetch(url.toString(), { cache: "no-store" });
   const json = (await res.json()) as Record<string, unknown>;
-  if ((json as any).error) {
-    console.error("[meta-api] API error:", JSON.stringify((json as any).error));
+  if (getMetaGraphError(json)) {
+    console.error("[meta-api] API error:", JSON.stringify(json.error));
   } else {
     setCache(key, json, ttlForEndpoint(endpoint));
   }
@@ -150,8 +175,8 @@ export async function metaApiPost(
     body: body.toString(),
   });
   const json = (await res.json()) as Record<string, unknown>;
-  if ((json as any).error) {
-    console.error("[meta-api] POST error:", JSON.stringify((json as any).error));
+  if (getMetaGraphError(json)) {
+    console.error("[meta-api] POST error:", JSON.stringify(json.error));
   } else {
     // Invalidate related caches after successful mutation
     if (endpoint.includes("/campaigns")) invalidateCache("/campaigns");
@@ -181,8 +206,8 @@ export async function metaApiUploadImage(
   console.log("[meta-api] UPLOAD IMAGE", accountId, fileName);
   const res = await fetch(url, { method: "POST", body: form });
   const json = (await res.json()) as Record<string, unknown>;
-  if ((json as any).error) {
-    console.error("[meta-api] Upload error:", JSON.stringify((json as any).error));
+  if (getMetaGraphError(json)) {
+    console.error("[meta-api] Upload error:", JSON.stringify(json.error));
   }
   return json;
 }
@@ -229,10 +254,11 @@ export async function fetchCampaigns(
     params.effective_status = JSON.stringify([options.status]);
   }
   const result = await metaApiGet(`${ensureActPrefix(accountId)}/campaigns`, token, params);
-  if ((result as any).error) {
-    return { data: [], error: (result as any).error?.message ?? "Unknown error" };
+  const errMsg = metaUserFacingError(result);
+  if (errMsg) {
+    return { data: [], error: errMsg };
   }
-  return { data: (result as any).data ?? [] };
+  return { data: metaListData(result) };
 }
 
 export async function fetchAdSets(
@@ -246,10 +272,11 @@ export async function fetchAdSets(
     limit: options?.limit ?? 25,
   };
   const result = await metaApiGet(`${parent}/adsets`, token, params);
-  if ((result as any).error) {
-    return { data: [], error: (result as any).error?.message ?? "Unknown error" };
+  const errMsg = metaUserFacingError(result);
+  if (errMsg) {
+    return { data: [], error: errMsg };
   }
-  return { data: (result as any).data ?? [] };
+  return { data: metaListData(result) };
 }
 
 export async function fetchAds(
@@ -263,10 +290,11 @@ export async function fetchAds(
     limit: options?.limit ?? 25,
   };
   const result = await metaApiGet(`${parent}/ads`, token, params);
-  if ((result as any).error) {
-    return { data: [], error: (result as any).error?.message ?? "Unknown error" };
+  const errMsg = metaUserFacingError(result);
+  if (errMsg) {
+    return { data: [], error: errMsg };
   }
-  return { data: (result as any).data ?? [] };
+  return { data: metaListData(result) };
 }
 
 // Maps our UI presets to Meta API date_preset values
@@ -293,10 +321,11 @@ export async function fetchInsights(
   params.date_preset = DATE_PRESET_MAP[preset] ?? "last_30d";
 
   const result = await metaApiGet(`${ensureActPrefix(accountId)}/insights`, token, params);
-  if ((result as any).error) {
-    return { data: [], error: (result as any).error?.message ?? "Unknown error" };
+  const errMsg = metaUserFacingError(result);
+  if (errMsg) {
+    return { data: [], error: errMsg };
   }
-  return { data: (result as any).data ?? [] };
+  return { data: metaListData(result) };
 }
 
 const CREATIVE_FIELDS = "id,name,status,thumbnail_url,object_type";
@@ -311,10 +340,11 @@ export async function fetchCreatives(
     limit: options?.limit ?? 50,
   };
   const result = await metaApiGet(`${ensureActPrefix(accountId)}/adcreatives`, token, params);
-  if ((result as any).error) {
-    return { data: [], error: (result as any).error?.message ?? "Unknown error" };
+  const errMsg = metaUserFacingError(result);
+  if (errMsg) {
+    return { data: [], error: errMsg };
   }
-  return { data: (result as any).data ?? [] };
+  return { data: metaListData(result) };
 }
 
 export async function fetchPages(
@@ -324,8 +354,9 @@ export async function fetchPages(
     fields: PAGE_FIELDS,
     limit: 50,
   });
-  if ((result as any).error) {
-    return { data: [], error: (result as any).error?.message ?? "Unknown error" };
+  const errMsg = metaUserFacingError(result);
+  if (errMsg) {
+    return { data: [], error: errMsg };
   }
-  return { data: (result as any).data ?? [] };
+  return { data: metaListData(result) };
 }

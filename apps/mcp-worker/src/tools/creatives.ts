@@ -191,6 +191,39 @@ export function registerCreativeTools(ctx: ToolContext): void {
     },
   );
 
+  // ── get_video_status (read — stays available without write flag) ───
+  server.tool(
+    "get_video_status",
+    "Check the processing status of a video uploaded to a Meta ad account. Poll this after upload_ad_video until status is 'ready' before creating a creative.",
+    {
+      video_id: z
+        .string()
+        .describe("The video ID returned by upload_ad_video."),
+    },
+    async (args) => {
+      const data = await metaApiGet(args.video_id, token, {
+        fields: "id,title,status,length,picture",
+      });
+
+      if ((data as any).error) {
+        return textResult(data, true);
+      }
+
+      const status = (data as any).status as Record<string, unknown> | undefined;
+      return textResult({
+        video_id: args.video_id,
+        processing_status: status?.video_status ?? "unknown",
+        processing_progress: status?.processing_progress ?? null,
+        ready: status?.video_status === "ready",
+        title: (data as any).title ?? null,
+        duration: (data as any).length ?? null,
+        thumbnail_url: (data as any).picture ?? null,
+      });
+    },
+  );
+
+  if (!ctx.enableMetaMutations) return;
+
   // ── upload_ad_image (PRO+ TIER ONLY) ──────────────────────────────
   server.tool(
     "upload_ad_image",
@@ -201,8 +234,9 @@ export function registerCreativeTools(ctx: ToolContext): void {
         .describe("The ad account ID (with or without act_ prefix)."),
       image_url: z
         .string()
+        .url()
         .optional()
-        .describe("Public URL of the image. Provide this OR image_base64."),
+        .describe("Public HTTPS URL of the image. Provide this OR image_base64."),
       image_base64: z
         .string()
         .optional()
@@ -275,26 +309,37 @@ export function registerCreativeTools(ctx: ToolContext): void {
         return textResult(data, true);
       }
 
-      return textResult({ ...data as object, r2_key: r2Key });
+      // Meta returns: { images: { "<filename>": { hash, url, name, ... } } }
+      // Normalize to a flat object so callers don't have to navigate the structure.
+      const imagesMap = (data as any).images as Record<string, Record<string, unknown>> | undefined;
+      const firstEntry = imagesMap ? Object.values(imagesMap)[0] : undefined;
+      const normalized = firstEntry
+        ? {
+            hash: firstEntry.hash,
+            url: firstEntry.url,
+            name: firstEntry.name,
+            width: firstEntry.width,
+            height: firstEntry.height,
+            r2_key: r2Key,
+          }
+        : { ...data as object, r2_key: r2Key };
+
+      return textResult(normalized);
     },
   );
 
   // ── upload_ad_video (PRO+ TIER ONLY) ──────────────────────────────
   server.tool(
     "upload_ad_video",
-    "Upload a video to a Meta ad account from a URL or base64 data. Returns video_id (processing is async on Meta's side). Requires Pro tier.",
+    "Upload a video to a Meta ad account from a public URL. Returns video_id (processing is async on Meta's side — use get_video_status to poll). Requires Pro tier.",
     {
       account_id: z
         .string()
         .describe("The ad account ID (with or without act_ prefix)."),
       video_url: z
         .string()
-        .optional()
-        .describe("Public URL of the video file. Provide this OR video_base64."),
-      video_base64: z
-        .string()
-        .optional()
-        .describe("Base64-encoded video data. Provide this OR video_url."),
+        .url()
+        .describe("Public HTTPS URL of the video file (mp4, mov, etc.)."),
       title: z
         .string()
         .optional()
@@ -316,13 +361,6 @@ export function registerCreativeTools(ctx: ToolContext): void {
         );
       }
 
-      if (!args.video_url && !args.video_base64) {
-        return textResult(
-          { error: "Provide either video_url or video_base64." },
-          true,
-        );
-      }
-
       const limits = UPLOAD_LIMITS[tier as SubscriptionTier];
       const uploadCheck = await checkUploadLimit(workspaceId, "videos", limits.videos_per_day, env);
       if (!uploadCheck.allowed) {
@@ -333,32 +371,8 @@ export function registerCreativeTools(ctx: ToolContext): void {
       }
 
       const accountId = ensureActPrefix(args.account_id);
-      let fileUrl = args.video_url;
-      let r2Key: string | null = null;
 
-      // If base64, upload to R2 first to get a public URL
-      if (args.video_base64) {
-        const estimatedSize = estimateBase64Size(args.video_base64);
-        if (estimatedSize > limits.max_video_bytes) {
-          return textResult(
-            { error: `Video exceeds max size (${Math.round(limits.max_video_bytes / 1024 / 1024)}MB).` },
-            true,
-          );
-        }
-
-        const r2Result = await uploadToR2(
-          env,
-          workspaceId,
-          "videos",
-          args.title ?? "video",
-          args.video_base64,
-        );
-
-        fileUrl = r2Result.publicUrl;
-        r2Key = r2Result.key;
-      }
-
-      const params: Record<string, unknown> = { file_url: fileUrl };
+      const params: Record<string, unknown> = { file_url: args.video_url };
       if (args.title) params.title = args.title;
       if (args.description) params.description = args.description;
 
@@ -370,8 +384,7 @@ export function registerCreativeTools(ctx: ToolContext): void {
 
       return textResult({
         ...data as object,
-        r2_key: r2Key,
-        note: "Video processing is asynchronous. Use get_ad_video with the returned video_id to check status.",
+        note: "Video processing is asynchronous. Use get_video_status with the returned video_id before creating a creative.",
       });
     },
   );
@@ -436,6 +449,20 @@ export function registerCreativeTools(ctx: ToolContext): void {
       if (tier === "free") {
         return textResult(
           { error: "create_ad_creative requires a Pro or Enterprise subscription. Upgrade at https://vibefly.app/pricing" },
+          true,
+        );
+      }
+
+      if (!args.image_hash && !args.video_id) {
+        return textResult(
+          { error: "Provide either image_hash (for image creatives) or video_id (for video creatives)." },
+          true,
+        );
+      }
+
+      if (args.image_hash && !args.link_url) {
+        return textResult(
+          { error: "link_url is required when using image_hash. Meta requires a destination URL for image link ads." },
           true,
         );
       }

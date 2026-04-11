@@ -57,6 +57,7 @@ const TOOLS_WITHOUT_ACCOUNT_GUARD = new Set([
   "get_ad_video",
   "get_ad_creatives",
   "get_creative_details",
+  "get_video_status",
   "update_ad_creative",
   "get_insights",
   "search_interests",
@@ -139,6 +140,7 @@ describe("Allowed Accounts Enforcement", () => {
       tier: "pro",
       env: createMockEnv(),
       workspaceId: "test-ws",
+      enableMetaMutations: true,
       allowedAccounts: [ALLOWED_ACCOUNT],
     });
 
@@ -161,6 +163,7 @@ describe("Allowed Accounts Enforcement", () => {
         tier: "pro",
         env: createMockEnv(),
         workspaceId: "test-ws",
+        enableMetaMutations: true,
         allowedAccounts: [ALLOWED_ACCOUNT],
       });
 
@@ -190,6 +193,7 @@ describe("Allowed Accounts Enforcement", () => {
         tier: "pro",
         env: createMockEnv(),
         workspaceId: "test-ws",
+        enableMetaMutations: true,
         allowedAccounts: [ALLOWED_ACCOUNT],
       });
 
@@ -214,6 +218,7 @@ describe("Allowed Accounts Enforcement", () => {
         tier: "pro",
         env: createMockEnv(),
         workspaceId: "test-ws",
+        enableMetaMutations: true,
         // no allowedAccounts
       });
 
@@ -238,6 +243,7 @@ describe("Allowed Accounts Enforcement", () => {
         tier: "pro",
         env: createMockEnv(),
         workspaceId: "test-ws",
+        enableMetaMutations: true,
         allowedAccounts: [],
       });
 
@@ -261,6 +267,7 @@ describe("Allowed Accounts Enforcement", () => {
       tier: "pro",
       env: createMockEnv(),
       workspaceId: "test-ws",
+      enableMetaMutations: true,
       allowedAccounts: [ALLOWED_ACCOUNT],
     });
 
@@ -287,6 +294,7 @@ describe("Allowed Accounts Enforcement", () => {
       tier: "pro",
       env: createMockEnv(),
       workspaceId: "test-ws",
+      enableMetaMutations: true,
       allowedAccounts: [ALLOWED_ACCOUNT],
     });
 
@@ -323,6 +331,7 @@ describe("Allowed Accounts Enforcement", () => {
       tier: "pro",
       env: createMockEnv(),
       workspaceId: "test-ws",
+      enableMetaMutations: true,
       allowedAccounts: [ALLOWED_ACCOUNT],
     });
 
@@ -349,6 +358,7 @@ describe("Allowed Accounts Enforcement", () => {
       tier: "pro",
       env: createMockEnv(),
       workspaceId: "test-ws",
+      enableMetaMutations: true,
       allowedAccounts: ["123"],
     });
 

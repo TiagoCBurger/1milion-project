@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getDecryptedToken, fetchInsights } from "@/lib/meta-api";
 import { getEnabledAdAccounts } from "@/lib/workspace-data";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -42,19 +43,20 @@ export default async function InsightsPage({
     return (
       <>
         <PageHeader breadcrumbs={[
-          { label: "Workspaces", href: "/dashboard" },
+          { label: "Espaços de trabalho", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Insights" },
         ]} />
+        <CampaignsTopNav slug={slug} active="insights" />
         <div className="p-6">
           <EmptyState
             icon={Link2}
-            title={!token ? "Meta account not connected" : "No ad accounts enabled"}
-            description={!token ? "Connect your Meta account to view insights." : "Enable at least one ad account."}
+            title={!token ? "Meta não conectada" : "Nenhuma conta de anúncios ativa"}
+            description={!token ? "Conecte a Meta para ver insights." : "Ative pelo menos uma conta de anúncios."}
           >
             <Button asChild>
-              <Link href={`/dashboard/${slug}/${!token ? "connect" : ""}`}>
-                {!token ? "Connect Meta" : "Go to Dashboard"}
+              <Link href={!token ? `/dashboard/${slug}/integrations/meta` : `/dashboard/${slug}`}>
+                {!token ? "Conectar Meta" : "Ir ao dashboard"}
               </Link>
             </Button>
           </EmptyState>
@@ -71,12 +73,13 @@ export default async function InsightsPage({
   });
 
   // Aggregate stats
-  const totals = insights.reduce(
-    (acc: any, row: any) => {
-      acc.spend += Number(row.spend ?? 0);
-      acc.impressions += Number(row.impressions ?? 0);
-      acc.clicks += Number(row.clicks ?? 0);
-      acc.reach += Number(row.reach ?? 0);
+  type InsightTotals = { spend: number; impressions: number; clicks: number; reach: number };
+  const totals = insights.reduce<InsightTotals>(
+    (acc, row) => {
+      acc.spend += Number(row["spend"] ?? 0);
+      acc.impressions += Number(row["impressions"] ?? 0);
+      acc.clicks += Number(row["clicks"] ?? 0);
+      acc.reach += Number(row["reach"] ?? 0);
       return acc;
     },
     { spend: 0, impressions: 0, clicks: 0, reach: 0 }
@@ -88,16 +91,17 @@ export default async function InsightsPage({
   return (
     <>
       <PageHeader breadcrumbs={[
-        { label: "Workspaces", href: "/dashboard" },
+        { label: "Espaços de trabalho", href: "/dashboard" },
         { label: slug, href: `/dashboard/${slug}` },
         { label: "Insights" },
       ]} />
+      <CampaignsTopNav slug={slug} active="insights" />
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Insights</h1>
             <p className="text-muted-foreground text-sm">
-              Campaign performance overview
+              Visão geral do desempenho das campanhas
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -108,7 +112,7 @@ export default async function InsightsPage({
 
         {error && (
           <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-            Meta API error: {error}
+            Erro na API Meta: {error}
           </div>
         )}
 
@@ -159,31 +163,31 @@ export default async function InsightsPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {insights.map((row: any, i: number) => (
-                    <TableRow key={row.campaign_id ?? i}>
+                  {insights.map((row, i) => (
+                    <TableRow key={String(row["campaign_id"] ?? i)}>
                       <TableCell className="font-medium max-w-[200px] truncate">
-                        {row.campaign_name ?? "—"}
+                        {String(row["campaign_name"] ?? "—")}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {Number(row.impressions ?? 0).toLocaleString()}
+                        {Number(row["impressions"] ?? 0).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {Number(row.clicks ?? 0).toLocaleString()}
+                        {Number(row["clicks"] ?? 0).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        ${Number(row.spend ?? 0).toFixed(2)}
+                        ${Number(row["spend"] ?? 0).toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
-                        ${Number(row.cpc ?? 0).toFixed(2)}
+                        ${Number(row["cpc"] ?? 0).toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
-                        ${Number(row.cpm ?? 0).toFixed(2)}
+                        ${Number(row["cpm"] ?? 0).toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {Number(row.ctr ?? 0).toFixed(2)}%
+                        {Number(row["ctr"] ?? 0).toFixed(2)}%
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {Number(row.reach ?? 0).toLocaleString()}
+                        {Number(row["reach"] ?? 0).toLocaleString()}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -194,8 +198,8 @@ export default async function InsightsPage({
         ) : !error ? (
           <EmptyState
             icon={BarChart3}
-            title="No insights data"
-            description="No performance data found for this period. Try a different date range."
+            title="Sem dados de insights"
+            description="Não há dados para este período. Tente outro intervalo de datas."
           />
         ) : null}
       </div>

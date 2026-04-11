@@ -79,6 +79,8 @@ export function registerAdsetTools(ctx: ToolContext) {
     }
   );
 
+  if (!ctx.enableMetaMutations) return;
+
   // ---------------------------------------------------------------
   // create_adset  (PRO tier only)
   // ---------------------------------------------------------------

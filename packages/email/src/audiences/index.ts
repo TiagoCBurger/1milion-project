@@ -3,6 +3,7 @@
 // ============================================================
 
 import { getResendClient } from "../client";
+import type { ResendAudience, ResendContact } from "../resend-shapes";
 
 export async function createAudience(name: string) {
   const resend = getResendClient();
@@ -11,11 +12,11 @@ export async function createAudience(name: string) {
   return data!;
 }
 
-export async function listAudiences() {
+export async function listAudiences(): Promise<ResendAudience[]> {
   const resend = getResendClient();
   const { data, error } = await resend.audiences.list();
   if (error) throw new Error(`[email] Failed to list audiences: ${error.message}`);
-  return data!.data;
+  return data!.data as ResendAudience[];
 }
 
 export async function addContact(
@@ -45,11 +46,11 @@ export async function removeContact(audienceId: string, contactId: string) {
   return data!;
 }
 
-export async function listContacts(audienceId: string) {
+export async function listContacts(audienceId: string): Promise<ResendContact[]> {
   const resend = getResendClient();
   const { data, error } = await resend.contacts.list({ audienceId });
   if (error) throw new Error(`[email] Failed to list contacts: ${error.message}`);
-  return data!.data;
+  return data!.data as ResendContact[];
 }
 
 export async function updateContactSubscription(

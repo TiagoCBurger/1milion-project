@@ -4,9 +4,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getDecryptedToken, fetchPages } from "@/lib/meta-api";
 import { getEnabledAdAccounts } from "@/lib/workspace-data";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { ImageIcon, Link2 } from "lucide-react";
+import { Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { CreativesClient } from "@/components/dashboard/creatives-client";
@@ -26,7 +27,7 @@ export default async function CreativesPage({
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id")
+    .select("id, enable_meta_mutations")
     .eq("slug", slug)
     .single();
   if (!workspace) notFound();
@@ -38,19 +39,20 @@ export default async function CreativesPage({
     return (
       <>
         <PageHeader breadcrumbs={[
-          { label: "Workspaces", href: "/dashboard" },
+          { label: "Espaços de trabalho", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
-          { label: "Creatives" },
+          { label: "Criativos" },
         ]} />
+        <CampaignsTopNav slug={slug} active="creatives" />
         <div className="p-6">
           <EmptyState
             icon={Link2}
-            title={!token ? "Meta account not connected" : "No ad accounts enabled"}
-            description={!token ? "Connect your Meta account to manage creatives." : "Enable at least one ad account."}
+            title={!token ? "Meta não conectada" : "Nenhuma conta de anúncios ativa"}
+            description={!token ? "Conecte a Meta para gerenciar criativos." : "Ative pelo menos uma conta de anúncios."}
           >
             <Button asChild>
-              <Link href={`/dashboard/${slug}/${!token ? "connect" : ""}`}>
-                {!token ? "Connect Meta" : "Go to Dashboard"}
+              <Link href={!token ? `/dashboard/${slug}/integrations/meta` : `/dashboard/${slug}`}>
+                {!token ? "Conectar Meta" : "Ir ao dashboard"}
               </Link>
             </Button>
           </EmptyState>
@@ -61,7 +63,10 @@ export default async function CreativesPage({
 
   const selectedAccount = account_id ?? accounts[0].meta_account_id;
   const { data: pages } = await fetchPages(token);
-  const pageOptions = pages.map((p: any) => ({ id: p.id, name: p.name }));
+  const pageOptions = pages.map((p) => ({
+    id: String(p["id"] ?? ""),
+    name: String(p["name"] ?? ""),
+  }));
 
   // Fetch persisted images
   const admin = createAdminClient();
@@ -76,16 +81,17 @@ export default async function CreativesPage({
   return (
     <>
       <PageHeader breadcrumbs={[
-        { label: "Workspaces", href: "/dashboard" },
+        { label: "Espaços de trabalho", href: "/dashboard" },
         { label: slug, href: `/dashboard/${slug}` },
-        { label: "Creatives" },
+        { label: "Criativos" },
       ]} />
+      <CampaignsTopNav slug={slug} active="creatives" />
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Creatives</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Criativos</h1>
             <p className="text-muted-foreground text-sm">
-              Upload images and create ad creatives
+              Envie imagens e crie criativos de anúncio
             </p>
           </div>
           <AccountSelector accounts={accounts} current={selectedAccount} />
@@ -96,6 +102,7 @@ export default async function CreativesPage({
           accountId={selectedAccount}
           pages={pageOptions}
           initialImages={images ?? []}
+          canWrite={workspace.enable_meta_mutations}
         />
       </div>
     </>

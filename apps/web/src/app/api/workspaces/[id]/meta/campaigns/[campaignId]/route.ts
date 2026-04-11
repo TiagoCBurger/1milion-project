@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getDecryptedToken, metaApiPost } from "@/lib/meta-api";
+import { getDecryptedToken, metaApiPost, metaUserFacingError } from "@/lib/meta-api";
+import { assertWorkspaceCanWrite } from "@/lib/workspace-write-guard";
 
 export async function PATCH(
   request: Request,
@@ -27,6 +28,9 @@ export async function PATCH(
     return Response.json({ error: "Not authorized" }, { status: 403 });
   }
 
+  const blocked = await assertWorkspaceCanWrite(supabase, workspaceId);
+  if (blocked) return blocked;
+
   const token = await getDecryptedToken(workspaceId);
   if (!token) {
     return Response.json({ error: "No Meta account connected" }, { status: 403 });
@@ -40,11 +44,9 @@ export async function PATCH(
 
   const result = await metaApiPost(campaignId, token, metaParams);
 
-  if ((result as any).error) {
-    return Response.json(
-      { error: (result as any).error?.message ?? "Meta API error" },
-      { status: 400 }
-    );
+  const errMsg = metaUserFacingError(result);
+  if (errMsg) {
+    return Response.json({ error: errMsg }, { status: 400 });
   }
 
   return Response.json(result);

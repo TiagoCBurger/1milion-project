@@ -173,6 +173,16 @@ describe("metaApiGet", () => {
     expect(url.searchParams.get("type")).toBe("adinterest");
     expect(url.searchParams.get("limit")).toBe("25");
   });
+
+  it("returns NetworkError object when fetch throws", async () => {
+    (globalThis.fetch as any).mockRejectedValue(new Error("DNS failure"));
+
+    const result = await metaApiGet("me/adaccounts", "tok");
+
+    expect((result as any).error).toBeDefined();
+    expect((result as any).error.type).toBe("NetworkError");
+    expect((result as any).error.message).toContain("DNS failure");
+  });
 });
 
 describe("metaApiPost", () => {

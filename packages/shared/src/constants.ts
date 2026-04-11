@@ -1,5 +1,14 @@
 import type { SubscriptionTier } from "./types";
 
+/** Hotmart integration is available on paid tiers only. */
+export function isHotmartIntegrationEnabled(tier: SubscriptionTier): boolean {
+  return tier !== "free";
+}
+
+export const INTEGRATION_PROVIDERS = {
+  HOTMART: "hotmart",
+} as const;
+
 // ============================================================
 // Tier limits
 // ============================================================
@@ -109,6 +118,7 @@ export const FREE_TIER_TOOLS = new Set([
   // Creatives (read)
   "get_ad_creatives",
   "get_creative_details",
+  "get_video_status",
   // Insights
   "get_insights",
   // Targeting / Audiences

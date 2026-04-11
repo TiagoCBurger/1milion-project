@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export async function POST(request: NextRequest) {
   const redirectUrl = new URL("/login", request.url);
-  let response = NextResponse.redirect(redirectUrl, { status: 302 });
+  const response = NextResponse.redirect(redirectUrl, { status: 302 });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

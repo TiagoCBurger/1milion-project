@@ -45,6 +45,13 @@ export type {
   SendBroadcastOptions,
 } from "./types";
 
+export type {
+  ResendAudience,
+  ResendBroadcastDetail,
+  ResendBroadcastSummary,
+  ResendContact,
+} from "./resend-shapes";
+
 // Templates — transactional
 export { WelcomeEmail } from "./templates/transactional/welcome";
 export { WorkspaceInviteEmail } from "./templates/transactional/workspace-invite";

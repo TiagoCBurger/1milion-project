@@ -22,11 +22,13 @@ export function CreativesClient({
   accountId,
   pages,
   initialImages,
+  canWrite = false,
 }: {
   workspaceId: string;
   accountId: string;
   pages: { id: string; name: string }[];
   initialImages: AdImage[];
+  canWrite?: boolean;
 }) {
   const router = useRouter();
   const [images, setImages] = useState<AdImage[]>(initialImages);
@@ -88,36 +90,38 @@ export function CreativesClient({
   return (
     <div className="space-y-6">
       {/* Upload + Create actions */}
-      <div className="flex items-center gap-3">
-        <Button
-          variant="outline"
-          onClick={() => fileRef.current?.click()}
-          disabled={uploading}
-        >
-          {uploading ? (
-            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-          ) : (
-            <Upload className="mr-1.5 h-4 w-4" />
-          )}
-          {uploading ? "Uploading..." : "Upload Image"}
-        </Button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={handleUpload}
-          className="hidden"
-        />
-
-        {pages.length > 0 && (
-          <CreateCreativeDialog
-            workspaceId={workspaceId}
-            accountId={accountId}
-            pages={pages}
-            images={images}
+      {canWrite && (
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="mr-1.5 h-4 w-4" />
+            )}
+            {uploading ? "Uploading..." : "Upload Image"}
+          </Button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleUpload}
+            className="hidden"
           />
-        )}
-      </div>
+
+          {pages.length > 0 && (
+            <CreateCreativeDialog
+              workspaceId={workspaceId}
+              accountId={accountId}
+              pages={pages}
+              images={images}
+            />
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">

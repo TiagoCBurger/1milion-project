@@ -1,6 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
+import { assertWorkspaceCanWrite } from "@/lib/workspace-write-guard";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getDecryptedToken, metaApiUploadImage } from "@/lib/meta-api";
+import { getDecryptedToken, metaApiUploadImage, metaUserFacingError } from "@/lib/meta-api";
+
+function firstUploadedImageHash(metaResult: Record<string, unknown>): string | null {
+  const raw = metaResult.images;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const values = Object.values(raw as Record<string, unknown>);
+  const first = values[0];
+  if (!first || typeof first !== "object") return null;
+  const h = (first as Record<string, unknown>).hash;
+  return typeof h === "string" ? h : null;
+}
 import { uploadToR2 } from "@/lib/r2-upload";
 
 async function authorize(workspaceId: string) {
@@ -68,6 +79,10 @@ export async function POST(
     return Response.json({ error: "Not authorized" }, { status: 403 });
   }
 
+  const supabase = await createClient();
+  const blocked = await assertWorkspaceCanWrite(supabase, workspaceId);
+  if (blocked) return blocked;
+
   const token = await getDecryptedToken(workspaceId);
   if (!token) {
     return Response.json({ error: "No Meta account connected" }, { status: 403 });
@@ -116,16 +131,12 @@ export async function POST(
     name
   );
 
-  if ((metaResult as any).error) {
-    return Response.json(
-      { error: (metaResult as any).error?.message ?? "Meta API error" },
-      { status: 400 }
-    );
+  const errMsg = metaUserFacingError(metaResult);
+  if (errMsg) {
+    return Response.json({ error: errMsg }, { status: 400 });
   }
 
-  const images = (metaResult as any).images ?? {};
-  const firstImage = Object.values(images)[0] as any;
-  const imageHash = firstImage?.hash ?? null;
+  const imageHash = firstUploadedImageHash(metaResult);
 
   if (!imageHash) {
     return Response.json({ error: "Failed to get image hash from Meta" }, { status: 500 });

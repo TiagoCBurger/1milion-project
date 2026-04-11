@@ -23,7 +23,7 @@ describe("Ad Tools", () => {
       vi.clearAllMocks();
       const capture = createToolCapture();
       callTool = capture.callTool;
-      registerAdTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
+      registerAdTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
     });
 
     it("fetches ads by account ID", async () => {
@@ -79,7 +79,7 @@ describe("Ad Tools", () => {
   describe("create_ad (tier gating)", () => {
     it("blocks free tier", async () => {
       const capture = createToolCapture();
-      registerAdTools({ server: capture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
+      registerAdTools({ server: capture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
 
       const result = await capture.callTool("create_ad", {
         account_id: "act_123",
@@ -94,7 +94,7 @@ describe("Ad Tools", () => {
 
     it("creates ad for pro tier", async () => {
       const capture = createToolCapture();
-      registerAdTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
+      registerAdTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
 
       (metaApiPost as any).mockResolvedValue({ id: "ad_new" });
 
@@ -121,7 +121,7 @@ describe("Ad Tools", () => {
   describe("update_ad (tier gating)", () => {
     it("blocks free tier", async () => {
       const capture = createToolCapture();
-      registerAdTools({ server: capture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
+      registerAdTools({ server: capture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
 
       const result = await capture.callTool("update_ad", {
         ad_id: "ad_1",
@@ -133,7 +133,7 @@ describe("Ad Tools", () => {
 
     it("updates ad status for pro tier", async () => {
       const capture = createToolCapture();
-      registerAdTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
+      registerAdTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
 
       (metaApiPost as any).mockResolvedValue({ success: true });
 

@@ -15,6 +15,7 @@
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.0",
     "@vibefly/email": "workspace:*",
+    "@vibefly/hotmart": "workspace:*",
     "@vibefly/shared": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

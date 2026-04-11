@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getDecryptedToken, fetchAdSets, fetchCampaigns } from "@/lib/meta-api";
 import { getEnabledAdAccounts } from "@/lib/workspace-data";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,7 +39,7 @@ export default async function AdSetsPage({
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id")
+    .select("id, enable_meta_mutations")
     .eq("slug", slug)
     .single();
   if (!workspace) notFound();
@@ -50,19 +51,20 @@ export default async function AdSetsPage({
     return (
       <>
         <PageHeader breadcrumbs={[
-          { label: "Workspaces", href: "/dashboard" },
+          { label: "Espaços de trabalho", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
-          { label: "Ad Sets" },
+          { label: "Conjuntos de anúncio" },
         ]} />
+        <CampaignsTopNav slug={slug} active="campaigns" />
         <div className="p-6">
           <EmptyState
             icon={Link2}
-            title={!token ? "Meta account not connected" : "No ad accounts enabled"}
-            description={!token ? "Connect your Meta account to view ad sets." : "Enable at least one ad account."}
+            title={!token ? "Meta não conectada" : "Nenhuma conta de anúncios ativa"}
+            description={!token ? "Conecte a Meta para ver conjuntos de anúncio." : "Ative pelo menos uma conta de anúncios."}
           >
             <Button asChild>
-              <Link href={`/dashboard/${slug}/${!token ? "connect" : ""}`}>
-                {!token ? "Connect Meta" : "Go to Dashboard"}
+              <Link href={!token ? `/dashboard/${slug}/integrations/meta` : `/dashboard/${slug}`}>
+                {!token ? "Conectar Meta" : "Ir ao dashboard"}
               </Link>
             </Button>
           </EmptyState>
@@ -74,37 +76,40 @@ export default async function AdSetsPage({
   const selectedAccount = account_id ?? accounts[0].meta_account_id;
   const { data: adsets, error } = await fetchAdSets(token, selectedAccount);
   const { data: campaigns } = await fetchCampaigns(token, selectedAccount);
-  const campaignOptions = campaigns.map((c: any) => ({
-    id: c.id,
-    name: c.name,
-    hasBudget: !!(c.daily_budget || c.lifetime_budget),
-    bidStrategy: c.bid_strategy ?? null,
+  const campaignOptions = campaigns.map((c) => ({
+    id: String(c["id"] ?? ""),
+    name: String(c["name"] ?? ""),
+    hasBudget: !!(c["daily_budget"] || c["lifetime_budget"]),
+    bidStrategy: (c["bid_strategy"] as string | null | undefined) ?? null,
   }));
 
   return (
     <>
       <PageHeader breadcrumbs={[
-        { label: "Workspaces", href: "/dashboard" },
+        { label: "Espaços de trabalho", href: "/dashboard" },
         { label: slug, href: `/dashboard/${slug}` },
-        { label: "Ad Sets" },
+        { label: "Conjuntos de anúncio" },
       ]} />
+      <CampaignsTopNav slug={slug} active="campaigns" />
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Ad Sets</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Conjuntos de anúncio</h1>
             <p className="text-muted-foreground text-sm">
-              {adsets.length} ad set{adsets.length !== 1 ? "s" : ""} found
+              {adsets.length === 1 ? "1 conjunto encontrado" : `${adsets.length} conjuntos encontrados`}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <CreateAdSetDialog workspaceId={workspace.id} accountId={selectedAccount} campaigns={campaignOptions} />
+            {workspace.enable_meta_mutations && (
+              <CreateAdSetDialog workspaceId={workspace.id} accountId={selectedAccount} campaigns={campaignOptions} />
+            )}
             <AccountSelector accounts={accounts} current={selectedAccount} />
           </div>
         </div>
 
         {error && (
           <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-            Meta API error: {error}
+            Erro na API Meta: {error}
           </div>
         )}
 
@@ -124,31 +129,44 @@ export default async function AdSetsPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {adsets.map((a: any) => (
-                    <TableRow key={a.id}>
+                  {adsets.map((a) => {
+                    const db = a["daily_budget"];
+                    const st = a["start_time"];
+                    const et = a["end_time"];
+                    return (
+                    <TableRow key={String(a["id"] ?? "")}>
                       <TableCell className="font-medium max-w-[200px] truncate">
-                        {a.name}
+                        {String(a["name"] ?? "")}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={statusVariant(a.status)}>{a.status}</Badge>
+                        <Badge variant={statusVariant(String(a["status"] ?? ""))}>
+                          {String(a["status"] ?? "")}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {a.daily_budget ? `$${(Number(a.daily_budget) / 100).toFixed(2)}` : "—"}
+                        {db != null && db !== ""
+                          ? `$${(Number(db) / 100).toFixed(2)}`
+                          : "—"}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs">
-                        {a.optimization_goal ?? "—"}
+                        {String(a["optimization_goal"] ?? "—")}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs">
-                        {a.billing_event ?? "—"}
+                        {String(a["billing_event"] ?? "—")}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {a.start_time ? new Date(a.start_time).toLocaleDateString() : "—"}
+                        {typeof st === "string"
+                          ? new Date(st).toLocaleDateString()
+                          : "—"}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {a.end_time ? new Date(a.end_time).toLocaleDateString() : "—"}
+                        {typeof et === "string"
+                          ? new Date(et).toLocaleDateString()
+                          : "—"}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -156,8 +174,8 @@ export default async function AdSetsPage({
         ) : !error ? (
           <EmptyState
             icon={Layers}
-            title="No ad sets found"
-            description="This ad account has no ad sets yet."
+            title="Nenhum conjunto encontrado"
+            description="Esta conta de anúncios ainda não tem conjuntos."
           />
         ) : null}
       </div>

@@ -194,6 +194,7 @@ describe("buildServer", () => {
       tier: "pro",
       env: createMockEnv(),
       workspaceId: "test-workspace",
+      enableMetaMutations: true,
     });
 
     // Should have all 35 tools registered

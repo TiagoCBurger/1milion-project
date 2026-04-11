@@ -101,6 +101,7 @@ export function createMockWorkspace(
     requestsPerHour: 200,
     requestsPerDay: 1000,
     maxMcpConnections: 3,
+    enableMetaMutations: true,
     ...overrides,
   };
 }

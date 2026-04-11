@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getDecryptedToken, fetchPages } from "@/lib/meta-api";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,18 +33,19 @@ export default async function PagesPage({
     return (
       <>
         <PageHeader breadcrumbs={[
-          { label: "Workspaces", href: "/dashboard" },
+          { label: "Espaços de trabalho", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
-          { label: "Pages" },
+          { label: "Páginas Facebook" },
         ]} />
+        <CampaignsTopNav slug={slug} active="pages" />
         <div className="p-6">
           <EmptyState
             icon={Link2}
-            title="Meta account not connected"
-            description="Connect your Meta account to view your Facebook Pages."
+            title="Meta não conectada"
+            description="Conecte a Meta para ver suas páginas do Facebook."
           >
             <Button asChild>
-              <Link href={`/dashboard/${slug}/connect`}>Connect Meta</Link>
+              <Link href={`/dashboard/${slug}/integrations/meta`}>Conectar Meta</Link>
             </Button>
           </EmptyState>
         </div>
@@ -56,36 +58,50 @@ export default async function PagesPage({
   return (
     <>
       <PageHeader breadcrumbs={[
-        { label: "Workspaces", href: "/dashboard" },
+        { label: "Espaços de trabalho", href: "/dashboard" },
         { label: slug, href: `/dashboard/${slug}` },
-        { label: "Pages" },
+        { label: "Páginas Facebook" },
       ]} />
+      <CampaignsTopNav slug={slug} active="pages" />
       <div className="p-6 space-y-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Facebook Pages</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Páginas Facebook</h1>
           <p className="text-muted-foreground text-sm">
-            {pages.length} page{pages.length !== 1 ? "s" : ""} found
+            {pages.length === 1 ? "1 página encontrada" : `${pages.length} páginas encontradas`}
           </p>
         </div>
 
         {error && (
           <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-            Meta API error: {error}
+            Erro na API Meta: {error}
           </div>
         )}
 
         {pages.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {pages.map((page: any) => (
-              <Card key={page.id} className="hover:shadow-md transition-shadow">
+            {pages.map((page) => {
+              const picture = page["picture"];
+              const picObj =
+                picture && typeof picture === "object" && !Array.isArray(picture)
+                  ? (picture as Record<string, unknown>)
+                  : null;
+              const picData = picObj?.["data"];
+              const dataObj =
+                picData && typeof picData === "object" && !Array.isArray(picData)
+                  ? (picData as Record<string, unknown>)
+                  : null;
+              const picUrl = dataObj?.["url"];
+              const pageName = String(page["name"] ?? "");
+              return (
+              <Card key={String(page["id"] ?? "")} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-5">
                   <div className="flex items-start gap-4">
                     {/* Page avatar */}
                     <div className="shrink-0">
-                      {page.picture?.data?.url ? (
+                      {typeof picUrl === "string" ? (
                         <img
-                          src={page.picture.data.url}
-                          alt={page.name}
+                          src={picUrl}
+                          alt={pageName}
                           className="h-12 w-12 rounded-full object-cover"
                         />
                       ) : (
@@ -97,44 +113,47 @@ export default async function PagesPage({
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold truncate">{page.name}</h3>
-                        {page.verification_status === "blue_verified" && (
+                        <h3 className="font-semibold truncate">{pageName}</h3>
+                        {page["verification_status"] === "blue_verified" && (
                           <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0" />
                         )}
                       </div>
 
-                      {page.username && (
-                        <p className="text-xs text-muted-foreground">@{page.username}</p>
-                      )}
+                      {page["username"] ? (
+                        <p className="text-xs text-muted-foreground">
+                          @{String(page["username"])}
+                        </p>
+                      ) : null}
 
                       <div className="mt-2 flex flex-wrap gap-2">
-                        {page.category && (
+                        {page["category"] ? (
                           <Badge variant="outline" className="text-xs">
-                            {page.category}
+                            {String(page["category"])}
                           </Badge>
-                        )}
-                        {page.fan_count !== undefined && (
+                        ) : null}
+                        {page["fan_count"] != null && page["fan_count"] !== "" ? (
                           <Badge variant="secondary" className="text-xs">
                             <Users className="mr-1 h-3 w-3" />
-                            {Number(page.fan_count).toLocaleString()} followers
+                            {Number(page["fan_count"]).toLocaleString()} followers
                           </Badge>
-                        )}
+                        ) : null}
                       </div>
 
                       <p className="mt-2 text-xs text-muted-foreground font-mono">
-                        ID: {page.id}
+                        ID: {String(page["id"] ?? "")}
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         ) : !error ? (
           <EmptyState
             icon={Globe}
-            title="No pages found"
-            description="No Facebook Pages are linked to your account."
+            title="Nenhuma página encontrada"
+            description="Não há páginas do Facebook vinculadas à sua conta."
           />
         ) : null}
       </div>

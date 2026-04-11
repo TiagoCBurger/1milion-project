@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { jsonRequest, parseJsonResponse, mockUser } from "./helpers";
+import { NextRequest } from "next/server";
+import { jsonRequest, mockUser } from "./helpers";
 
 /**
  * Security-focused tests covering:
@@ -235,7 +236,7 @@ describe("Security: Input validation", () => {
     const handler = await import("@/app/api/oauth/approve/route");
 
     const res = await handler.POST(
-      new Request("http://localhost/test", {
+      new NextRequest("http://localhost/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -310,7 +311,7 @@ describe("Security: JWT token generation", () => {
 
     const handler = await import("@/app/api/oauth/approve/route");
     const res = await handler.POST(
-      new Request("http://localhost/test", {
+      new NextRequest("http://localhost/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ request_id: "req-1", workspace_id: "ws-1", user_id: "user-123" }),
@@ -330,7 +331,7 @@ describe("Security: JWT token generation", () => {
 
     const handler = await import("@/app/api/oauth/approve/route");
     const res = await handler.POST(
-      new Request("http://localhost/test", {
+      new NextRequest("http://localhost/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

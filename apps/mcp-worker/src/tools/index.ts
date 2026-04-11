@@ -17,6 +17,8 @@ export interface ToolContext {
   tier: string;
   env: Env;
   workspaceId: string;
+  /** When false/omitted, Meta mutation tools are not registered. */
+  enableMetaMutations?: boolean;
   allowedAccounts?: string[];
 }
 

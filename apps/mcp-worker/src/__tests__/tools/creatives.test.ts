@@ -22,7 +22,7 @@ describe("Creative Tools", () => {
     vi.clearAllMocks();
     const capture = createToolCapture();
     callTool = capture.callTool;
-    registerCreativeTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
+    registerCreativeTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
   });
 
   describe("get_ad_creatives", () => {
@@ -131,10 +131,51 @@ describe("Creative Tools", () => {
     });
   });
 
+  describe("get_video_status", () => {
+    it("returns ready=true when video_status is ready", async () => {
+      (metaApiGet as any).mockResolvedValue({
+        id: "vid_1",
+        title: "My Ad Video",
+        length: 15,
+        picture: "https://thumb.jpg",
+        status: { video_status: "ready", processing_progress: 100 },
+      });
+
+      const result = await callTool("get_video_status", { video_id: "vid_1" });
+      const data = parseToolResult(result as any) as any;
+
+      expect(data.ready).toBe(true);
+      expect(data.processing_status).toBe("ready");
+      expect(data.processing_progress).toBe(100);
+    });
+
+    it("returns ready=false when still processing", async () => {
+      (metaApiGet as any).mockResolvedValue({
+        id: "vid_1",
+        status: { video_status: "processing", processing_progress: 42 },
+      });
+
+      const result = await callTool("get_video_status", { video_id: "vid_1" });
+      const data = parseToolResult(result as any) as any;
+
+      expect(data.ready).toBe(false);
+      expect(data.processing_status).toBe("processing");
+    });
+
+    it("surfaces API error as isError", async () => {
+      (metaApiGet as any).mockResolvedValue({
+        error: { message: "Video not found", code: 100 },
+      });
+
+      const result = await callTool("get_video_status", { video_id: "vid_bad" });
+      expect((result as any).isError).toBe(true);
+    });
+  });
+
   describe("upload_ad_image (tier gating)", () => {
     it("blocks non-pro tier", async () => {
       const freeCapture = createToolCapture();
-      registerCreativeTools({ server: freeCapture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
+      registerCreativeTools({ server: freeCapture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
 
       const result = await freeCapture.callTool("upload_ad_image", {
         account_id: "act_123",
@@ -143,19 +184,115 @@ describe("Creative Tools", () => {
 
       expect((result as any).isError).toBe(true);
     });
+
+    it("normalizes Meta response to flat hash/url object", async () => {
+      (metaApiPost as any).mockResolvedValue({
+        images: {
+          "my-image.jpg": {
+            hash: "abc123hash",
+            url: "https://cdn.facebook.com/img.jpg",
+            name: "my-image.jpg",
+            width: 1200,
+            height: 628,
+          },
+        },
+      });
+
+      const result = await callTool("upload_ad_image", {
+        account_id: "act_123",
+        image_url: "https://example.com/img.jpg",
+      });
+
+      const data = parseToolResult(result as any) as any;
+      expect(data.hash).toBe("abc123hash");
+      expect(data.url).toBe("https://cdn.facebook.com/img.jpg");
+      expect(data.width).toBe(1200);
+    });
+
+    it("surfaces Meta API error", async () => {
+      (metaApiPost as any).mockResolvedValue({
+        error: { message: "Invalid image", code: 100 },
+      });
+
+      const result = await callTool("upload_ad_image", {
+        account_id: "act_123",
+        image_url: "https://example.com/img.jpg",
+      });
+
+      expect((result as any).isError).toBe(true);
+    });
   });
 
-  describe("create_ad_creative (tier gating)", () => {
+  describe("upload_ad_video", () => {
     it("blocks non-pro tier", async () => {
       const freeCapture = createToolCapture();
-      registerCreativeTools({ server: freeCapture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
+      registerCreativeTools({ server: freeCapture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+
+      const result = await freeCapture.callTool("upload_ad_video", {
+        account_id: "act_123",
+        video_url: "https://example.com/video.mp4",
+      });
+
+      expect((result as any).isError).toBe(true);
+    });
+
+    it("posts file_url to advideos and returns video_id with note", async () => {
+      (metaApiPost as any).mockResolvedValue({ id: "vid_new" });
+
+      const result = await callTool("upload_ad_video", {
+        account_id: "act_123",
+        video_url: "https://example.com/video.mp4",
+        title: "Summer Sale",
+      });
+
+      const callArgs = (metaApiPost as any).mock.calls[0];
+      expect(callArgs[0]).toBe("act_123/advideos");
+      const body = callArgs[2] as Record<string, unknown>;
+      expect(body.file_url).toBe("https://example.com/video.mp4");
+      expect(body.title).toBe("Summer Sale");
+
+      const data = parseToolResult(result as any) as any;
+      expect(data.id).toBe("vid_new");
+      expect(data.note).toContain("get_video_status");
+    });
+  });
+
+  describe("create_ad_creative (validation + tier gating)", () => {
+    it("blocks non-pro tier", async () => {
+      const freeCapture = createToolCapture();
+      registerCreativeTools({ server: freeCapture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
 
       const result = await freeCapture.callTool("create_ad_creative", {
+        account_id: "act_123",
+        page_id: "page_1",
+        image_hash: "abc123",
+        link_url: "https://example.com",
+      });
+
+      expect((result as any).isError).toBe(true);
+    });
+
+    it("errors when neither image_hash nor video_id is provided", async () => {
+      const result = await callTool("create_ad_creative", {
         account_id: "act_123",
         page_id: "page_1",
       });
 
       expect((result as any).isError).toBe(true);
+      const data = parseToolResult(result as any) as any;
+      expect(data.error).toContain("image_hash");
+    });
+
+    it("errors when image_hash provided without link_url", async () => {
+      const result = await callTool("create_ad_creative", {
+        account_id: "act_123",
+        page_id: "page_1",
+        image_hash: "abc123",
+      });
+
+      expect((result as any).isError).toBe(true);
+      const data = parseToolResult(result as any) as any;
+      expect(data.error).toContain("link_url");
     });
 
     it("creates image creative with link_data", async () => {

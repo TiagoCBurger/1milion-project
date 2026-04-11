@@ -5,6 +5,7 @@ import { validateApiKey, getMetaToken, verifyOAuthAccessToken, type AuthResult }
 import { checkRateLimit } from "./rate-limit";
 import { logUsage } from "./usage";
 import { registerAllTools } from "./tools";
+import { registerHotmartTools } from "./tools/hotmart";
 import { routeOAuth } from "./oauth/router";
 import type { Env, WorkspaceContext } from "./types";
 
@@ -178,10 +179,32 @@ function buildServer(
         isError: true,
       })
     );
+    registerHotmartTools({
+      server,
+      token: "",
+      tier: workspace.tier,
+      env,
+      workspaceId: workspace.workspaceId,
+    });
     return server;
   }
 
-  registerAllTools({ server, token: metaToken, tier: workspace.tier, env, workspaceId: workspace.workspaceId, allowedAccounts: workspace.allowedAccounts });
+  registerAllTools({
+    server,
+    token: metaToken,
+    tier: workspace.tier,
+    env,
+    workspaceId: workspace.workspaceId,
+    enableMetaMutations: workspace.enableMetaMutations,
+    allowedAccounts: workspace.allowedAccounts,
+  });
+  registerHotmartTools({
+    server,
+    token: metaToken,
+    tier: workspace.tier,
+    env,
+    workspaceId: workspace.workspaceId,
+  });
   return server;
 }
 

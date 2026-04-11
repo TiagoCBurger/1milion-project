@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   // Helper to redirect with error
   const redirectError = (slug: string | null, errorCode: string) => {
     const target = slug
-      ? `${origin}/dashboard/${slug}/connect?error=${errorCode}`
+      ? `${origin}/dashboard/${slug}/integrations/meta?error=${errorCode}`
       : `${origin}/dashboard?error=${errorCode}`;
     const response = NextResponse.redirect(target);
     response.headers.set("Set-Cookie", clearOAuthStateCookie(isSecure));
@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Redirect to connect page with success
-    const successUrl = `${origin}/dashboard/${slug}/connect?success=true&name=${encodeURIComponent(inspection.userName)}${apiKeyParam}`;
+    const successUrl = `${origin}/dashboard/${slug}/integrations/meta?success=true&name=${encodeURIComponent(inspection.userName)}${apiKeyParam}`;
     const response = NextResponse.redirect(successUrl);
     response.headers.set("Set-Cookie", clearOAuthStateCookie(isSecure));
     return response;

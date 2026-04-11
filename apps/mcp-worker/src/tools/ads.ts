@@ -84,6 +84,8 @@ export function registerAdTools(ctx: ToolContext) {
     }
   );
 
+  if (!ctx.enableMetaMutations) return;
+
   // ---------------------------------------------------------------
   // create_ad  (PRO tier only)
   // ---------------------------------------------------------------
