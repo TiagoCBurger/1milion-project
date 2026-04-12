@@ -399,6 +399,10 @@ export default function HotmartIntegrationPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="hm-basic">Token Basic</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Cole o valor exibido em Credenciais (pode começar com{" "}
+                    <span className="font-mono">Basic </span> — aceitamos dos dois jeitos).
+                  </p>
                   <Input
                     id="hm-basic"
                     type="password"

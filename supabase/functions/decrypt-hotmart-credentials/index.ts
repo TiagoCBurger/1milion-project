@@ -8,11 +8,20 @@ const WORKER_SECRET = Deno.env.get("WORKER_SECRET");
 const HOTMART_OAUTH_URL =
   "https://api-sec-vlc.hotmart.com/security/oauth/token";
 
+function normalizeHotmartBasicToken(raw: string): string {
+  const t = raw.trim();
+  if (/^basic\s+/i.test(t)) {
+    return t.replace(/^basic\s+/i, "").trim();
+  }
+  return t;
+}
+
 async function hotmartAuth(
   clientId: string,
   clientSecret: string,
   basicToken: string
 ): Promise<{ accessToken: string; expiresAtMs: number } | { error: string }> {
+  const basic = normalizeHotmartBasicToken(basicToken);
   const params = new URLSearchParams();
   params.set("grant_type", "client_credentials");
   params.set("client_id", clientId);
@@ -22,7 +31,7 @@ async function hotmartAuth(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Basic ${basicToken}`,
+      Authorization: `Basic ${basic}`,
     },
   });
 

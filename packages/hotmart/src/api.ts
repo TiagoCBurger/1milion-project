@@ -20,6 +20,19 @@ function asRecord(v: unknown): Record<string, unknown> | null {
 }
 
 /**
+ * Hotmart’s developer UI shows the Basic credential as the full scheme value
+ * (`Basic <base64>`). We always send `Authorization: Basic <base64>`, so strip
+ * a duplicated `Basic ` prefix if the user pasted the value from the portal.
+ */
+export function normalizeHotmartBasicToken(raw: string): string {
+  const t = raw.trim();
+  if (/^basic\s+/i.test(t)) {
+    return t.replace(/^basic\s+/i, "").trim();
+  }
+  return t;
+}
+
+/**
  * Exchange client credentials for an access token.
  * Hotmart expects grant_type, client_id, and client_secret as query parameters
  * (not in the body), with the Basic token in the Authorization header.
@@ -30,6 +43,7 @@ export async function hotmartAuth(
   clientSecret: string,
   basicToken: string
 ): Promise<HotmartAuthSuccess | HotmartError> {
+  const basic = normalizeHotmartBasicToken(basicToken);
   const params = new URLSearchParams();
   params.set("grant_type", "client_credentials");
   params.set("client_id", clientId);
@@ -39,7 +53,7 @@ export async function hotmartAuth(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Basic ${basicToken}`,
+      Authorization: `Basic ${basic}`,
     },
   });
 

@@ -1,5 +1,9 @@
 import { after } from "next/server";
-import { hotmartAuth, runHotmartInitialBackfill } from "@vibefly/hotmart";
+import {
+  hotmartAuth,
+  normalizeHotmartBasicToken,
+  runHotmartInitialBackfill,
+} from "@vibefly/hotmart";
 import { requireHotmartWorkspaceAdmin } from "@/lib/hotmart-api-guards";
 import { fetchHotmartCredentialsFromEdge } from "@/lib/hotmart-edge";
 
@@ -36,7 +40,7 @@ export async function POST(request: Request) {
   const workspaceId = body.workspace_id;
   const clientId = body.client_id?.trim();
   const clientSecret = body.client_secret?.trim();
-  const basicToken = body.basic_token?.trim();
+  const basicToken = normalizeHotmartBasicToken(body.basic_token ?? "");
 
   if (!workspaceId || !clientId || !clientSecret || !basicToken) {
     return Response.json(
