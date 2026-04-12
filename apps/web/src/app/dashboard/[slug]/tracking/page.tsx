@@ -59,7 +59,10 @@ export default function TrackingPage() {
 
   async function handleTestEvent() {
     if (!pixelId || !capiToken) {
-      setTestResult({ success: false, message: "Save your Pixel ID and CAPI token first." });
+      setTestResult({
+        success: false,
+        message: "Salve o ID do Pixel e o token da CAPI antes de testar.",
+      });
       return;
     }
     setTesting(true);
@@ -80,12 +83,18 @@ export default function TrackingPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setTestResult({ success: true, message: `Event sent! ID: ${data.event_id}` });
+        setTestResult({
+          success: true,
+          message: `Evento enviado. ID: ${data.event_id}`,
+        });
       } else {
-        setTestResult({ success: false, message: data.error || "Failed to send event" });
+        setTestResult({
+          success: false,
+          message: data.error || "Não foi possível enviar o evento.",
+        });
       }
     } catch (err) {
-      setTestResult({ success: false, message: `Network error: ${err}` });
+      setTestResult({ success: false, message: `Erro de rede: ${String(err)}` });
     }
     setTesting(false);
   }
@@ -136,16 +145,16 @@ src="https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1"/></noscri
     <div className="flex-1 p-6 space-y-6">
       <PageHeader
         breadcrumbs={[
-          { label: "Workspaces", href: "/dashboard" },
-          { label: slug, href: `/dashboard/${slug}` },
-          { label: "Tracking & CAPI" },
+          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: String(slug), href: `/dashboard/${slug}` },
+          { label: "Rastreamento" },
         ]}
       />
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Tracking & CAPI</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Rastreamento e CAPI</h1>
         <p className="text-muted-foreground mt-1">
-          Configure Meta Pixel and Conversions API for advanced tracking with data enrichment and
-          deduplication.
+          Configure o Pixel da Meta e a API de Conversões para rastreamento com enriquecimento de
+          dados e deduplicação entre navegador e servidor.
         </p>
       </div>
 
@@ -153,7 +162,7 @@ src="https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1"/></noscri
       <Card>
         <CardContent className="p-6 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="pixel-id">Meta Pixel ID</Label>
+            <Label htmlFor="pixel-id">ID do Pixel (Meta)</Label>
             <Input
               id="pixel-id"
               placeholder="123456789012345"
@@ -161,12 +170,12 @@ src="https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1"/></noscri
               onChange={(e) => setPixelId(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Found in Meta Events Manager → Data Sources → Pixel → Settings
+              Events Manager → Fontes de dados → Pixel → Configurações
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="capi-token">Conversions API Access Token</Label>
+            <Label htmlFor="capi-token">Token de acesso da API de Conversões (CAPI)</Label>
             <div className="flex gap-2">
               <Input
                 id="capi-token"
@@ -180,17 +189,17 @@ src="https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1"/></noscri
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Generate in Meta Events Manager → Settings → Conversions API → Generate Access Token
+              Events Manager → Configurações → API de Conversões → Gerar token de acesso
             </p>
           </div>
 
           <div className="flex gap-2">
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : saved ? "Saved!" : "Save Configuration"}
+              {saving ? "Salvando…" : saved ? "Salvo!" : "Salvar configuração"}
             </Button>
             <Button variant="outline" onClick={handleTestEvent} disabled={testing}>
               <Send className="h-4 w-4 mr-2" />
-              {testing ? "Sending..." : "Send Test Event"}
+              {testing ? "Enviando…" : "Enviar evento de teste"}
             </Button>
           </div>
 
@@ -208,14 +217,14 @@ src="https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1"/></noscri
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold">Installation Snippet</h3>
+                <h3 className="font-semibold">Snippet de instalação</h3>
                 <p className="text-sm text-muted-foreground">
-                  Add this to the <code>&lt;head&gt;</code> of your website for Pixel + CAPI tracking with deduplication.
+                  Cole no <code>&lt;head&gt;</code> do site para Pixel + CAPI com deduplicação.
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={handleCopy}>
                 {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
-                {copied ? "Copied" : "Copy"}
+                {copied ? "Copiado" : "Copiar"}
               </Button>
             </div>
             <pre className="bg-muted rounded-lg p-4 overflow-x-auto text-xs leading-relaxed">
@@ -223,12 +232,12 @@ src="https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1"/></noscri
             </pre>
 
             <div className="space-y-3">
-              <h4 className="font-medium text-sm">Tracking Custom Events</h4>
+              <h4 className="font-medium text-sm">Eventos personalizados</h4>
               <p className="text-sm text-muted-foreground">
-                After installing the snippet, use <code>vfTrack()</code> to fire events:
+                Depois de instalar o snippet, use <code>vfTrack()</code> para disparar eventos:
               </p>
               <pre className="bg-muted rounded-lg p-4 overflow-x-auto text-xs leading-relaxed">
-                <code>{`// Lead event with user data enrichment
+                <code>{`// Lead com dados do usuário
 vfTrack('Lead', {
   email: 'user@example.com',
   phone: '+5511999999999',
@@ -236,16 +245,16 @@ vfTrack('Lead', {
   last_name: 'Silva'
 });
 
-// Purchase event with custom data
+// Compra com custom_data
 vfTrack('Purchase', { email: 'user@example.com' }, {
   value: 99.90,
   currency: 'BRL',
-  content_name: 'Product Name',
+  content_name: 'Nome do produto',
   content_ids: ['SKU123'],
   num_items: 1
 });
 
-// All supported events:
+// Eventos suportados:
 // PageView, ViewContent, Lead, InitiateCheckout,
 // AddToCart, AddPaymentInfo, Purchase, CompleteRegistration,
 // Subscribe, Contact, CustomizeProduct, FindLocation,
@@ -254,7 +263,7 @@ vfTrack('Purchase', { email: 'user@example.com' }, {
             </div>
 
             <div className="space-y-2">
-              <h4 className="font-medium text-sm">Data Enrichment</h4>
+              <h4 className="font-medium text-sm">Enriquecimento de dados</h4>
               <div className="flex flex-wrap gap-2">
                 {[
                   "Email (SHA-256)",
@@ -271,8 +280,8 @@ vfTrack('Purchase', { email: 'user@example.com' }, {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                All PII data is hashed server-side (SHA-256) before being sent to Meta.
-                IP and User Agent are captured automatically by the server.
+                Dados pessoais são hasheados no servidor (SHA-256) antes do envio à Meta. IP e user
+                agent são capturados automaticamente pelo servidor.
               </p>
             </div>
           </CardContent>

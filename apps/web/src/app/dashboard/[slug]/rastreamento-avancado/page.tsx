@@ -2,9 +2,9 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { ShoppingCart } from "lucide-react";
+import { Radar } from "lucide-react";
 
-export default async function VendasPage({
+export default async function RastreamentoAvancadoPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
@@ -30,14 +30,14 @@ export default async function VendasPage({
         breadcrumbs={[
           { label: "Espaços de trabalho", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
-          { label: "Vendas" },
+          { label: "Rastreamento Avançado" },
         ]}
       />
       <div className="p-6">
         <EmptyState
-          icon={ShoppingCart}
-          title="Vendas em breve"
-          description="Estamos preparando a visão de pedidos e receita com as integrações. Em breve você acompanha tudo aqui com filtros e exportação."
+          icon={Radar}
+          title="Rastreamento Avançado em breve"
+          description="Eventos server-side, deduplicação avançada e integrações de dados estarão disponíveis aqui em breve."
         />
       </div>
     </>

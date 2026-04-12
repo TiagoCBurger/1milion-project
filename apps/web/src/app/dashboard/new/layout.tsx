@@ -1,25 +1,19 @@
-import { redirect, notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { fetchSidebarWorkspaces } from "@/lib/dashboard-workspaces";
 
-export default async function WorkspaceLayout({
+export default async function NewWorkspaceLayout({
   children,
-  params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
 
   const workspaces = await fetchSidebarWorkspaces(supabase, user.id);
-
-  const currentWorkspace = workspaces.find((ws) => ws.slug === slug);
-  if (!currentWorkspace) notFound();
 
   const displayName =
     user.user_metadata?.display_name ??
@@ -28,18 +22,14 @@ export default async function WorkspaceLayout({
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Fixed sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 bg-sidebar md:flex md:flex-col">
         <AppSidebar
           workspaces={workspaces}
-          currentWorkspace={currentWorkspace}
+          currentWorkspace={null}
           user={{ email: user.email ?? "", name: displayName }}
         />
       </aside>
-      {/* Main content with left offset */}
-      <main className="flex-1 md:ml-64 min-h-screen flex flex-col">
-        {children}
-      </main>
+      <main className="flex-1 md:ml-64 min-h-screen flex flex-col">{children}</main>
     </div>
   );
 }

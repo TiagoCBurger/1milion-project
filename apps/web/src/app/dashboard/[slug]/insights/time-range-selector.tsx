@@ -14,10 +14,10 @@ interface TimeRangeSelectorProps {
 }
 
 const ranges = [
-  { value: "last_7d", label: "Last 7 days" },
-  { value: "last_30d", label: "Last 30 days" },
-  { value: "this_month", label: "This month" },
-  { value: "last_month", label: "Last month" },
+  { value: "last_7d", label: "Últimos 7 dias" },
+  { value: "last_30d", label: "Últimos 30 dias" },
+  { value: "this_month", label: "Este mês" },
+  { value: "last_month", label: "Mês passado" },
 ];
 
 export function TimeRangeSelector({ current }: TimeRangeSelectorProps) {
@@ -34,7 +34,7 @@ export function TimeRangeSelector({ current }: TimeRangeSelectorProps) {
   return (
     <Select value={current} onValueChange={handleChange}>
       <SelectTrigger className="w-[160px]">
-        <SelectValue placeholder="Time range" />
+        <SelectValue placeholder="Período" />
       </SelectTrigger>
       <SelectContent>
         {ranges.map((r) => (

@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Megaphone, ShoppingBag, ChevronRight } from "lucide-react";
+import { Cable, Megaphone, ShoppingBag, Sparkles, ChevronRight } from "lucide-react";
+import { SuggestIntegrationButton } from "./integration-request-form";
 
 export default async function IntegrationsHubPage({
   params,
@@ -40,14 +41,7 @@ export default async function IntegrationsHubPage({
     .eq("is_valid", true)
     .maybeSingle();
 
-  const { data: hotmartCred } = await supabase
-    .from("hotmart_credentials")
-    .select("is_active")
-    .eq("workspace_id", workspace.id)
-    .maybeSingle();
-
   const metaConnected = !!metaTok;
-  const hotmartConnected = hotmartCred?.is_active === true;
 
   return (
     <>
@@ -61,12 +55,15 @@ export default async function IntegrationsHubPage({
       <IntegrationsTopNav slug={slug} active="hub" />
 
       <div className="mx-auto max-w-5xl space-y-8 p-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Integrações</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Conecte contas externas para sincronizar dados com este espaço. Cada integração tem
-            credenciais e regras de sincronização próprias.
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight">Integrações</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Conecte contas externas para sincronizar dados com este espaço. Cada integração tem
+              credenciais e regras de sincronização próprias.
+            </p>
+          </div>
+          <SuggestIntegrationButton slug={slug} />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -113,32 +110,56 @@ export default async function IntegrationsHubPage({
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400">
                   <ShoppingBag className="h-5 w-5" />
                 </div>
-                {hotmartConnected ? (
-                  <Badge className="shrink-0 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-400">
-                    Conectado
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="shrink-0">
-                    Não conectado
-                  </Badge>
-                )}
+                <Badge variant="secondary" className="shrink-0">
+                  Em breve
+                </Badge>
               </div>
               <CardTitle className="text-lg">Hotmart</CardTitle>
               <CardDescription>
-                Sincronize produtos, clientes, vendas e estornos da sua conta de produtor. Os webhooks
-                são configurados no painel de postback da Hotmart.
+                Em breve: sincronização de produtos, clientes, vendas e estornos com postback da
+                Hotmart, tudo neste espaço.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
-              <Button asChild variant={hotmartConnected ? "outline" : "default"}>
+              <Button asChild variant="outline">
                 <Link href={`/dashboard/${slug}/integrations/hotmart`}>
-                  {hotmartConnected ? "Ver e gerenciar" : "Conectar Hotmart"}
+                  Saiba mais
                   <ChevronRight className="ml-1 h-4 w-4" />
                 </Link>
               </Button>
             </CardContent>
           </Card>
         </div>
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium text-muted-foreground">Conectar IA</h2>
+          <Card className="relative overflow-hidden border-border/80 bg-gradient-to-br from-violet-brand/5 via-background to-cyan-brand/5">
+            <CardHeader>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-brand/15 text-violet-brand">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <Badge variant="secondary" className="shrink-0">
+                  MCP
+                </Badge>
+              </div>
+              <CardTitle className="text-lg">Ferramentas de IA</CardTitle>
+              <CardDescription>
+                Conecte Claude, Cursor, ChatGPT e outros clientes via Model Context Protocol (MCP).
+                Gere chaves de API, gerencie OAuth e veja quais apps acessam este espaço.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="w-full sm:w-auto border-violet-brand/30 bg-background/80 hover:bg-violet-brand/10">
+                <Link href={`/dashboard/${slug}/integrations/mcp`}>
+                  <Cable className="mr-2 h-4 w-4" />
+                  Abrir conexões MCP
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </section>
       </div>
     </>
   );

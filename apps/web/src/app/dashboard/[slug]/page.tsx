@@ -1,11 +1,20 @@
 import { redirect, notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { Link2, Key, BookOpen, Shield, Wifi } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { getDecryptedToken, fetchInsights } from "@/lib/meta-api";
+import { getEnabledAdAccounts } from "@/lib/workspace-data";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/dashboard/empty-state";
+import { AccountSelector } from "@/components/dashboard/account-selector";
+import { TimeRangeSelector } from "./insights/time-range-selector";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -15,345 +24,365 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DisconnectButton } from "./disconnect-button";
-import { AdAccountToggle } from "./ad-account-toggle";
-import { OAuthConnections } from "./oauth-connections";
+import { Cable, Link2, Building2, DollarSign, BarChart3 } from "lucide-react";
+
+const PERIOD_LABELS: Record<string, string> = {
+  last_7d: "Últimos 7 dias",
+  last_30d: "Últimos 30 dias",
+  this_month: "Este mês",
+  last_month: "Mês passado",
+};
+
+function formatCurrency(amount: number, currencyCode: string | null): string {
+  const code =
+    currencyCode && /^[A-Z]{3}$/i.test(currencyCode)
+      ? currencyCode.toUpperCase()
+      : "USD";
+  try {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+    }).format(amount);
+  }
+}
 
 export default async function WorkspacePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ account_id?: string; time_range?: string }>;
 }) {
   const { slug } = await params;
+  const { account_id, time_range } = await searchParams;
+
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("*")
+    .select("id, name, slug")
     .eq("slug", slug)
     .single();
 
   if (!workspace) notFound();
 
-  const { data: token } = await supabase
+  const { data: metaToken } = await supabase
     .from("meta_tokens")
-    .select("id, token_type, meta_user_id, scopes, expires_at, is_valid, last_validated_at")
+    .select("is_valid")
     .eq("workspace_id", workspace.id)
-    .single();
+    .maybeSingle();
 
-  const { data: apiKeys } = await supabase
+  const metaConnected = metaToken?.is_valid === true;
+
+  const { data: activeApiKeys } = await supabase
     .from("api_keys")
-    .select("id, key_prefix, name, is_active, last_used_at, created_at")
+    .select("id")
     .eq("workspace_id", workspace.id)
     .eq("is_active", true);
 
-  const { data: businessManagers } = await supabase
-    .from("business_managers")
-    .select("id, meta_bm_id, name, ad_accounts(id, meta_account_id, name, account_status, currency, is_enabled)")
-    .eq("workspace_id", workspace.id);
-
-  const { data: membership } = await supabase
-    .from("memberships")
-    .select("role")
-    .eq("user_id", user.id)
-    .eq("workspace_id", workspace.id)
-    .single();
-
-  const { data: oauthConnections } = await supabase
+  const { data: activeOAuth } = await supabase
     .from("oauth_connections")
-    .select("id, client_id, client_name, user_id, allowed_accounts, is_active, granted_at, last_used_at")
+    .select("id")
     .eq("workspace_id", workspace.id)
-    .order("granted_at", { ascending: false });
+    .eq("is_active", true);
 
-  const isConnected = token?.is_valid === true;
-  const canManage = membership?.role === "owner" || membership?.role === "admin";
-  const now = Date.now(); // eslint-disable-line react-hooks/purity -- RSC: token expiry vs wall clock
-  const daysUntilExpiry = token?.expires_at
-    ? Math.ceil((new Date(token.expires_at).getTime() - now) / 86_400_000)
-    : null;
+  const mcpConfigured =
+    (activeApiKeys?.length ?? 0) > 0 || (activeOAuth?.length ?? 0) > 0;
 
-  const totalAdAccounts = (businessManagers ?? []).reduce(
-    (sum, bm) => sum + ((bm.ad_accounts as unknown[])?.length ?? 0),
+  const mcpCount =
+    (activeApiKeys?.length ?? 0) + (activeOAuth?.length ?? 0);
+
+  const checklistItems: Array<{
+    key: string;
+    title: string;
+    description: string;
+    href: string;
+    cta: string;
+    icon: typeof Link2;
+  }> = [];
+
+  if (!metaConnected) {
+    checklistItems.push({
+      key: "meta",
+      title: "Conectar o Facebook (Meta)",
+      description:
+        "Autorize sua conta Meta para gerenciar contas de anúncios, campanhas e criativos neste espaço.",
+      href: `/dashboard/${slug}/integrations/meta`,
+      cta: "Conectar Meta",
+      icon: Link2,
+    });
+  }
+
+  if (!mcpConfigured) {
+    checklistItems.push({
+      key: "mcp",
+      title: "Configurar acesso MCP",
+      description:
+        "Crie uma chave de API ou conclua o fluxo OAuth para o servidor MCP acessar as contas habilitadas.",
+      href: `/dashboard/${slug}/integrations/mcp`,
+      cta: "Abrir conexões MCP",
+      icon: Cable,
+    });
+  }
+
+  const showChecklist = checklistItems.length > 0;
+
+  const token = metaConnected ? await getDecryptedToken(workspace.id) : null;
+  const accounts =
+    metaConnected && token ? await getEnabledAdAccounts(workspace.id) : [];
+
+  const showMainDashboard = Boolean(token && accounts.length > 0);
+
+  let selectedAccount = account_id ?? accounts[0]?.meta_account_id ?? "";
+  if (
+    accounts.length > 0 &&
+    !accounts.some((a) => a.meta_account_id === selectedAccount)
+  ) {
+    selectedAccount = accounts[0].meta_account_id;
+  }
+
+  const selectedRange = time_range ?? "last_30d";
+
+  let insights: Record<string, unknown>[] = [];
+  let insightsError: string | undefined;
+
+  if (showMainDashboard) {
+    const result = await fetchInsights(token!, selectedAccount, {
+      timeRange: selectedRange,
+      level: "campaign",
+      limit: 200,
+    });
+    insights = result.data;
+    insightsError = result.error;
+  }
+
+  const totalsSpend = insights.reduce(
+    (sum, row) => sum + Number(row["spend"] ?? 0),
     0
   );
 
-  const statusLabels: Record<number, string> = {
-    1: "Active", 2: "Disabled", 3: "Unsettled", 7: "Pending review",
-    8: "Pending closure", 9: "In grace period", 100: "Pending",
-    101: "Temporarily unavailable", 201: "Pending appeal",
-  };
+  const selectedCurrency =
+    accounts.find((a) => a.meta_account_id === selectedAccount)?.currency ??
+    null;
+
+  const periodSubtitle = PERIOD_LABELS[selectedRange] ?? selectedRange;
+
+  const campaignQuery = new URLSearchParams();
+  campaignQuery.set("account_id", selectedAccount);
 
   return (
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "Workspaces", href: "/dashboard" },
+          { label: "Espaços de trabalho", href: "/dashboard" },
           { label: workspace.name },
         ]}
       />
 
       <div className="p-6 space-y-6">
-        {/* Stat Cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Connection Status"
-            value={isConnected ? "Connected" : "Disconnected"}
-            subtitle={
-              isConnected && daysUntilExpiry !== null && daysUntilExpiry <= 15
-                ? `Expires in ${daysUntilExpiry} days`
-                : undefined
-            }
-            icon={Wifi}
-            variant={isConnected ? "success" : "warning"}
-          />
-          <StatCard
-            title="API Keys"
-            value={apiKeys?.length ?? 0}
-            subtitle="active keys"
-            icon={Key}
-          />
-          <StatCard
-            title="Ad Accounts"
-            value={totalAdAccounts}
-            subtitle={`across ${(businessManagers ?? []).length} BM${(businessManagers ?? []).length !== 1 ? "s" : ""}`}
-            icon={Shield}
-          />
-          <StatCard
-            title="MCP Connections"
-            value={(oauthConnections ?? []).filter((c) => (c as { is_active: boolean }).is_active).length}
-            subtitle="active clients"
-            icon={Link2}
-          />
-        </div>
-
-        {/* Quick Actions */}
-        <div className="flex flex-wrap gap-3">
-          {!isConnected && (
-            <Button asChild>
-              <Link href={`/dashboard/${slug}/integrations/meta`}>
-                <Link2 className="mr-2 h-4 w-4" />
-                Conectar conta
-              </Link>
-            </Button>
-          )}
-          {isConnected && (
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/${slug}/integrations/meta`}>
-                <Link2 className="mr-2 h-4 w-4" />
-                Reconectar
-              </Link>
-            </Button>
-          )}
-          {isConnected && canManage && (
-            <DisconnectButton workspaceId={workspace.id} slug={slug} />
-          )}
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/${slug}/api-keys`}>
-              <Key className="mr-2 h-4 w-4" />
-              Manage Keys
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/${slug}/setup`}>
-              <BookOpen className="mr-2 h-4 w-4" />
-              Setup Guide
-            </Link>
-          </Button>
-        </div>
-
-        {/* Token Details */}
-        {isConnected && token && (
-          <Card>
+        {showChecklist ? (
+          <Card className="mx-auto max-w-xl border-border/80">
             <CardHeader>
-              <CardTitle className="text-base">OAuth Connection</CardTitle>
+              <CardTitle className="text-xl">Configuração</CardTitle>
+              <CardDescription>
+                Conclua os itens abaixo para usar anúncios e ferramentas MCP
+                neste espaço.
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium uppercase">User ID</p>
-                  <p className="mt-1 text-sm font-mono truncate">{token.meta_user_id || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium uppercase">Token Type</p>
-                  <p className="mt-1 text-sm capitalize">{token.token_type?.replace("_", " ") || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium uppercase">Expires</p>
-                  <p className={`mt-1 text-sm ${daysUntilExpiry !== null && daysUntilExpiry <= 15 ? "text-amber-600 font-medium" : ""}`}>
-                    {token.expires_at
-                      ? `${new Date(token.expires_at).toLocaleDateString()} (${daysUntilExpiry}d)`
-                      : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium uppercase">Last Validated</p>
-                  <p className="mt-1 text-sm">
-                    {token.last_validated_at
-                      ? new Date(token.last_validated_at).toLocaleDateString()
-                      : "—"}
-                  </p>
-                </div>
-              </div>
-              {token.scopes && (
-                <div className="mt-4 pt-4 border-t border-border/30">
-                  <p className="text-xs text-muted-foreground font-medium uppercase mb-2">Scopes</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(token.scopes as string[]).map((scope) => (
-                      <Badge key={scope} variant="secondary" className="font-mono text-xs">
-                        {scope}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <ol className="space-y-6">
+                {checklistItems.map((item, index) => {
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.key} className="flex gap-4">
+                      <span
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-muted/50 text-sm font-semibold tabular-nums text-muted-foreground"
+                        aria-hidden
+                      >
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium leading-snug">
+                              {item.title}
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                              {item.description}
+                            </p>
+                          </div>
+                        </div>
+                        <Button asChild size="sm" className="mt-1">
+                          <Link href={item.href}>{item.cta}</Link>
+                        </Button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
             </CardContent>
           </Card>
-        )}
+        ) : null}
 
-        {/* Business Managers & Ad Accounts */}
-        {isConnected && (businessManagers ?? []).length > 0 && (
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold">Advertising Accounts</h2>
-              <p className="text-sm text-muted-foreground">
-                {businessManagers!.length} BM{businessManagers!.length !== 1 ? "s" : ""} &middot;{" "}
-                {totalAdAccounts} ad account{totalAdAccounts !== 1 ? "s" : ""}
-              </p>
+        {metaConnected && token && accounts.length === 0 ? (
+          <EmptyState
+            icon={Building2}
+            title="Nenhuma conta de anúncios ativa"
+            description="Habilite pelo menos uma conta de anúncios no Business Manager sincronizado com este espaço."
+          >
+            <Button asChild>
+              <Link href={`/dashboard/${slug}/integrations/meta`}>
+                Gerenciar integração Meta
+              </Link>
+            </Button>
+          </EmptyState>
+        ) : null}
+
+        {showMainDashboard ? (
+          <>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  Visão geral
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Métricas e campanhas da conta selecionada.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <TimeRangeSelector current={selectedRange} />
+                <AccountSelector
+                  accounts={accounts}
+                  current={selectedAccount}
+                  alwaysShow
+                />
+              </div>
             </div>
 
-            {businessManagers!.map((bm) => {
-              const accounts = (bm.ad_accounts ?? []) as Array<{
-                id: string;
-                meta_account_id: string;
-                name: string;
-                account_status: number | null;
-                currency: string | null;
-                is_enabled: boolean;
-              }>;
+            {insightsError ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                Erro na API Meta: {insightsError}
+              </div>
+            ) : null}
 
-              return (
-                <Card key={bm.id}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-base">{bm.name}</CardTitle>
-                        <CardDescription className="font-mono text-xs">{bm.meta_bm_id}</CardDescription>
-                      </div>
-                      <Badge variant="outline">
-                        {accounts.length} account{accounts.length !== 1 ? "s" : ""}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    {accounts.length > 0 ? (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <StatCard
+                title="Contas de anúncio"
+                value={accounts.length}
+                subtitle="ativas neste espaço"
+                icon={Building2}
+              />
+              <StatCard
+                title="Gasto no período"
+                value={formatCurrency(totalsSpend, selectedCurrency)}
+                subtitle={periodSubtitle}
+                icon={DollarSign}
+              />
+              <StatCard
+                title="MCP conectados"
+                value={mcpCount}
+                subtitle="chaves API + OAuth ativos"
+                icon={Cable}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold tracking-tight">
+                Campanhas
+              </h2>
+              {insights.length > 0 ? (
+                <Card>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Account</TableHead>
-                            <TableHead>ID</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Currency</TableHead>
-                            {canManage && <TableHead>Enabled</TableHead>}
+                            <TableHead>Campanha</TableHead>
+                            <TableHead className="text-right">
+                              Impressões
+                            </TableHead>
+                            <TableHead className="text-right">Cliques</TableHead>
+                            <TableHead className="text-right">Gasto</TableHead>
+                            <TableHead className="text-right">CTR</TableHead>
+                            <TableHead className="text-right">CPM</TableHead>
+                            <TableHead className="text-right">Alcance</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {accounts.map((acc) => {
-                            const status = acc.account_status ?? 0;
-                            const isActive = status === 1;
+                          {insights.map((row, i) => {
+                            const campaignId = String(row["campaign_id"] ?? "");
+                            const href = `/dashboard/${slug}/campaigns/${campaignId}?${campaignQuery.toString()}`;
                             return (
-                              <TableRow key={acc.id} className={!acc.is_enabled ? "opacity-50" : ""}>
-                                <TableCell className="font-medium">{acc.name}</TableCell>
-                                <TableCell className="font-mono text-xs text-muted-foreground">
-                                  {acc.meta_account_id}
+                              <TableRow key={campaignId || `row-${i}`}>
+                                <TableCell className="max-w-[220px] font-medium">
+                                  <Link
+                                    href={href}
+                                    className="truncate text-primary hover:underline"
+                                  >
+                                    {String(row["campaign_name"] ?? "—")}
+                                  </Link>
                                 </TableCell>
-                                <TableCell>
-                                  <Badge variant={isActive ? "success" : "secondary"}>
-                                    {statusLabels[status] || `Unknown (${status})`}
-                                  </Badge>
+                                <TableCell className="text-right tabular-nums">
+                                  {Number(
+                                    row["impressions"] ?? 0
+                                  ).toLocaleString("pt-BR")}
                                 </TableCell>
-                                <TableCell className="text-muted-foreground">
-                                  {acc.currency || "—"}
+                                <TableCell className="text-right tabular-nums">
+                                  {Number(row["clicks"] ?? 0).toLocaleString(
+                                    "pt-BR"
+                                  )}
                                 </TableCell>
-                                {canManage && (
-                                  <TableCell>
-                                    <AdAccountToggle
-                                      workspaceId={workspace.id}
-                                      accountId={acc.id}
-                                      enabled={acc.is_enabled}
-                                    />
-                                  </TableCell>
-                                )}
+                                <TableCell className="text-right tabular-nums">
+                                  {formatCurrency(
+                                    Number(row["spend"] ?? 0),
+                                    selectedCurrency
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums text-muted-foreground">
+                                  {Number(row["ctr"] ?? 0).toFixed(2)}%
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums text-muted-foreground">
+                                  {formatCurrency(
+                                    Number(row["cpm"] ?? 0),
+                                    selectedCurrency
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums text-muted-foreground">
+                                  {Number(row["reach"] ?? 0).toLocaleString(
+                                    "pt-BR"
+                                  )}
+                                </TableCell>
                               </TableRow>
                             );
                           })}
                         </TableBody>
                       </Table>
-                    ) : (
-                      <p className="text-sm text-muted-foreground py-4">
-                        No ad accounts found in this Business Manager.
-                      </p>
-                    )}
+                    </div>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
-        )}
-
-        {/* MCP OAuth Connections */}
-        {isConnected && (
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold">MCP Connections</h2>
-              <p className="text-sm text-muted-foreground">
-                Clients connected via OAuth. Control which accounts each client can access.
-              </p>
+              ) : !insightsError ? (
+                <EmptyState
+                  icon={BarChart3}
+                  title="Sem dados no período"
+                  description="Não há insights de campanha para este intervalo ou conta. Tente outro período ou verifique se há campanhas com entrega."
+                />
+              ) : null}
             </div>
-            <OAuthConnections
-              workspaceId={workspace.id}
-              connections={(oauthConnections ?? []) as Array<{
-                id: string;
-                client_id: string;
-                client_name: string | null;
-                user_id: string;
-                allowed_accounts: string[];
-                is_active: boolean;
-                granted_at: string;
-                last_used_at: string | null;
-              }>}
-              adAccounts={(businessManagers ?? []).flatMap((bm) =>
-                ((bm.ad_accounts ?? []) as Array<{
-                  id: string;
-                  meta_account_id: string;
-                  name: string;
-                }>).map((a) => ({
-                  id: a.id,
-                  meta_account_id: a.meta_account_id,
-                  name: a.name,
-                }))
-              )}
-              canManage={canManage}
-            />
-          </div>
-        )}
-
-        {/* Empty state for connected but no BMs */}
-        {isConnected && (businessManagers ?? []).length === 0 && (
-          <Card className="bg-amber-50/60">
-            <CardContent className="p-5">
-              <p className="text-sm text-amber-700">
-                Your Meta account is connected but no Business Managers were found. This could mean
-                your account doesn&apos;t have access to any Business Managers, or you may need to
-                reconnect.
-              </p>
-              <Button asChild variant="outline" size="sm" className="mt-3">
-                <Link href={`/dashboard/${slug}/integrations/meta`}>Reconectar</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+          </>
+        ) : null}
       </div>
     </>
   );

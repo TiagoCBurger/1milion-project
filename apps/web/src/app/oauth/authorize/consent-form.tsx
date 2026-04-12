@@ -167,12 +167,12 @@ export function OAuthConsentForm({
             <a
               href={
                 currentWorkspace
-                  ? `/dashboard/${currentWorkspace.slug}/connections`
+                  ? `/dashboard/${currentWorkspace.slug}/integrations/mcp`
                   : "/dashboard"
               }
               className="font-medium text-amber-950 underline hover:no-underline"
             >
-              Dashboard → Connections
+              Integrações → Conexões MCP
             </a>
             {" to connect this app."}
           </p>

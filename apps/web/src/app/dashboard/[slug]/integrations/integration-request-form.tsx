@@ -37,7 +37,10 @@ function IntegrationRequestFormFields({
     FormData
   >(submitIntegrationRequest, undefined);
   const onSuccessRef = useRef(onSuccess);
-  onSuccessRef.current = onSuccess;
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
 
   useEffect(() => {
     if (state?.ok !== true) return;
@@ -102,6 +105,45 @@ function IntegrationRequestFormFields({
         )}
       </Button>
     </form>
+  );
+}
+
+/** Botão discreto + mesmo formulário (salva via `create_integration_request` no Supabase). */
+export function SuggestIntegrationButton({ slug }: { slug: string }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-auto gap-1.5 px-2 py-1 text-xs font-normal text-muted-foreground hover:text-foreground"
+        onClick={() => setOpen(true)}
+      >
+        <Sparkles className="h-3.5 w-3.5 opacity-60" aria-hidden />
+        Sugerir ferramenta
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Sugerir uma ferramenta</DialogTitle>
+            <DialogDescription>
+              Diga qual integração você quer ver neste espaço. Avaliamos cada sugestão.
+            </DialogDescription>
+          </DialogHeader>
+          {open ? (
+            <IntegrationRequestFormFields
+              slug={slug}
+              onSuccess={() => {
+                setOpen(false);
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

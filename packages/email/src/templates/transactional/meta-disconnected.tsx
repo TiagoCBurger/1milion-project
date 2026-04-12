@@ -13,7 +13,7 @@ export interface MetaDisconnectedEmailProps {
 export function MetaDisconnectedEmail({
   userName = "Usu\u00e1rio",
   workspaceName = "Meu Workspace",
-  reconnectUrl = "https://app.vibefly.app/dashboard/connections",
+  reconnectUrl = "https://app.vibefly.app/dashboard",
 }: MetaDisconnectedEmailProps) {
   return (
     <Layout preview="Conexão com Meta expirou no VibeFly">

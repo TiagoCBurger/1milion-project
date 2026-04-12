@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
     if (usedOthers >= maxMcp) {
       return NextResponse.json(
         {
-          error: `MCP connection limit reached (${maxMcp} allowed on your plan). Open Dashboard → Connections, revoke an existing app, then try again.`,
+          error: `MCP connection limit reached (${maxMcp} allowed on your plan). Open Dashboard → Integrações → Conexões MCP, revoke an existing app, then try again.`,
         },
         { status: 403 }
       );
