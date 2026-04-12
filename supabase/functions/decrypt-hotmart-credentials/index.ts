@@ -16,6 +16,27 @@ function normalizeHotmartBasicToken(raw: string): string {
   return t;
 }
 
+function tryParseJson(text: string): Record<string, unknown> | null {
+  const t = text.trim();
+  if (!t) return null;
+  try {
+    const v = JSON.parse(t) as unknown;
+    return v !== null && typeof v === "object" && !Array.isArray(v)
+      ? (v as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+const HOTMART_DEFAULT_EXPIRES_SEC = 86_400;
+
+function resolveExpiresAtMs(expiresInRaw: unknown): number {
+  const n = Number(expiresInRaw);
+  const sec = Number.isFinite(n) && n > 0 ? n : HOTMART_DEFAULT_EXPIRES_SEC;
+  return Date.now() + sec * 1000;
+}
+
 async function hotmartAuth(
   clientId: string,
   clientSecret: string,
@@ -35,22 +56,23 @@ async function hotmartAuth(
     },
   });
 
-  const json = (await res.json()) as Record<string, unknown>;
+  const text = await res.text();
+  const json = tryParseJson(text);
   if (!res.ok) {
     const msg =
-      (json.error_description as string) ||
-      (json.error as string) ||
+      (json?.error_description as string) ||
+      (json?.error as string) ||
+      (text.trim() ? text.trim().slice(0, 300) : null) ||
       `Hotmart auth failed (${res.status})`;
     return { error: msg };
   }
-  const accessToken = json.access_token as string;
-  const expiresIn = Number(json.expires_in ?? 0);
+  const accessToken = json?.access_token as string | undefined;
   if (!accessToken) {
     return { error: "Invalid auth response" };
   }
   return {
     accessToken,
-    expiresAtMs: Date.now() + Math.max(0, expiresIn) * 1000,
+    expiresAtMs: resolveExpiresAtMs(json?.expires_in),
   };
 }
 

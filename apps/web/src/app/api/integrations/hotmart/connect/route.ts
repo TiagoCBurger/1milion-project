@@ -7,8 +7,6 @@ import {
 import { requireHotmartWorkspaceAdmin } from "@/lib/hotmart-api-guards";
 import { fetchHotmartCredentialsFromEdge } from "@/lib/hotmart-edge";
 
-const TOKEN_ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY!;
-
 function appBaseUrl(request: Request): string {
   const trim = (u: string) => u.replace(/\/$/, "");
   if (process.env.NEXT_PUBLIC_APP_URL) {
@@ -30,12 +28,26 @@ function appBaseUrl(request: Request): string {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as {
+  let body: {
     workspace_id?: string;
     client_id?: string;
     client_secret?: string;
     basic_token?: string;
   };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const encKey = process.env.TOKEN_ENCRYPTION_KEY;
+  if (!encKey) {
+    console.error("[hotmart/connect] TOKEN_ENCRYPTION_KEY is not set");
+    return Response.json(
+      { error: "Server configuration error (encryption key missing)." },
+      { status: 500 }
+    );
+  }
 
   const workspaceId = body.workspace_id;
   const clientId = body.client_id?.trim();
@@ -72,7 +84,7 @@ export async function POST(request: Request) {
 
   const { error: upErr } = await guard.supabase.rpc("upsert_hotmart_credentials", {
     p_workspace_id: workspaceId,
-    p_encryption_key: TOKEN_ENCRYPTION_KEY,
+    p_encryption_key: encKey,
     p_client_id: clientId,
     p_client_secret: clientSecret,
     p_basic_token: basicToken,
@@ -83,8 +95,14 @@ export async function POST(request: Request) {
   });
 
   if (upErr) {
-    console.error("[hotmart/connect] upsert_hotmart_credentials:", upErr.message);
-    return Response.json({ error: "Failed to save credentials" }, { status: 500 });
+    console.error("[hotmart/connect] upsert_hotmart_credentials:", upErr.message, upErr);
+    return Response.json(
+      {
+        error: "Failed to save credentials",
+        details: upErr.message,
+      },
+      { status: 500 }
+    );
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;

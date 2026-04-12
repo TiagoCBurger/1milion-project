@@ -61,6 +61,26 @@ describe("hotmart api", () => {
     );
   });
 
+  it("hotmartAuth uses default TTL when expires_in is not a positive number", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response(
+          JSON.stringify({ access_token: "tok", expires_in: "not-a-number" }),
+          { status: 200 }
+        );
+      })
+    );
+    const r = await hotmartAuth("a", "b", "c");
+    expect("error" in r).toBe(false);
+    if ("accessToken" in r) {
+      expect(r.accessToken).toBe("tok");
+      const delta = r.expiresAtMs - Date.now();
+      expect(delta).toBeGreaterThanOrEqual(86_400 * 1000 - 2_000);
+      expect(delta).toBeLessThanOrEqual(86_400 * 1000 + 2_000);
+    }
+  });
+
   it("hotmartAuth returns error on 401", async () => {
     vi.stubGlobal(
       "fetch",

@@ -19,6 +19,25 @@ function asRecord(v: unknown): Record<string, unknown> | null {
   return null;
 }
 
+function tryParseJson(text: string): unknown | null {
+  const t = text.trim();
+  if (!t) return null;
+  try {
+    return JSON.parse(t) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/** Hotmart tokens are ~24h; use this when `expires_in` is missing or not a positive number. */
+const HOTMART_DEFAULT_EXPIRES_SEC = 86_400;
+
+function resolveExpiresAtMs(expiresInRaw: unknown): number {
+  const n = Number(expiresInRaw);
+  const sec = Number.isFinite(n) && n > 0 ? n : HOTMART_DEFAULT_EXPIRES_SEC;
+  return Date.now() + sec * 1000;
+}
+
 /**
  * Hotmart’s developer UI shows the Basic credential as the full scheme value
  * (`Basic <base64>`). We always send `Authorization: Basic <base64>`, so strip
@@ -57,22 +76,23 @@ export async function hotmartAuth(
     },
   });
 
-  const json = (await res.json()) as unknown;
+  const text = await res.text();
+  const json = tryParseJson(text);
   if (!res.ok) {
     const msg =
       (asRecord(json)?.error_description as string) ||
       (asRecord(json)?.error as string) ||
+      (text.trim() ? text.trim().slice(0, 300) : null) ||
       `Hotmart auth failed (${res.status})`;
     return { error: msg, status: res.status };
   }
 
   const o = asRecord(json);
   const accessToken = o?.access_token;
-  const expiresIn = Number(o?.expires_in ?? 0);
   if (typeof accessToken !== "string" || !accessToken) {
     return { error: "Invalid auth response (missing access_token)" };
   }
-  const expiresAtMs = Date.now() + Math.max(0, expiresIn) * 1000;
+  const expiresAtMs = resolveExpiresAtMs(o?.expires_in);
   return { accessToken, expiresAtMs };
 }
 
