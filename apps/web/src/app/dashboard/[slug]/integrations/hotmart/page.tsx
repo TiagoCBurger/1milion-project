@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -67,6 +67,12 @@ export default function HotmartIntegrationPage() {
   /** Rascunho do hottok na aba Webhook (editável após conectar). */
   const [hottokDraft, setHottokDraft] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+  /** Server-synced hottok baseline; keeps refreshStatus from wiping unsaved draft edits. */
+  const lastServerHottokRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    lastServerHottokRef.current = null;
+  }, [workspaceId]);
 
   useEffect(() => {
     async function loadWs() {
@@ -92,11 +98,30 @@ export default function HotmartIntegrationPage() {
       if (!res.ok) {
         setError(data.error ?? "Não foi possível carregar o status");
         setStatus(null);
+        lastServerHottokRef.current = null;
         return;
       }
       const payload = data as StatusPayload;
       setStatus(payload);
-      setHottokDraft(payload.webhook_hottok ?? "");
+      if (!payload.connected) {
+        lastServerHottokRef.current = null;
+        setHottokDraft("");
+        return;
+      }
+      setHottokDraft((draft) => {
+        const last = lastServerHottokRef.current;
+        const next = payload.webhook_hottok ?? "";
+        const draftTrim = draft.trim();
+        const nextTrim = next.trim();
+        const lastTrim = (last ?? "").trim();
+        const hasLocalEdits =
+          last !== null && draftTrim !== lastTrim && draftTrim !== nextTrim;
+        if (hasLocalEdits) {
+          return draft;
+        }
+        lastServerHottokRef.current = next;
+        return next;
+      });
     } catch {
       setError("Erro de rede");
     } finally {
