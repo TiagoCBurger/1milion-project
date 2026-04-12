@@ -13,18 +13,17 @@ async function hotmartAuth(
   clientSecret: string,
   basicToken: string
 ): Promise<{ accessToken: string; expiresAtMs: number } | { error: string }> {
-  const body = new URLSearchParams();
-  body.set("grant_type", "client_credentials");
-  body.set("client_id", clientId);
-  body.set("client_secret", clientSecret);
+  const params = new URLSearchParams();
+  params.set("grant_type", "client_credentials");
+  params.set("client_id", clientId);
+  params.set("client_secret", clientSecret);
 
-  const res = await fetch(HOTMART_OAUTH_URL, {
+  const res = await fetch(`${HOTMART_OAUTH_URL}?${params.toString()}`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
       Authorization: `Basic ${basicToken}`,
     },
-    body: body.toString(),
   });
 
   const json = (await res.json()) as Record<string, unknown>;

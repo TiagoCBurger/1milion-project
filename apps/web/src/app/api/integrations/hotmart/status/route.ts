@@ -12,9 +12,7 @@ export async function GET(request: Request) {
 
   const { data: cred } = await guard.supabase
     .from("hotmart_credentials")
-    .select(
-      "is_active, webhook_url, webhook_hottok, webhook_confirmed_at, last_sync_at, updated_at"
-    )
+    .select("is_active, webhook_url, webhook_confirmed_at, last_sync_at, updated_at")
     .eq("workspace_id", workspaceId)
     .maybeSingle();
 
@@ -50,9 +48,8 @@ export async function GET(request: Request) {
     .eq("integration_provider", "hotmart");
 
   return Response.json({
-    connected: Boolean(cred?.is_active && cred?.webhook_hottok),
+    connected: Boolean(cred?.is_active),
     webhook_url: cred?.webhook_url ?? null,
-    webhook_hottok: cred?.webhook_hottok ?? null,
     webhook_confirmed_at: cred?.webhook_confirmed_at ?? null,
     last_sync_at: cred?.last_sync_at ?? null,
     counts: {

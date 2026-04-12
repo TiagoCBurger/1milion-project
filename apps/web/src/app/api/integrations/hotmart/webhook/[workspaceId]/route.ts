@@ -34,7 +34,11 @@ export async function POST(
     .eq("workspace_id", workspaceId)
     .maybeSingle();
 
-  if (!cred?.is_active || cred.webhook_hottok !== hottok) {
+  if (!cred?.is_active) {
+    return new Response(null, { status: 401 });
+  }
+  const stored = cred.webhook_hottok?.trim() ?? "";
+  if (stored && stored !== hottok) {
     return new Response(null, { status: 401 });
   }
 

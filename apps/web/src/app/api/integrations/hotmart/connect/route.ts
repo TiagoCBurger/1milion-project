@@ -31,21 +31,17 @@ export async function POST(request: Request) {
     client_id?: string;
     client_secret?: string;
     basic_token?: string;
-    /** Hottok shown in the Hotmart dashboard ("Hottok de verificação"); sent in webhook payloads. */
-    verification_hottok?: string;
   };
 
   const workspaceId = body.workspace_id;
   const clientId = body.client_id?.trim();
   const clientSecret = body.client_secret?.trim();
   const basicToken = body.basic_token?.trim();
-  const verificationHottok = body.verification_hottok?.trim();
 
-  if (!workspaceId || !clientId || !clientSecret || !basicToken || !verificationHottok) {
+  if (!workspaceId || !clientId || !clientSecret || !basicToken) {
     return Response.json(
       {
-        error:
-          "Preencha Client ID, Client Secret, Token Basic e o hottok de verificação copiado na Hotmart (tela \"Hottok de verificação\").",
+        error: "Preencha Client ID, Client Secret e Token Basic.",
       },
       { status: 400 }
     );
@@ -56,8 +52,11 @@ export async function POST(request: Request) {
 
   const auth = await hotmartAuth(clientId, clientSecret, basicToken);
   if ("error" in auth) {
+    console.error("[hotmart/connect] auth failed:", auth.error, auth.status);
     return Response.json(
-      { error: "Could not validate Hotmart credentials. Check Client ID, Secret, and Basic token." },
+      {
+        error: `Could not validate Hotmart credentials: ${auth.error}`,
+      },
       { status: 400 }
     );
   }
@@ -75,7 +74,7 @@ export async function POST(request: Request) {
     p_basic_token: basicToken,
     p_access_token: auth.accessToken,
     p_token_expires_at: expiresIso,
-    p_webhook_hottok: verificationHottok,
+    p_webhook_hottok: null,
     p_webhook_url: webhookUrl,
   });
 
@@ -108,7 +107,6 @@ export async function POST(request: Request) {
   return Response.json({
     success: true,
     webhook_url: webhookUrl,
-    webhook_hottok: verificationHottok,
     message:
       "Register the webhook URL in app-postback.hotmart.com. Initial import runs in the background.",
   });

@@ -20,25 +20,27 @@ function asRecord(v: unknown): Record<string, unknown> | null {
 }
 
 /**
- * Exchange client credentials for an access token (Basic + form body).
+ * Exchange client credentials for an access token.
+ * Hotmart expects grant_type, client_id, and client_secret as query parameters
+ * (not in the body), with the Basic token in the Authorization header.
+ * See: https://developers.hotmart.com/docs/en/v1/getting-started/authentication/
  */
 export async function hotmartAuth(
   clientId: string,
   clientSecret: string,
   basicToken: string
 ): Promise<HotmartAuthSuccess | HotmartError> {
-  const body = new URLSearchParams();
-  body.set("grant_type", "client_credentials");
-  body.set("client_id", clientId);
-  body.set("client_secret", clientSecret);
+  const params = new URLSearchParams();
+  params.set("grant_type", "client_credentials");
+  params.set("client_id", clientId);
+  params.set("client_secret", clientSecret);
 
-  const res = await fetch(HOTMART_OAUTH_URL, {
+  const res = await fetch(`${HOTMART_OAUTH_URL}?${params.toString()}`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
       Authorization: `Basic ${basicToken}`,
     },
-    body: body.toString(),
   });
 
   const json = (await res.json()) as unknown;

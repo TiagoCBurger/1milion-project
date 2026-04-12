@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -17,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import {
   ExternalLink,
   Loader2,
@@ -31,7 +30,6 @@ import {
 type StatusPayload = {
   connected: boolean;
   webhook_url: string | null;
-  webhook_hottok: string | null;
   webhook_confirmed_at: string | null;
   last_sync_at: string | null;
   counts: {
@@ -62,17 +60,7 @@ export default function HotmartIntegrationPage() {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [basicToken, setBasicToken] = useState("");
-  /** Hottok exibido pela Hotmart em "Hottok de verificação" — o mesmo enviado no corpo das notificações. */
-  const [verificationHottok, setVerificationHottok] = useState("");
-  /** Rascunho do hottok na aba Webhook (editável após conectar). */
-  const [hottokDraft, setHottokDraft] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
-  /** Server-synced hottok baseline; keeps refreshStatus from wiping unsaved draft edits. */
-  const lastServerHottokRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    lastServerHottokRef.current = null;
-  }, [workspaceId]);
 
   useEffect(() => {
     async function loadWs() {
@@ -98,30 +86,9 @@ export default function HotmartIntegrationPage() {
       if (!res.ok) {
         setError(data.error ?? "Não foi possível carregar o status");
         setStatus(null);
-        lastServerHottokRef.current = null;
         return;
       }
-      const payload = data as StatusPayload;
-      setStatus(payload);
-      if (!payload.connected) {
-        lastServerHottokRef.current = null;
-        setHottokDraft("");
-        return;
-      }
-      setHottokDraft((draft) => {
-        const last = lastServerHottokRef.current;
-        const next = payload.webhook_hottok ?? "";
-        const draftTrim = draft.trim();
-        const nextTrim = next.trim();
-        const lastTrim = (last ?? "").trim();
-        const hasLocalEdits =
-          last !== null && draftTrim !== lastTrim && draftTrim !== nextTrim;
-        if (hasLocalEdits) {
-          return draft;
-        }
-        lastServerHottokRef.current = next;
-        return next;
-      });
+      setStatus(data as StatusPayload);
     } catch {
       setError("Erro de rede");
     } finally {
@@ -147,7 +114,6 @@ export default function HotmartIntegrationPage() {
           client_id: clientId,
           client_secret: clientSecret,
           basic_token: basicToken,
-          verification_hottok: verificationHottok,
         }),
       });
       const data = await res.json();
@@ -157,7 +123,6 @@ export default function HotmartIntegrationPage() {
       }
       setClientSecret("");
       setBasicToken("");
-      setVerificationHottok("");
       await refreshStatus();
     } catch {
       setError("Erro de rede");
@@ -179,37 +144,6 @@ export default function HotmartIntegrationPage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Falha na sincronização");
-        return;
-      }
-      await refreshStatus();
-    } catch {
-      setError("Erro de rede");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function handleSaveVerificationHottok() {
-    if (!workspaceId) return;
-    const trimmed = hottokDraft.trim();
-    if (!trimmed) {
-      setError("Cole o hottok de verificação da Hotmart.");
-      return;
-    }
-    setBusy("hottok");
-    setError("");
-    try {
-      const res = await fetch("/api/integrations/hotmart/verification-hottok", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workspace_id: workspaceId,
-          verification_hottok: trimmed,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Falha ao salvar o hottok");
         return;
       }
       await refreshStatus();
@@ -257,8 +191,6 @@ export default function HotmartIntegrationPage() {
   }
 
   const connected = status?.connected;
-  const hottokDirty =
-    (status?.webhook_hottok ?? "").trim() !== hottokDraft.trim();
 
   return (
     <>
@@ -324,8 +256,9 @@ export default function HotmartIntegrationPage() {
               Como conectar a Hotmart
             </CardTitle>
             <CardDescription>
-              Fluxo em três partes: credenciais de API no portal da Hotmart, conexão aqui no painel e
-              cadastro manual do postback (a Hotmart não oferece API para criar webhooks).
+              Credenciais de API no portal da Hotmart, conexão aqui e cadastro manual da URL do postback
+              no painel da Hotmart (sem API para criar webhooks). O hottok de verificação fica só na
+              Hotmart.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5 text-sm leading-relaxed text-foreground">
@@ -369,37 +302,18 @@ export default function HotmartIntegrationPage() {
                 </p>
               </li>
               <li>
-                <span className="font-medium text-foreground">
-                  Copiar o hottok de verificação na Hotmart
-                </span>
-                <p className="mt-1 text-muted-foreground">
-                  No painel da Hotmart, abra a tela{" "}
-                  <strong className="font-medium text-foreground">Hottok de verificação</strong>. O
-                  token exibido lá é{" "}
-                  <strong className="font-medium text-foreground">fornecido pela Hotmart</strong> — não
-                  invente nem gere outro valor aqui. Use o botão de copiar e guarde o token com
-                  cuidado; é o mesmo que a Hotmart inclui no campo{" "}
-                  <code className="rounded bg-muted px-1 text-xs">hottok</code> de cada notificação de
-                  postback.
-                </p>
-              </li>
-              <li>
                 <span className="font-medium text-foreground">Conectar neste painel</span>
                 <p className="mt-1 text-muted-foreground">
                   {connected ? (
                     <>
-                      As credenciais e o hottok já estão salvos neste espaço.                       Se a Hotmart gerar um novo hottok, atualize na aba{" "}
-                      <strong className="font-medium text-foreground">Webhook</strong> sem
-                      desconectar. Para trocar de conta de produtor, desconecte e conecte de novo.
+                      As credenciais de API já estão salvas neste espaço. Para trocar de conta de
+                      produtor, desconecte e conecte de novo.
                     </>
                   ) : (
                     <>
-                      Cole as credenciais de API e o{" "}
-                      <strong className="font-medium text-foreground">hottok de verificação</strong>{" "}
-                      no formulário abaixo e clique em{" "}
-                      <strong className="font-medium text-foreground">Conectar</strong>. Validamos
-                      as chaves com a Hotmart e guardamos o hottok para conferir cada webhook.
-                      Em seguida iniciamos a{" "}
+                      Cole as credenciais de API no formulário abaixo e clique em{" "}
+                      <strong className="font-medium text-foreground">Conectar</strong>. Validamos as
+                      chaves com a Hotmart e iniciamos a{" "}
                       <strong className="font-medium text-foreground">importação inicial</strong> em
                       segundo plano (produtos, vendas, clientes e estornos).
                     </>
@@ -424,10 +338,9 @@ export default function HotmartIntegrationPage() {
                     app-postback.hotmart.com
                     <ExternalLink className="h-3 w-3" />
                   </a>
-                  , cadastre essa URL. O hottok continua sendo o da Hotmart: nós já o temos do passo
-                  anterior e comparamos com o{" "}
-                  <code className="rounded bg-muted px-1 text-xs">hottok</code> enviado em cada POST.
-                  Quando o primeiro evento válido chegar, o status passa a mostrar que os eventos estão
+                  , cadastre essa URL e configure o hottok de verificação{" "}
+                  <strong className="font-medium text-foreground">somente no painel da Hotmart</strong>
+                  . Quando o primeiro evento válido chegar, o status passa a mostrar que os eventos estão
                   sendo recebidos.
                 </p>
               </li>
@@ -457,9 +370,8 @@ export default function HotmartIntegrationPage() {
                 >
                   developers.hotmart.com
                   <ExternalLink className="h-3 w-3" />
-                </a>{" "}
-                e o <strong className="font-medium text-foreground">hottok de verificação</strong> na
-                tela homônima da Hotmart (copie o valor exibido por eles, não gere outro).
+                </a>
+                .
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -495,22 +407,6 @@ export default function HotmartIntegrationPage() {
                     autoComplete="off"
                     required
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hm-hottok">Hottok de verificação (Hotmart)</Label>
-                  <Input
-                    id="hm-hottok"
-                    type="password"
-                    value={verificationHottok}
-                    onChange={(e) => setVerificationHottok(e.target.value)}
-                    autoComplete="off"
-                    placeholder='Cole o token da tela "Hottok de verificação"'
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Esse valor vem do painel da Hotmart (botão copiar). É o mesmo enviado no campo{" "}
-                    <code className="rounded bg-muted px-1">hottok</code> das notificações.
-                  </p>
                 </div>
                 <Button type="submit" disabled={busy === "connect" || !workspaceId}>
                   {busy === "connect" ? (
@@ -636,14 +532,11 @@ export default function HotmartIntegrationPage() {
                       app-postback.hotmart.com
                       <ExternalLink className="h-3 w-3" />
                     </a>
-                    , cadastre a URL abaixo. O{" "}
-                    <code className="rounded bg-muted px-1 text-xs">hottok</code> nas notificações é
-                    o da Hotmart. Você pode colar ou atualizar o valor abaixo quando a Hotmart gerar
-                    um novo token; ao salvar, revalidamos os próximos POSTs e o aviso de confirmação
-                    é zerado até o próximo evento válido.
+                    , cadastre a URL abaixo. O hottok de verificação fica só no painel da Hotmart (não
+                    é necessário colá-lo aqui).
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent>
                   <div className="space-y-2">
                     <Label>URL do webhook</Label>
                     <div className="flex gap-2">
@@ -667,63 +560,6 @@ export default function HotmartIntegrationPage() {
                         )}
                       </Button>
                     </div>
-                  </div>
-                  <Separator />
-                  <div className="space-y-3">
-                    <Label htmlFor="hm-hottok-edit">Hottok de verificação (Hotmart)</Label>
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                      <Input
-                        id="hm-hottok-edit"
-                        type="password"
-                        autoComplete="off"
-                        value={hottokDraft}
-                        onChange={(e) => setHottokDraft(e.target.value)}
-                        placeholder='Cole o token da tela "Hottok de verificação"'
-                        className="font-mono text-sm sm:flex-1"
-                      />
-                      <div className="flex shrink-0 gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="shrink-0"
-                          onClick={() =>
-                            hottokDraft.trim() && void copyField("tok-draft", hottokDraft.trim())
-                          }
-                          disabled={!hottokDraft.trim()}
-                          title="Copiar"
-                        >
-                          {copied === "tok-draft" ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={() => void handleSaveVerificationHottok()}
-                          disabled={
-                            busy === "hottok" ||
-                            !hottokDraft.trim() ||
-                            !hottokDirty
-                          }
-                          className="sm:min-w-[7rem]"
-                        >
-                          {busy === "hottok" ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Salvando…
-                            </>
-                          ) : (
-                            "Salvar hottok"
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Deve ser exatamente o valor exibido pela Hotmart. Se alterar na Hotmart,
-                      atualize aqui também.
-                    </p>
                   </div>
                 </CardContent>
               </Card>
