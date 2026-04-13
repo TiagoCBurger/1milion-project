@@ -6,8 +6,8 @@ describe("isAccountAllowed", () => {
     expect(isAccountAllowed("act_123", undefined)).toBe(true);
   });
 
-  it("returns true when allowedAccounts is empty array", () => {
-    expect(isAccountAllowed("act_123", [])).toBe(true);
+  it("returns false when allowedAccounts is empty array", () => {
+    expect(isAccountAllowed("act_123", [])).toBe(false);
   });
 
   it("returns true when account is in the allowed list", () => {

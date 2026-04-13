@@ -233,7 +233,7 @@ describe("Allowed Accounts Enforcement", () => {
     }
   });
 
-  it("all BLOCK tools allow access when allowedAccounts is empty array", async () => {
+  it("all BLOCK tools deny access when allowedAccounts is empty array", async () => {
     for (const toolName of TOOLS_THAT_BLOCK) {
       vi.clearAllMocks();
       const capture = createToolCapture();
@@ -253,8 +253,8 @@ describe("Allowed Accounts Enforcement", () => {
       const text = (result as any).content?.[0]?.text ?? "";
       expect(
         text,
-        `${toolName} should not block when allowedAccounts is empty`,
-      ).not.toContain("Access denied");
+        `${toolName} should block when allowedAccounts is empty`,
+      ).toContain("Access denied");
     }
   });
 

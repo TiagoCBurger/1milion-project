@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 
+function normMetaId(id: string): string {
+  return id.replace(/^act_/, "");
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string; accountId: string }> }
@@ -58,6 +62,17 @@ export async function PATCH(
     }
   }
 
+  const { data: accMeta } = await supabase
+    .from("ad_accounts")
+    .select("meta_account_id")
+    .eq("id", accountId)
+    .eq("workspace_id", workspaceId)
+    .single();
+
+  if (!accMeta) {
+    return Response.json({ error: "Account not found" }, { status: 404 });
+  }
+
   const { data, error } = await supabase
     .from("ad_accounts")
     .update({ is_enabled })
@@ -68,6 +83,26 @@ export async function PATCH(
 
   if (error || !data) {
     return Response.json({ error: "Account not found" }, { status: 404 });
+  }
+
+  if (!is_enabled && accMeta.meta_account_id) {
+    const disabledNorm = normMetaId(accMeta.meta_account_id);
+    const { data: connections } = await supabase
+      .from("oauth_connections")
+      .select("id, allowed_accounts")
+      .eq("workspace_id", workspaceId);
+
+    for (const conn of connections ?? []) {
+      const prev = conn.allowed_accounts ?? [];
+      const next = prev.filter((x) => normMetaId(x) !== disabledNorm);
+      if (next.length !== prev.length) {
+        await supabase
+          .from("oauth_connections")
+          .update({ allowed_accounts: next })
+          .eq("id", conn.id)
+          .eq("workspace_id", workspaceId);
+      }
+    }
   }
 
   return Response.json(data);

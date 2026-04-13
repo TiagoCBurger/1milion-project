@@ -183,11 +183,18 @@ describe("PATCH /api/workspaces/[id]/ad-accounts/[accountId]/toggle", () => {
     mockFrom.mockImplementation(() => {
       callCount.n++;
       if (callCount.n === 1) {
-        // membership check
         return mockQueryChain({ data: { role: "admin" }, error: null });
       }
-      // toggle update
-      return mockQueryChain({ data: { id: "acc-1", is_enabled: false }, error: null });
+      if (callCount.n === 2) {
+        return mockQueryChain({
+          data: { meta_account_id: "act_999" },
+          error: null,
+        });
+      }
+      if (callCount.n === 3) {
+        return mockQueryChain({ data: { id: "acc-1", is_enabled: false }, error: null });
+      }
+      return mockQueryChain({ data: [], error: null });
     });
 
     const res = await handler.PATCH(

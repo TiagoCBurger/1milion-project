@@ -17,19 +17,31 @@ describe("validateApiKey", () => {
   });
 
   it("returns workspace context for valid API key", async () => {
-    (globalThis.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => [
-        {
-          workspace_id: "ws-1",
-          api_key_id: "key-1",
-          tier: "pro",
-          requests_per_hour: 200,
-          requests_per_day: 1000,
-          max_mcp_connections: 3,
-          enable_meta_mutations: true,
-        },
-      ],
+    (globalThis.fetch as any).mockImplementation(async (url: string) => {
+      if (url.includes("rpc/validate_api_key")) {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              workspace_id: "ws-1",
+              api_key_id: "key-1",
+              tier: "pro",
+              requests_per_hour: 200,
+              requests_per_day: 1000,
+              max_mcp_connections: 3,
+              max_ad_accounts: 2,
+              enable_meta_mutations: true,
+            },
+          ],
+        };
+      }
+      if (url.includes("/rest/v1/ad_accounts?")) {
+        return {
+          ok: true,
+          json: async () => [{ meta_account_id: "act_workspace_1" }],
+        };
+      }
+      return { ok: false, json: async () => [] };
     });
 
     const result = await validateApiKey("mads_test123", env);
@@ -43,7 +55,9 @@ describe("validateApiKey", () => {
         requestsPerHour: 200,
         requestsPerDay: 1000,
         maxMcpConnections: 3,
+        maxAdAccounts: 2,
         enableMetaMutations: true,
+        allowedAccounts: ["act_workspace_1"],
       },
     });
   });
@@ -73,30 +87,40 @@ describe("validateApiKey", () => {
   });
 
   it("returns cached result on second call", async () => {
-    (globalThis.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => [
-        {
-          workspace_id: "ws-1",
-          api_key_id: "key-1",
-          tier: "free",
-          requests_per_hour: 20,
-          requests_per_day: 20,
-          max_mcp_connections: 1,
-          enable_meta_mutations: false,
-        },
-      ],
+    (globalThis.fetch as any).mockImplementation(async (url: string) => {
+      if (url.includes("rpc/validate_api_key")) {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              workspace_id: "ws-1",
+              api_key_id: "key-1",
+              tier: "free",
+              requests_per_hour: 20,
+              requests_per_day: 20,
+              max_mcp_connections: 1,
+              max_ad_accounts: 0,
+              enable_meta_mutations: false,
+            },
+          ],
+        };
+      }
+      if (url.includes("/rest/v1/ad_accounts?")) {
+        return {
+          ok: true,
+          json: async () => [{ meta_account_id: "act_cached" }],
+        };
+      }
+      return { ok: false, json: async () => [] };
     });
 
-    // First call: hits Supabase
     const result1 = await validateApiKey("mads_cached", env);
     expect(result1.ok).toBe(true);
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
 
-    // Second call: should get from KV cache
     const result2 = await validateApiKey("mads_cached", env);
     expect(result2).toEqual(result1);
-    // fetch is not called again because KV.get returned the cached value
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
   });
 
   it("calls Supabase RPC with correct params", async () => {

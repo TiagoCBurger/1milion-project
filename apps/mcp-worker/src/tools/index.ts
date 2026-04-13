@@ -24,14 +24,16 @@ export interface ToolContext {
 
 /**
  * Checks if an account ID is in the allowed list.
- * If allowedAccounts is undefined or empty, all accounts are allowed.
+ * - undefined: no list supplied (tests / legacy) → allow any account.
+ * - empty array: workspace has no enabled accounts (or MCP has none) → deny.
  * Handles both "act_123" and "123" formats.
  */
 export function isAccountAllowed(
   accountId: string,
   allowedAccounts?: string[]
 ): boolean {
-  if (!allowedAccounts || allowedAccounts.length === 0) return true;
+  if (allowedAccounts === undefined) return true;
+  if (allowedAccounts.length === 0) return false;
   const raw = accountId.replace(/^act_/, "");
   return allowedAccounts.some((a) => a.replace(/^act_/, "") === raw);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,29 @@ interface ConnectionManagerProps {
   canManage: boolean;
 }
 
+function normMetaId(id: string): string {
+  return id.replace(/^act_/, "");
+}
+
+function workspaceIds(adAccounts: AdAccount[]): string[] {
+  return adAccounts.map((a) => a.meta_account_id);
+}
+
+/** Persisted payload: [] means “all workspace-enabled accounts” for this client. */
+function buildAllowedPayload(working: string[], wsIds: string[]): string[] {
+  const wsNorm = new Set(wsIds.map(normMetaId));
+  const filtered = working.filter((id) => wsNorm.has(normMetaId(id)));
+  const wsSorted = [...wsIds].map(normMetaId).sort();
+  const filSorted = [...filtered].map(normMetaId).sort();
+  if (
+    wsSorted.length === filSorted.length &&
+    wsSorted.every((v, i) => v === filSorted[i])
+  ) {
+    return [];
+  }
+  return filtered;
+}
+
 export function ConnectionManager({
   workspaceId,
   connection,
@@ -39,17 +62,31 @@ export function ConnectionManager({
   canManage,
 }: ConnectionManagerProps) {
   const [expanded, setExpanded] = useState(false);
-  const [allowed, setAllowed] = useState<string[]>(connection.allowed_accounts);
+  const [allowed, setAllowed] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const router = useRouter();
 
-  const hasChanges =
-    JSON.stringify([...allowed].sort()) !==
-    JSON.stringify([...connection.allowed_accounts].sort());
+  const accountKey = useMemo(() => adAccounts.map((a) => a.id).join(","), [adAccounts]);
 
-  const allAllowed = allowed.length === 0;
+  useEffect(() => {
+    const ids = workspaceIds(adAccounts);
+    const stored = connection.allowed_accounts;
+    if (stored.length === 0) {
+      setAllowed(ids);
+    } else {
+      const wsNorm = new Set(ids.map(normMetaId));
+      setAllowed(stored.filter((s) => wsNorm.has(normMetaId(s))));
+    }
+  }, [connection.id, connection.allowed_accounts, accountKey]);
+
+  const payload = buildAllowedPayload(allowed, workspaceIds(adAccounts));
+  const hasChanges =
+    JSON.stringify([...connection.allowed_accounts].sort()) !==
+    JSON.stringify([...payload].sort());
+
+  const inheritWorkspace = connection.allowed_accounts.length === 0;
   const displayName = connection.client_name || connection.client_id;
 
   async function handleSave() {
@@ -60,7 +97,7 @@ export function ConnectionManager({
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ allowed_accounts: allowed }),
+          body: JSON.stringify({ allowed_accounts: payload }),
         }
       );
       if (res.ok) router.refresh();
@@ -84,37 +121,35 @@ export function ConnectionManager({
   }
 
   function toggleAccount(metaAccountId: string) {
-    setAllowed((prev) =>
-      prev.includes(metaAccountId)
+    setAllowed((prev) => {
+      const next = prev.includes(metaAccountId)
         ? prev.filter((a) => a !== metaAccountId)
-        : [...prev, metaAccountId]
-    );
+        : [...prev, metaAccountId];
+      if (adAccounts.length > 0 && next.length === 0) return prev;
+      return next;
+    });
   }
 
-  function toggleAll() {
-    if (allowed.length === adAccounts.length) {
-      setAllowed([]);
-    } else {
-      setAllowed(adAccounts.map((a) => a.meta_account_id));
-    }
+  function selectAllWorkspaceAccounts() {
+    setAllowed(workspaceIds(adAccounts));
+  }
+
+  if (!connection.is_active) {
+    return null;
   }
 
   return (
-    <Card className={!connection.is_active ? "opacity-60" : ""}>
+    <Card>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3 min-w-0">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-              connection.is_active ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
-            }`}>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
               <Cable className="h-5 w-5" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-semibold truncate">{displayName}</h3>
-                <Badge variant={connection.is_active ? "success" : "destructive"}>
-                  {connection.is_active ? "Active" : "Revoked"}
-                </Badge>
+                <Badge variant="success">Active</Badge>
               </div>
               <p className="text-xs text-muted-foreground font-mono mt-0.5 truncate">
                 Client ID: {connection.client_id}
@@ -136,15 +171,17 @@ export function ConnectionManager({
                 )}
                 <span className="flex items-center gap-1">
                   <Shield className="h-3 w-3" />
-                  {allAllowed
-                    ? "All ad accounts"
-                    : `${allowed.length} of ${adAccounts.length} accounts`}
+                  {adAccounts.length === 0
+                    ? "Nenhuma conta habilitada no espaço"
+                    : inheritWorkspace && payload.length === 0
+                      ? `Todas as contas do espaço (${adAccounts.length})`
+                      : `${payload.length || allowed.length} conta(s) para este cliente`}
                 </span>
               </div>
             </div>
           </div>
 
-          {connection.is_active && canManage && (
+          {canManage && (
             <Button
               variant="outline"
               size="sm"
@@ -152,32 +189,31 @@ export function ConnectionManager({
               className="shrink-0"
             >
               {expanded ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
-              {expanded ? "Close" : "Manage"}
+              {expanded ? "Fechar" : "Gerenciar"}
             </Button>
           )}
         </div>
       </CardHeader>
 
-      {/* Expanded management panel */}
-      {expanded && connection.is_active && canManage && (
+      {expanded && canManage && (
         <CardContent className="border-t border-border/30 pt-4 space-y-4">
-          {/* Ad account permissions */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h4 className="text-sm font-medium">Ad Account Permissions</h4>
+                <h4 className="text-sm font-medium">Contas de anúncio (MCP)</h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Choose which ad accounts this client can access. Uncheck all to allow access to every account.
+                  Somente contas habilitadas no espaço aparecem aqui. A seleção restringe este cliente
+                  além do que já está ativo em Integrações → Meta.
                 </p>
               </div>
-              <Button variant="link" size="sm" onClick={toggleAll} className="h-auto p-0 text-xs">
-                {allowed.length === adAccounts.length ? "Clear all" : "Select all"}
+              <Button variant="link" size="sm" onClick={selectAllWorkspaceAccounts} className="h-auto p-0 text-xs">
+                Selecionar todas do espaço
               </Button>
             </div>
 
             {adAccounts.length === 0 ? (
               <p className="text-sm text-muted-foreground py-2">
-                No ad accounts found in this workspace.
+                Habilite ao menos uma conta de anúncio em Integrações → Meta para conceder acesso MCP.
               </p>
             ) : (
               <div className="rounded-xl bg-secondary/40 divide-y divide-border/30 max-h-64 overflow-y-auto">
@@ -206,17 +242,16 @@ export function ConnectionManager({
               <div className="flex justify-end pt-2">
                 <Button onClick={handleSave} disabled={saving} size="sm">
                   <Save className="h-4 w-4 mr-1" />
-                  {saving ? "Saving..." : "Save permissions"}
+                  {saving ? "Salvando…" : "Salvar permissões"}
                 </Button>
               </div>
             )}
           </div>
 
-          {/* Danger zone */}
           <div className="border-t border-border/30 pt-4">
-            <h4 className="text-sm font-medium text-destructive mb-1">Danger Zone</h4>
+            <h4 className="text-sm font-medium text-destructive mb-1">Zona de risco</h4>
             <p className="text-xs text-muted-foreground mb-3">
-              Revoking a connection will immediately block this client from accessing your workspace. This cannot be undone — the client will need to re-authorize.
+              Revogar bloqueia este cliente imediatamente. Será necessário autorizar de novo.
             </p>
 
             {confirmRevoke ? (
@@ -228,7 +263,7 @@ export function ConnectionManager({
                   size="sm"
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
-                  {revoking ? "Revoking..." : "Confirm revoke"}
+                  {revoking ? "Revogando…" : "Confirmar revogação"}
                 </Button>
                 <Button
                   onClick={() => setConfirmRevoke(false)}
@@ -236,7 +271,7 @@ export function ConnectionManager({
                   variant="outline"
                   size="sm"
                 >
-                  Cancel
+                  Cancelar
                 </Button>
               </div>
             ) : (
@@ -247,18 +282,17 @@ export function ConnectionManager({
                 className="text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
-                Revoke connection
+                Revogar conexão
               </Button>
             )}
           </div>
         </CardContent>
       )}
 
-      {/* Read-only info for non-managers */}
-      {!canManage && connection.is_active && (
+      {!canManage && (
         <CardContent className="pt-0">
           <p className="text-xs text-muted-foreground">
-            Contact a workspace owner or admin to manage this connection.
+            Peça a um proprietário ou administrador para gerenciar esta conexão.
           </p>
         </CardContent>
       )}

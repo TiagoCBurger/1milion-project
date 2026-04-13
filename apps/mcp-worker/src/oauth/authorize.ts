@@ -87,7 +87,17 @@ export async function handleAuthorize(
   );
 
   // Redirect to web app consent page (client_id lets the web app enforce plan limits before approve)
-  const consentUrl = new URL(`${env.WEB_APP_URL}/oauth/authorize`);
+  const webBase = env.WEB_APP_URL?.replace(/\/$/, "").trim();
+  if (!webBase) {
+    return new Response(
+      JSON.stringify({
+        error: "server_error",
+        error_description: "WEB_APP_URL is not configured on the MCP worker.",
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+  const consentUrl = new URL(`${webBase}/oauth/authorize`);
   consentUrl.searchParams.set("request_id", requestId);
   consentUrl.searchParams.set("client_id", clientId);
   consentUrl.searchParams.set("client_name", client.client_name || clientId);
@@ -174,13 +184,19 @@ export async function handleOAuthCallback(
   );
 
   // Redirect back to client with auth code
-  const redirectUrl = new URL(authRequest.redirect_uri);
-  redirectUrl.searchParams.set("code", code);
-  if (authRequest.state) {
-    redirectUrl.searchParams.set("state", authRequest.state);
+  try {
+    const redirectUrl = new URL(authRequest.redirect_uri);
+    redirectUrl.searchParams.set("code", code);
+    if (authRequest.state) {
+      redirectUrl.searchParams.set("state", authRequest.state);
+    }
+    return Response.redirect(redirectUrl.toString(), 302);
+  } catch {
+    return oauthCallbackErrorPage(
+      "Invalid redirect",
+      "The registered redirect URI is not a valid URL. Re-register the MCP client or fix redirect_uris."
+    );
   }
-
-  return Response.redirect(redirectUrl.toString(), 302);
 }
 
 function oauthCallbackErrorPage(title: string, detail: string): Response {
@@ -234,10 +250,19 @@ function errorRedirect(
     );
   }
 
-  const url = new URL(redirectUri);
-  url.searchParams.set("error", error);
-  url.searchParams.set("error_description", description);
-  if (state) url.searchParams.set("state", state);
-
-  return Response.redirect(url.toString(), 302);
+  try {
+    const url = new URL(redirectUri);
+    url.searchParams.set("error", error);
+    url.searchParams.set("error_description", description);
+    if (state) url.searchParams.set("state", state);
+    return Response.redirect(url.toString(), 302);
+  } catch {
+    return new Response(
+      JSON.stringify({ error, error_description: description }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
 }

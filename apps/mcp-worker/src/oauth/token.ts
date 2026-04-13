@@ -269,11 +269,15 @@ async function authenticateClient(
   // Try HTTP Basic auth first
   const authHeader = request.headers.get("Authorization");
   if (authHeader?.startsWith("Basic ")) {
-    const decoded = atob(authHeader.slice(6));
-    const colonIndex = decoded.indexOf(":");
-    if (colonIndex > 0) {
-      clientId = decodeURIComponent(decoded.slice(0, colonIndex));
-      clientSecret = decodeURIComponent(decoded.slice(colonIndex + 1));
+    try {
+      const decoded = atob(authHeader.slice(6));
+      const colonIndex = decoded.indexOf(":");
+      if (colonIndex > 0) {
+        clientId = decodeURIComponent(decoded.slice(0, colonIndex));
+        clientSecret = decodeURIComponent(decoded.slice(colonIndex + 1));
+      }
+    } catch {
+      // Malformed Basic header — fall through to body params
     }
   }
 

@@ -15,6 +15,34 @@ export default {
     env: Env,
     ctx: ExecutionContext
   ): Promise<Response> {
+    try {
+      return await handleFetch(request, env, ctx);
+    } catch (err) {
+      console.error("[mcp-worker] unhandled:", err);
+      const message =
+        err instanceof Error ? err.message : "Internal server error";
+      return new Response(
+        JSON.stringify({
+          error: "server_error",
+          error_description: message,
+        }),
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+  },
+};
+
+async function handleFetch(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext
+): Promise<Response> {
     const url = new URL(request.url);
 
     // -------------------------------------------------------
@@ -154,8 +182,7 @@ export default {
     corsResponse.headers.set("Access-Control-Allow-Origin", "*");
     corsResponse.headers.set("X-Response-Time", `${responseTime}ms`);
     return corsResponse;
-  },
-};
+}
 
 // ============================================================
 // MCP Server builder (new instance per request)

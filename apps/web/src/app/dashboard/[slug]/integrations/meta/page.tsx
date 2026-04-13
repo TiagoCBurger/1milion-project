@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight, Check, Copy } from "lucide-react";
+import { ChevronRight, Check, Copy, Link2, LogOut } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { IntegrationsTopNav } from "@/components/dashboard/integrations-top-nav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { MetaWorkspaceAdAccounts } from "./meta-workspace-ad-accounts";
 
 export default function MetaIntegrationPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -17,6 +18,10 @@ export default function MetaIntegrationPage() {
   const supabase = createClient();
 
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [metaConnected, setMetaConnected] = useState(false);
+  const [canManageMeta, setCanManageMeta] = useState(false);
+  const [connectionLoaded, setConnectionLoaded] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,12 +41,41 @@ export default function MetaIntegrationPage() {
 
   useEffect(() => {
     async function loadWorkspace() {
-      const { data } = await supabase
+      setConnectionLoaded(false);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const { data: ws } = await supabase
         .from("workspaces")
         .select("id")
         .eq("slug", slug)
-        .single();
-      if (data) setWorkspaceId(data.id);
+        .maybeSingle();
+      if (!ws) {
+        setWorkspaceId(null);
+        setMetaConnected(false);
+        setCanManageMeta(false);
+        setConnectionLoaded(true);
+        return;
+      }
+      setWorkspaceId(ws.id);
+      if (user) {
+        const { data: membership } = await supabase
+          .from("memberships")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("workspace_id", ws.id)
+          .maybeSingle();
+        setCanManageMeta(membership?.role === "owner" || membership?.role === "admin");
+      } else {
+        setCanManageMeta(false);
+      }
+      const { data: metaTok } = await supabase
+        .from("meta_tokens")
+        .select("is_valid")
+        .eq("workspace_id", ws.id)
+        .maybeSingle();
+      setMetaConnected(metaTok?.is_valid === true);
+      setConnectionLoaded(true);
     }
     loadWorkspace();
   }, [slug, supabase]);
@@ -86,6 +120,36 @@ export default function MetaIntegrationPage() {
     window.location.href = `/api/auth/facebook?workspace_id=${workspaceId}&slug=${slug}`;
   }
 
+  async function handleDisconnect() {
+    if (!workspaceId || !canManageMeta) return;
+    if (
+      !window.confirm(
+        "Desconectar a conta Facebook deste espaço? Será necessário conectar de novo para usar dados de anúncios."
+      )
+    ) {
+      return;
+    }
+    setDisconnecting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/disconnect`, { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(data.error || "Não foi possível desconectar");
+        return;
+      }
+      setMetaConnected(false);
+      setManualSuccess(null);
+      if (oauthSuccess) {
+        router.replace(`/dashboard/${slug}/integrations/meta`);
+      }
+    } catch {
+      setError("Erro de rede");
+    } finally {
+      setDisconnecting(false);
+    }
+  }
+
   async function copyToClipboard(text: string) {
     await navigator.clipboard.writeText(text);
     setCopied(true);
@@ -95,6 +159,25 @@ export default function MetaIntegrationPage() {
   const successData = oauthSuccess
     ? { meta_user_name: oauthName || "—", api_key: oauthApiKey || undefined }
     : manualSuccess;
+
+  if (!successData && !connectionLoaded) {
+    return (
+      <>
+        <PageHeader
+          breadcrumbs={[
+            { label: "Espaços de trabalho", href: "/dashboard" },
+            { label: slug, href: `/dashboard/${slug}` },
+            { label: "Integrações", href: `/dashboard/${slug}/integrations` },
+            { label: "Meta Ads" },
+          ]}
+        />
+        <IntegrationsTopNav slug={slug} active="meta" />
+        <div className="mx-auto max-w-xl p-6">
+          <p className="text-sm text-muted-foreground">Carregando…</p>
+        </div>
+      </>
+    );
+  }
 
   if (successData) {
     return (
@@ -156,7 +239,88 @@ export default function MetaIntegrationPage() {
                 </Button>
               </CardContent>
             )}
+            {canManageMeta && (
+              <CardContent className="border-t pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  disabled={disconnecting}
+                  onClick={handleDisconnect}
+                >
+                  <LogOut className="h-4 w-4" />
+                  {disconnecting ? "Desconectando…" : "Desconectar Facebook"}
+                </Button>
+              </CardContent>
+            )}
           </Card>
+        </div>
+      </>
+    );
+  }
+
+  if (metaConnected && connectionLoaded) {
+    return (
+      <>
+        <PageHeader
+          breadcrumbs={[
+            { label: "Espaços de trabalho", href: "/dashboard" },
+            { label: slug, href: `/dashboard/${slug}` },
+            { label: "Integrações", href: `/dashboard/${slug}/integrations` },
+            { label: "Meta Ads" },
+          ]}
+        />
+        <IntegrationsTopNav slug={slug} active="meta" />
+        <div className="mx-auto max-w-xl p-6">
+          <h1 className="mb-1 text-2xl font-semibold tracking-tight">Conta Facebook conectada</h1>
+          <p className="mb-6 text-muted-foreground">
+            Este espaço está vinculado à Meta. Você pode desconectar para revogar o acesso neste
+            produto ou trocar de conta.
+          </p>
+          {(oauthError || error) && (
+            <div className="mb-6 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              {oauthError ? errorMessages[oauthError] || "Ocorreu um erro. Tente novamente." : error}
+            </div>
+          )}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/35 bg-primary/20 dark:border-primary/45 dark:bg-primary/25">
+                  <Link2 className="h-4 w-4 text-foreground" />
+                </div>
+                <CardTitle className="text-base">Integração ativa</CardTitle>
+              </div>
+              <CardDescription>
+                Para atualizar permissões, desconecte e inicie o fluxo &quot;Continuar com
+                Facebook&quot; de novo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {canManageMeta ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  disabled={disconnecting}
+                  onClick={handleDisconnect}
+                >
+                  <LogOut className="h-4 w-4" />
+                  {disconnecting ? "Desconectando…" : "Desconectar Facebook"}
+                </Button>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Somente proprietários ou administradores podem desconectar a conta Facebook.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          {workspaceId ? (
+            <MetaWorkspaceAdAccounts
+              workspaceId={workspaceId}
+              slug={slug}
+              canManage={canManageMeta}
+            />
+          ) : null}
         </div>
       </>
     );

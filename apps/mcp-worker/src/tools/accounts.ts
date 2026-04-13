@@ -78,8 +78,7 @@ export function registerAccountsTools(ctx: ToolContext): void {
 
       let accounts = ((data as any).data ?? []) as AdAccount[];
 
-      // Filter by allowed accounts if restricted
-      if (allowedAccounts && allowedAccounts.length > 0) {
+      if (allowedAccounts !== undefined) {
         accounts = accounts.filter((acc) => {
           const id = (acc.account_id as string) || (acc.id as string) || "";
           return isAccountAllowed(id, allowedAccounts);

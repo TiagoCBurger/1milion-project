@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Cable, Megaphone, ShoppingBag, Sparkles, ChevronRight } from "lucide-react";
+import { Cable, LineChart, Megaphone, ShoppingBag, Sparkles, ChevronRight } from "lucide-react";
 import { SuggestIntegrationButton } from "./integration-request-form";
 
 export default async function IntegrationsHubPage({
@@ -129,6 +129,32 @@ export default async function IntegrationsHubPage({
               </Button>
             </CardContent>
           </Card>
+
+          <Card className="relative overflow-hidden border-border/80">
+            <CardHeader>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                  <LineChart className="h-5 w-5" />
+                </div>
+                <Badge variant="secondary" className="shrink-0">
+                  Em breve
+                </Badge>
+              </div>
+              <CardTitle className="text-lg">Google</CardTitle>
+              <CardDescription>
+                Em breve: conexão com Google Ads e ferramentas do ecossistema Google para campanhas,
+                métricas e relatórios neste espaço.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              <Button asChild variant="outline">
+                <Link href={`/dashboard/${slug}/integrations/google`}>
+                  Saiba mais
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         <section className="space-y-3">
@@ -146,7 +172,7 @@ export default async function IntegrationsHubPage({
               <CardTitle className="text-lg">Ferramentas de IA</CardTitle>
               <CardDescription>
                 Conecte Claude, Cursor, ChatGPT e outros clientes via Model Context Protocol (MCP).
-                Gere chaves de API, gerencie OAuth e veja quais apps acessam este espaço.
+                Use OAuth e veja quais apps acessam este espaço.
               </CardDescription>
             </CardHeader>
             <CardContent>

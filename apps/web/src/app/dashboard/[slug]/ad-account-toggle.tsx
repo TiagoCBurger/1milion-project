@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Switch } from "@/components/ui/switch";
 
@@ -8,12 +8,17 @@ interface Props {
   workspaceId: string;
   accountId: string;
   enabled: boolean;
+  onApplied?: (isEnabled: boolean) => void;
 }
 
-export function AdAccountToggle({ workspaceId, accountId, enabled }: Props) {
+export function AdAccountToggle({ workspaceId, accountId, enabled, onApplied }: Props) {
   const [isEnabled, setIsEnabled] = useState(enabled);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setIsEnabled(enabled);
+  }, [enabled]);
 
   async function handleToggle() {
     setLoading(true);
@@ -29,6 +34,7 @@ export function AdAccountToggle({ workspaceId, accountId, enabled }: Props) {
       );
       if (res.ok) {
         setIsEnabled(next);
+        onApplied?.(next);
         router.refresh();
       }
     } catch {
@@ -41,9 +47,9 @@ export function AdAccountToggle({ workspaceId, accountId, enabled }: Props) {
   return (
     <Switch
       checked={isEnabled}
-      onCheckedChange={handleToggle}
+      onCheckedChange={() => void handleToggle()}
       disabled={loading}
-      aria-label={isEnabled ? "Disable account" : "Enable account"}
+      aria-label={isEnabled ? "Desativar conta" : "Ativar conta"}
     />
   );
 }

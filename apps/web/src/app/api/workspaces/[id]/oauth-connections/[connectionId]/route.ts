@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 
+function normMetaId(id: string): string {
+  return id.replace(/^act_/, "");
+}
+
 /**
  * PATCH /api/workspaces/[id]/oauth-connections/[connectionId]
  * Update allowed_accounts or is_active for a connection.
@@ -38,6 +42,29 @@ export async function PATCH(
 
   const update: Record<string, unknown> = {};
   if (body.allowed_accounts !== undefined) {
+    if (body.allowed_accounts.length > 0) {
+      const { data: enabledRows } = await supabase
+        .from("ad_accounts")
+        .select("meta_account_id")
+        .eq("workspace_id", workspaceId)
+        .eq("is_enabled", true);
+
+      const enabledNorm = new Set(
+        (enabledRows ?? []).map((r) => normMetaId(r.meta_account_id))
+      );
+
+      for (const id of body.allowed_accounts) {
+        if (typeof id !== "string" || !enabledNorm.has(normMetaId(id))) {
+          return Response.json(
+            {
+              error:
+                "Cada conta em allowed_accounts precisa estar habilitada para o espaço (Integrações → Meta).",
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
     update.allowed_accounts = body.allowed_accounts;
   }
   if (body.is_active !== undefined) {
