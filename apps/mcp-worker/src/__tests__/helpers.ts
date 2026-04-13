@@ -100,7 +100,8 @@ export function createMockWorkspace(
     tier: "pro",
     requestsPerHour: 200,
     requestsPerDay: 1000,
-    maxMcpConnections: 3,
+    maxMcpConnections: 1,
+    maxAdAccounts: 1,
     enableMetaMutations: true,
     ...overrides,
   };

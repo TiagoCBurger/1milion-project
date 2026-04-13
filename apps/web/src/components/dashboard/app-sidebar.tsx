@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { BrandLogo } from "@/components/brand-logo"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
@@ -148,18 +149,14 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
   return (
     <div className="flex h-full flex-col">
       <div className="p-4 pb-2">
-        <Link href={homeDashboardHref} className="flex items-center gap-2">
-          <span className="text-lg font-light tracking-tight font-display bg-gradient-to-r from-violet-brand to-cyan-brand bg-clip-text text-transparent">
-            VibeFly
-          </span>
-        </Link>
+        <BrandLogo href={homeDashboardHref} sidebar />
       </div>
 
       <div className="px-3 pb-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-sidebar-accent transition-colors">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-brand/10 text-violet-brand">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-vf-lime/20 text-vf-ink">
                 <Building2 className="h-4 w-4" />
               </div>
               <div className="flex-1 min-w-0">
@@ -214,7 +211,7 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
           <DropdownMenuTrigger asChild>
             <button className="flex w-full items-center gap-3 rounded-lg p-2 hover:bg-sidebar-accent transition-colors">
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-violet-brand/10 text-violet-brand text-xs font-semibold">
+                <AvatarFallback className="bg-vf-lime/20 text-vf-ink text-xs font-semibold">
                   {initials}
                 </AvatarFallback>
               </Avatar>

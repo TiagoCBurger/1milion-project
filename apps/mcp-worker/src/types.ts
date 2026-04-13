@@ -25,6 +25,7 @@ export interface WorkspaceContext {
   requestsPerHour: number;
   requestsPerDay: number;
   maxMcpConnections: number;
+  maxAdAccounts: number;
   enableMetaMutations: boolean;
   allowedAccounts?: string[];
 }

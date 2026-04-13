@@ -86,7 +86,19 @@ export default {
     const workspace = authResult.workspace;
 
     // -------------------------------------------------------
-    // 3. Rate limit
+    // 3. Free tier — no API access
+    // -------------------------------------------------------
+    if (workspace.tier === "free") {
+      return jsonRpcError(
+        -32600,
+        "A free plan does not include API access. Upgrade to Pro or Max at vibefly.app/dashboard.",
+        null,
+        403
+      );
+    }
+
+    // -------------------------------------------------------
+    // 4. Rate limit
     // -------------------------------------------------------
     const rateResult = await checkRateLimit(workspace, env);
     if (rateResult.limited) {

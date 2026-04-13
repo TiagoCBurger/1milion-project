@@ -154,7 +154,7 @@ export function IntegrationRequestCard({ slug }: { slug: string }) {
     <>
       <Card className="border-border/80 transition-colors hover:border-border">
         <CardHeader className="flex flex-row items-start gap-4 space-y-0">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-brand/10 text-violet-brand">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-vf-lime/20 text-vf-ink">
             <Sparkles className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1 space-y-1">

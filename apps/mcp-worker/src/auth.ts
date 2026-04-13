@@ -48,6 +48,7 @@ export async function validateApiKey(
     requests_per_hour: number;
     requests_per_day: number;
     max_mcp_connections: number;
+    max_ad_accounts: number;
     enable_meta_mutations?: boolean | null;
   }>;
 
@@ -63,6 +64,7 @@ export async function validateApiKey(
     requestsPerHour: row.requests_per_hour,
     requestsPerDay: row.requests_per_day,
     maxMcpConnections: row.max_mcp_connections,
+    maxAdAccounts: row.max_ad_accounts ?? 0,
     enableMetaMutations: row.enable_meta_mutations === true,
   };
 
@@ -318,6 +320,7 @@ export async function verifyOAuthAccessToken(
     requests_per_hour: number;
     requests_per_day: number;
     max_mcp_connections: number;
+    max_ad_accounts: number;
     enable_meta_mutations?: boolean | null;
   }>;
 
@@ -429,6 +432,7 @@ export async function verifyOAuthAccessToken(
       requestsPerHour: row.requests_per_hour,
       requestsPerDay: row.requests_per_day,
       maxMcpConnections: row.max_mcp_connections,
+      maxAdAccounts: row.max_ad_accounts ?? 0,
       enableMetaMutations: row.enable_meta_mutations === true,
       allowedAccounts,
     },

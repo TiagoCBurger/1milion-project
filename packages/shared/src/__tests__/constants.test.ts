@@ -35,51 +35,49 @@ describe("TIER_LIMITS", () => {
     expect(TIER_LIMITS).toHaveProperty("enterprise");
   });
 
-  it("free tier: 20 req/hr, 20 req/day, 1 key, 1 MCP connection", () => {
+  it("free tier: no access (all zeros)", () => {
     expect(TIER_LIMITS.free).toEqual({
-      requests_per_hour: 20,
-      requests_per_day: 20,
-      max_api_keys: 1,
-      max_mcp_connections: 1,
+      requests_per_hour: 0,
+      requests_per_day: 0,
+      max_api_keys: 0,
+      max_mcp_connections: 0,
+      max_ad_accounts: 0,
     });
   });
 
-  it("pro tier: 200 req/hr, 1000 req/day, 5 keys, 3 MCP connections", () => {
+  it("pro tier: 200 req/hr, 1000 req/day, 1 key, 1 MCP, 1 ad account", () => {
     expect(TIER_LIMITS.pro).toEqual({
       requests_per_hour: 200,
       requests_per_day: 1_000,
-      max_api_keys: 5,
-      max_mcp_connections: 3,
+      max_api_keys: 1,
+      max_mcp_connections: 1,
+      max_ad_accounts: 1,
     });
   });
 
-  it("max tier: 500 req/hr, 5000 req/day, 10 keys, unlimited MCP", () => {
+  it("max tier: 200 req/hr, 5000 req/day, 5 keys, 5 MCP, 5 ad accounts", () => {
     expect(TIER_LIMITS.max).toEqual({
-      requests_per_hour: 500,
+      requests_per_hour: 200,
       requests_per_day: 5_000,
-      max_api_keys: 10,
-      max_mcp_connections: -1,
+      max_api_keys: 5,
+      max_mcp_connections: 5,
+      max_ad_accounts: 5,
     });
   });
 
-  it("enterprise tier: custom (0 = per contract)", () => {
+  it("enterprise tier: custom (0 = per contract, -1 = unlimited)", () => {
     expect(TIER_LIMITS.enterprise).toEqual({
       requests_per_hour: 0,
       requests_per_day: 0,
       max_api_keys: 0,
       max_mcp_connections: -1,
+      max_ad_accounts: -1,
     });
   });
 
-  it("paid tiers have increasing limits (free < pro < max)", () => {
-    const tiers = ["free", "pro", "max"] as const;
-    for (let i = 1; i < tiers.length; i++) {
-      const prev = TIER_LIMITS[tiers[i - 1]];
-      const curr = TIER_LIMITS[tiers[i]];
-      expect(curr.requests_per_hour).toBeGreaterThan(prev.requests_per_hour);
-      expect(curr.requests_per_day).toBeGreaterThan(prev.requests_per_day);
-      expect(curr.max_api_keys).toBeGreaterThan(prev.max_api_keys);
-    }
+  it("paid tiers have increasing ad account and MCP limits (pro < max)", () => {
+    expect(TIER_LIMITS.max.max_ad_accounts).toBeGreaterThan(TIER_LIMITS.pro.max_ad_accounts);
+    expect(TIER_LIMITS.max.max_mcp_connections).toBeGreaterThan(TIER_LIMITS.pro.max_mcp_connections);
   });
 });
 
@@ -109,72 +107,34 @@ describe("PRICING", () => {
   });
 
   it("values are in centavos (positive integers)", () => {
-    expect(PRICING.pro.monthly).toBe(3_700);
-    expect(PRICING.pro.annually).toBe(35_500);
+    expect(PRICING.pro.monthly).toBe(2_700);
     expect(PRICING.max.monthly).toBe(9_700);
-    expect(PRICING.max.annually).toBe(93_100);
   });
 
-  it("annual price offers discount vs 12x monthly", () => {
-    expect(PRICING.pro.annually).toBeLessThan(PRICING.pro.monthly * 12);
-    expect(PRICING.max.annually).toBeLessThan(PRICING.max.monthly * 12);
+  it("max monthly is more expensive than pro monthly", () => {
+    expect(PRICING.max.monthly).toBeGreaterThan(PRICING.pro.monthly);
   });
 });
 
 describe("FREE_TIER_TOOLS", () => {
-  it("is a Set with 24 tools", () => {
+  it("is an empty Set (free tier has no API access)", () => {
     expect(FREE_TIER_TOOLS).toBeInstanceOf(Set);
-    expect(FREE_TIER_TOOLS.size).toBe(24);
+    expect(FREE_TIER_TOOLS.size).toBe(0);
   });
 
-  const expectedReadTools = [
+  const allTools = [
     "get_ad_accounts",
-    "get_account_info",
     "get_campaigns",
-    "get_campaign_details",
-    "get_adsets",
-    "get_adset_details",
-    "get_ads",
-    "get_ad_details",
-    "get_ad_image",
-    "get_ad_video",
-    "get_ad_creatives",
-    "get_creative_details",
     "get_insights",
-    "search_interests",
-    "get_interest_suggestions",
-    "search_behaviors",
-    "search_demographics",
-    "search_geo_locations",
-    "estimate_audience_size",
-    "search_ads_archive",
-    "get_account_pages",
-    "search_pages_by_name",
-    "search",
-    "fetch",
-  ];
-
-  for (const tool of expectedReadTools) {
-    it(`includes ${tool}`, () => {
-      expect(FREE_TIER_TOOLS.has(tool)).toBe(true);
-    });
-  }
-
-  const forbiddenWriteTools = [
     "create_campaign",
     "update_campaign",
     "create_adset",
-    "update_adset",
     "create_ad",
-    "update_ad",
     "upload_ad_image",
-    "create_ad_creative",
-    "update_ad_creative",
-    "create_budget_schedule",
   ];
 
-  for (const tool of forbiddenWriteTools) {
-    it(`excludes write tool ${tool}`, () => {
+  for (const tool of allTools) {
+    it(`does not include ${tool}`, () => {
       expect(FREE_TIER_TOOLS.has(tool)).toBe(false);
     });
   }

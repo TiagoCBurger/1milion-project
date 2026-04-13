@@ -133,10 +133,10 @@ export default async function IntegrationsHubPage({
 
         <section className="space-y-3">
           <h2 className="text-sm font-medium text-muted-foreground">Conectar IA</h2>
-          <Card className="relative overflow-hidden border-border/80 bg-gradient-to-br from-violet-brand/5 via-background to-cyan-brand/5">
+          <Card className="relative overflow-hidden border-border/80 bg-gradient-to-br from-vf-lime/10 via-background to-vf-lime/5">
             <CardHeader>
               <div className="flex items-start justify-between gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-brand/15 text-violet-brand">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-vf-lime/25 text-vf-ink">
                   <Sparkles className="h-5 w-5" />
                 </div>
                 <Badge variant="secondary" className="shrink-0">
@@ -150,7 +150,7 @@ export default async function IntegrationsHubPage({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild variant="outline" className="w-full sm:w-auto border-violet-brand/30 bg-background/80 hover:bg-violet-brand/10">
+              <Button asChild variant="outline" className="w-full sm:w-auto border-vf-lime/40 bg-background/80 hover:bg-vf-lime/15">
                 <Link href={`/dashboard/${slug}/integrations/mcp`}>
                   <Cable className="mr-2 h-4 w-4" />
                   Abrir conexões MCP

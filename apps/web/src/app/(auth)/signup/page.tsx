@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,9 +45,7 @@ export default function SignupPage() {
     <main className="flex min-h-screen items-center justify-center p-4 bg-background">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <Link href="/" className="text-2xl font-light tracking-tight font-display bg-gradient-to-r from-violet-brand to-cyan-brand bg-clip-text text-transparent mb-2 inline-block">
-            VibeFly
-          </Link>
+          <BrandLogo href="/" className="mb-2 justify-center" />
           <CardTitle className="text-xl">Create Account</CardTitle>
           <CardDescription>Get started managing your Meta Ads with AI</CardDescription>
         </CardHeader>

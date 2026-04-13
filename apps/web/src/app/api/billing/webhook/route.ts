@@ -91,6 +91,7 @@ export async function POST(request: Request) {
           requests_per_hour: limits.requests_per_hour,
           requests_per_day: limits.requests_per_day,
           max_mcp_connections: limits.max_mcp_connections,
+          max_ad_accounts: limits.max_ad_accounts,
           // Clear any pending changes since this is a fresh subscription
           pending_tier: null,
           pending_billing_cycle: null,
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
       const ownerName = data.customer?.name;
       if (ownerEmail) {
         const tierLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
-        const cycleLabel = cycle === "annually" ? "anual" : "mensal";
+        const cycleLabel = "mensal";
         const amount = `R$ ${(data.checkout?.amount ?? 0) / 100}`;
 
         sendTransactionalEmail({
@@ -163,6 +164,7 @@ export async function POST(request: Request) {
             requests_per_hour: freeLimits.requests_per_hour,
             requests_per_day: freeLimits.requests_per_day,
             max_mcp_connections: freeLimits.max_mcp_connections,
+            max_ad_accounts: freeLimits.max_ad_accounts,
             pending_tier: null,
             pending_billing_cycle: null,
             updated_at: new Date().toISOString(),
@@ -231,6 +233,7 @@ async function applyPendingChange(
         requests_per_hour: freeLimits.requests_per_hour,
         requests_per_day: freeLimits.requests_per_day,
         max_mcp_connections: freeLimits.max_mcp_connections,
+        max_ad_accounts: freeLimits.max_ad_accounts,
         pending_tier: null,
         pending_billing_cycle: null,
         updated_at: new Date().toISOString(),
@@ -249,6 +252,7 @@ async function applyPendingChange(
         requests_per_hour: limits.requests_per_hour,
         requests_per_day: limits.requests_per_day,
         max_mcp_connections: limits.max_mcp_connections,
+        max_ad_accounts: limits.max_ad_accounts,
         pending_tier: null,
         pending_billing_cycle: null,
         updated_at: new Date().toISOString(),

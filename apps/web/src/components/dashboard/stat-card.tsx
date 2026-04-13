@@ -11,7 +11,7 @@ interface StatCardProps {
 }
 
 const variantStyles = {
-  default: "bg-violet-brand/10 text-violet-brand",
+  default: "bg-vf-lime/20 text-vf-ink",
   success: "bg-emerald-100 text-emerald-700",
   warning: "bg-amber-100 text-amber-700",
   danger: "bg-red-100 text-red-700",

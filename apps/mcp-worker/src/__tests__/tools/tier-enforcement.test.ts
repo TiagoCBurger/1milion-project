@@ -9,9 +9,8 @@ import {
 } from "@vibefly/shared";
 
 /**
- * Cross-check tier enforcement:
- * - All registered tools are accounted for in FREE_TIER_TOOLS or are write-only
- * - Free tier blocks all write tools
+ * Tier enforcement tests:
+ * - Free tier blocks ALL tools (no read, no write)
  * - Pro tier allows all tools
  * - TIER_LIMITS values are consistent
  */
@@ -71,6 +70,34 @@ const WRITE_TOOLS = new Set([
   "commerce_trigger_sync",
 ]);
 
+const READ_TOOLS = new Set([
+  "get_ad_accounts",
+  "get_account_info",
+  "get_campaigns",
+  "get_campaign_details",
+  "get_adsets",
+  "get_adset_details",
+  "get_ads",
+  "get_ad_details",
+  "get_ad_image",
+  "get_ad_video",
+  "get_ad_creatives",
+  "get_creative_details",
+  "get_video_status",
+  "get_insights",
+  "search_interests",
+  "get_interest_suggestions",
+  "search_behaviors",
+  "search_demographics",
+  "search_geo_locations",
+  "estimate_audience_size",
+  "search_ads_archive",
+  "get_account_pages",
+  "search_pages_by_name",
+  "search",
+  "fetch",
+]);
+
 /** Commerce MCP tools (paid tier; local DB reads + sync, provider-agnostic). */
 const COMMERCE_READ_TOOLS = new Set([
   "commerce_list_products",
@@ -87,37 +114,8 @@ describe("Tier Enforcement", () => {
     globalThis.fetch = originalFetch;
   });
 
-  it("FREE_TIER_TOOLS contains only read-only tools", () => {
-    for (const tool of FREE_TIER_TOOLS) {
-      expect(WRITE_TOOLS.has(tool)).toBe(false);
-    }
-  });
-
-  it("all registered tools are in FREE_TIER_TOOLS or WRITE_TOOLS", () => {
-    const capture = createToolCapture();
-    registerAllTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
-
-    // Get all registered tool names via the capture's internal handler map
-    const allTools = new Set<string>();
-    const originalTool = capture.server.tool;
-
-    // Re-register to capture names
-    const names: string[] = [];
-    const nameCapture = {
-      tool: (name: string, ..._args: unknown[]) => {
-        names.push(name);
-      },
-    };
-    registerAllTools({ server: nameCapture as any, token: "tok", tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
-    registerCommerceTools({ server: nameCapture as any, token: "tok", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
-
-    for (const name of names) {
-      expect(
-        FREE_TIER_TOOLS.has(name) ||
-          WRITE_TOOLS.has(name) ||
-          COMMERCE_READ_TOOLS.has(name),
-      ).toBe(true);
-    }
+  it("FREE_TIER_TOOLS is empty (free tier has no API access)", () => {
+    expect(FREE_TIER_TOOLS.size).toBe(0);
   });
 
   it("free tier blocks ALL write tools", async () => {
@@ -127,7 +125,6 @@ describe("Tier Enforcement", () => {
       registerAllTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
       registerCommerceTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
 
-      // Build a minimal valid args object for each tool
       const args = getMinimalArgs(toolName);
       const result = await capture.callTool(toolName, args);
 
@@ -169,22 +166,6 @@ describe("Tier Enforcement", () => {
       expect(text).toContain("paid plan");
     }
   });
-
-  it("free tier allows ALL read-only tools", async () => {
-    for (const toolName of FREE_TIER_TOOLS) {
-      vi.clearAllMocks();
-      const capture = createToolCapture();
-      registerAllTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: false });
-
-      const args = getMinimalArgs(toolName);
-      const result = await capture.callTool(toolName, args);
-
-      // Should NOT block with tier error
-      const text = (result as any).content?.[0]?.text ?? "";
-      expect(text).not.toContain("requires a PRO");
-      expect(text).not.toContain("Pro or Enterprise subscription");
-    }
-  });
 });
 
 describe("TIER_LIMITS constants", () => {
@@ -195,64 +176,45 @@ describe("TIER_LIMITS constants", () => {
     expect(TIER_LIMITS).toHaveProperty("enterprise");
   });
 
-  it("free tier has correct limits", () => {
-    expect(TIER_LIMITS.free.requests_per_hour).toBe(20);
-    expect(TIER_LIMITS.free.requests_per_day).toBe(20);
-    expect(TIER_LIMITS.free.max_api_keys).toBe(1);
-    expect(TIER_LIMITS.free.max_mcp_connections).toBe(1);
+  it("free tier has zero limits (no access)", () => {
+    expect(TIER_LIMITS.free.requests_per_hour).toBe(0);
+    expect(TIER_LIMITS.free.requests_per_day).toBe(0);
+    expect(TIER_LIMITS.free.max_api_keys).toBe(0);
+    expect(TIER_LIMITS.free.max_mcp_connections).toBe(0);
+    expect(TIER_LIMITS.free.max_ad_accounts).toBe(0);
   });
 
-  it("pro tier has higher limits than free", () => {
-    expect(TIER_LIMITS.pro.requests_per_hour).toBeGreaterThan(
-      TIER_LIMITS.free.requests_per_hour,
-    );
-    expect(TIER_LIMITS.pro.requests_per_day).toBeGreaterThan(
-      TIER_LIMITS.free.requests_per_day,
-    );
+  it("pro tier has correct limits", () => {
+    expect(TIER_LIMITS.pro.requests_per_hour).toBe(200);
+    expect(TIER_LIMITS.pro.requests_per_day).toBe(1_000);
+    expect(TIER_LIMITS.pro.max_mcp_connections).toBe(1);
+    expect(TIER_LIMITS.pro.max_ad_accounts).toBe(1);
   });
 
-  it("max tier has higher limits than pro", () => {
-    expect(TIER_LIMITS.max.requests_per_hour).toBeGreaterThan(
-      TIER_LIMITS.pro.requests_per_hour,
-    );
-    expect(TIER_LIMITS.max.requests_per_day).toBeGreaterThan(
-      TIER_LIMITS.pro.requests_per_day,
-    );
+  it("max tier has correct limits", () => {
+    expect(TIER_LIMITS.max.requests_per_hour).toBe(200);
+    expect(TIER_LIMITS.max.requests_per_day).toBe(5_000);
+    expect(TIER_LIMITS.max.max_mcp_connections).toBe(5);
+    expect(TIER_LIMITS.max.max_ad_accounts).toBe(5);
   });
 
-  it("max tier allows unlimited MCP connections", () => {
-    expect(TIER_LIMITS.max.max_mcp_connections).toBe(-1);
-  });
-
-  it("paid tiers (free, pro, max) have positive rate limits", () => {
-    for (const tier of ["free", "pro", "max"] as const) {
-      expect(TIER_LIMITS[tier].requests_per_hour).toBeGreaterThan(0);
-      expect(TIER_LIMITS[tier].requests_per_day).toBeGreaterThan(0);
-      expect(TIER_LIMITS[tier].max_api_keys).toBeGreaterThan(0);
-    }
+  it("max tier has more ad accounts and MCP connections than pro", () => {
+    expect(TIER_LIMITS.max.max_ad_accounts).toBeGreaterThan(TIER_LIMITS.pro.max_ad_accounts);
+    expect(TIER_LIMITS.max.max_mcp_connections).toBeGreaterThan(TIER_LIMITS.pro.max_mcp_connections);
   });
 });
 
 describe("FREE_TIER_TOOLS set", () => {
-  it("contains expected read-only tools", () => {
-    expect(FREE_TIER_TOOLS.has("get_ad_accounts")).toBe(true);
-    expect(FREE_TIER_TOOLS.has("get_campaigns")).toBe(true);
-    expect(FREE_TIER_TOOLS.has("get_insights")).toBe(true);
-    expect(FREE_TIER_TOOLS.has("search_interests")).toBe(true);
-    expect(FREE_TIER_TOOLS.has("search")).toBe(true);
-    expect(FREE_TIER_TOOLS.has("fetch")).toBe(true);
+  it("is empty — free tier has no API access", () => {
+    expect(FREE_TIER_TOOLS.size).toBe(0);
   });
 
-  it("does NOT contain write tools", () => {
+  it("does NOT contain any tools", () => {
+    expect(FREE_TIER_TOOLS.has("get_ad_accounts")).toBe(false);
+    expect(FREE_TIER_TOOLS.has("get_campaigns")).toBe(false);
+    expect(FREE_TIER_TOOLS.has("get_insights")).toBe(false);
     expect(FREE_TIER_TOOLS.has("create_campaign")).toBe(false);
-    expect(FREE_TIER_TOOLS.has("update_campaign")).toBe(false);
-    expect(FREE_TIER_TOOLS.has("create_adset")).toBe(false);
-    expect(FREE_TIER_TOOLS.has("create_ad")).toBe(false);
     expect(FREE_TIER_TOOLS.has("upload_ad_image")).toBe(false);
-  });
-
-  it("has exactly 25 read-only tools", () => {
-    expect(FREE_TIER_TOOLS.size).toBe(25);
   });
 });
 

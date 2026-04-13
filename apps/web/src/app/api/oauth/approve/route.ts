@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     .eq("status", "active")
     .maybeSingle();
 
-  const maxMcp = subRow?.max_mcp_connections ?? 1;
+  const maxMcp = subRow?.max_mcp_connections ?? 0;
 
   if (maxMcp !== -1) {
     let connQuery = supabase

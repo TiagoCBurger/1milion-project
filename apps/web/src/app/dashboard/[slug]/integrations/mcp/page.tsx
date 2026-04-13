@@ -100,7 +100,7 @@ export default async function ConnectionsPage({
         <div className="grid gap-4 sm:grid-cols-3">
           <Card>
             <CardContent className="p-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-brand/10 text-violet-brand">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-vf-lime/20 text-vf-ink">
                 <Key className="h-5 w-5" />
               </div>
               <div>

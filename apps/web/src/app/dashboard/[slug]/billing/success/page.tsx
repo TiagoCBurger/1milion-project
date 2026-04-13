@@ -65,7 +65,7 @@ export default function BillingSuccessPage() {
           <CardContent className="pt-8 pb-8 text-center space-y-4">
             {status === "loading" && (
               <>
-                <Loader2 className="h-12 w-12 text-violet-brand animate-spin mx-auto" />
+                <Loader2 className="h-12 w-12 text-vf-lime animate-spin mx-auto" />
                 <h2 className="text-xl font-semibold">Processing payment...</h2>
                 <p className="text-muted-foreground text-sm">
                   We&apos;re confirming your subscription. This usually takes a few seconds.

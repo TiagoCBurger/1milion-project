@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useParams } from "next/navigation";
-import { Check, Zap, Crown, Building2, Mail, Clock, X } from "lucide-react";
+import { Check, Zap, Crown, Clock, X } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ interface SubscriptionInfo {
   requests_per_hour: number;
   requests_per_day: number;
   max_mcp_connections: number;
+  max_ad_accounts: number;
   pending_tier: string | null;
   pending_billing_cycle: string | null;
 }
@@ -31,63 +33,24 @@ const TIER_ORDER: Record<string, number> = {
 
 const PLANS = [
   {
-    tier: "free" as const,
-    name: "Free",
-    monthlyPrice: 0,
-    annualPrice: 0,
-    icon: Check,
-    features: [
-      "20 requests/hour",
-      "20 requests/day",
-      "1 API key",
-      "1 MCP connection",
-      "Read-only tools",
-    ],
-  },
-  {
     tier: "pro" as const,
     name: "Pro",
-    monthlyPrice: 37,
-    annualPrice: 355,
+    monthlyPrice: 27,
     icon: Zap,
     features: [
-      "200 requests/hour",
-      "1,000 requests/day",
-      "5 API keys",
-      "3 MCP connections",
-      "All tools (read + write)",
-      "50 images/day, 10 videos/day",
+      "1 conta de anúncios",
+      "1 conexão MCP",
     ],
   },
   {
     tier: "max" as const,
     name: "Max",
     monthlyPrice: 97,
-    annualPrice: 931,
     icon: Crown,
     popular: true,
     features: [
-      "500 requests/hour",
-      "5,000 requests/day",
-      "10 API keys",
-      "Unlimited MCP connections",
-      "All tools (read + write)",
-      "200 images/day, 50 videos/day",
-    ],
-  },
-  {
-    tier: "enterprise" as const,
-    name: "Enterprise",
-    monthlyPrice: null,
-    annualPrice: null,
-    icon: Building2,
-    features: [
-      "Custom rate limits",
-      "Custom API keys",
-      "Unlimited MCP connections",
-      "All tools (read + write)",
-      "Custom upload limits",
-      "Dedicated support & SLA",
+      "5 contas de anúncios",
+      "5 conexões MCP",
     ],
   },
 ];
@@ -96,7 +59,6 @@ export default function BillingPage() {
   const { slug } = useParams<{ slug: string }>();
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [isAnnual, setIsAnnual] = useState(false);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const supabase = createClient();
 
@@ -128,7 +90,6 @@ export default function BillingPage() {
   const currentTier = subscription?.tier ?? "free";
   const hasPending = !!subscription?.pending_tier;
 
-  // First subscription (from free) → goes through checkout
   async function handleCheckout(tier: "pro" | "max") {
     if (!workspaceId) return;
     setLoadingAction(tier);
@@ -139,7 +100,7 @@ export default function BillingPage() {
         body: JSON.stringify({
           workspace_id: workspaceId,
           tier,
-          cycle: isAnnual ? "annually" : "monthly",
+          cycle: "monthly",
         }),
       });
       const data = await res.json();
@@ -151,7 +112,6 @@ export default function BillingPage() {
     }
   }
 
-  // Change plan (from paid → different paid or free) → scheduled for next cycle
   async function handleChangePlan(tier: string) {
     if (!workspaceId) return;
     setLoadingAction(`change-${tier}`);
@@ -162,7 +122,7 @@ export default function BillingPage() {
         body: JSON.stringify({
           workspace_id: workspaceId,
           tier,
-          cycle: tier === "free" ? undefined : isAnnual ? "annually" : "monthly",
+          cycle: tier === "free" ? undefined : "monthly",
         }),
       });
       if (res.ok) loadSubscription();
@@ -171,29 +131,12 @@ export default function BillingPage() {
     }
   }
 
-  // Cancel pending change
   async function handleCancelPending() {
     if (!workspaceId) return;
     setLoadingAction("cancel-pending");
     try {
       await fetch(`/api/billing/change-plan?workspace_id=${workspaceId}`, {
         method: "DELETE",
-      });
-      loadSubscription();
-    } finally {
-      setLoadingAction(null);
-    }
-  }
-
-  // Cancel subscription → schedules downgrade to free
-  async function handleCancel() {
-    if (!workspaceId || !confirm("Are you sure? Your plan will downgrade to Free at the end of the current period.")) return;
-    setLoadingAction("cancel");
-    try {
-      await fetch("/api/billing/cancel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace_id: workspaceId }),
       });
       loadSubscription();
     } finally {
@@ -208,60 +151,54 @@ export default function BillingPage() {
     const isDowngrade = (TIER_ORDER[planTier] ?? 0) < (TIER_ORDER[currentTier] ?? 0);
     const isOnFree = currentTier === "free";
 
-    // This plan is already the pending target
     if (isPending) {
-      return { label: "Scheduled", disabled: true, action: () => {} };
+      return { label: "Agendado", disabled: true, action: () => {} };
     }
 
-    // This is the current active plan (and no pending or pending goes elsewhere)
     if (isCurrent && !hasPending) {
-      return { label: "Current plan", disabled: true, action: () => {} };
+      return { label: "Plano atual", disabled: true, action: () => {} };
     }
 
-    // Current plan but there's a pending change — allow "Keep current"
     if (isCurrent && hasPending) {
       return {
-        label: "Keep current plan",
+        label: "Manter plano atual",
         disabled: false,
         action: () => handleCancelPending(),
       };
     }
 
-    // From free → checkout (immediate, needs payment)
     if (isOnFree && (planTier === "pro" || planTier === "max")) {
       return {
-        label: "Subscribe",
+        label: "Assinar",
         disabled: false,
         action: () => handleCheckout(planTier as "pro" | "max"),
       };
     }
 
-    // If there's a pending change, allow switching the pending target
     if (hasPending) {
       return {
-        label: isUpgrade ? "Switch to upgrade" : "Switch to downgrade",
+        label: isUpgrade ? "Mudar para este" : "Mudar para este",
         disabled: false,
-        action: () => (planTier === "free" ? handleCancel() : handleChangePlan(planTier)),
+        action: () => handleChangePlan(planTier),
       };
     }
 
-    // From paid → different plan (scheduled for next cycle)
     if (isUpgrade) {
       return {
-        label: "Upgrade at next cycle",
+        label: "Fazer upgrade",
         disabled: false,
         action: () => handleChangePlan(planTier),
       };
     }
     if (isDowngrade) {
       return {
-        label: planTier === "free" ? "Cancel plan" : "Downgrade at next cycle",
+        label: "Fazer downgrade",
         disabled: false,
-        action: () => (planTier === "free" ? handleCancel() : handleChangePlan(planTier)),
+        action: () => handleChangePlan(planTier),
       };
     }
 
-    return { label: "Select", disabled: false, action: () => handleChangePlan(planTier) };
+    return { label: "Selecionar", disabled: false, action: () => handleChangePlan(planTier) };
   }
 
   return (
@@ -273,11 +210,11 @@ export default function BillingPage() {
           { label: "Billing" },
         ]}
       />
-      <div className="p-6 max-w-5xl space-y-8">
+      <div className="p-6 max-w-3xl space-y-8">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your workspace subscription and plan.
+            Gerencie sua assinatura e plano do workspace.
           </p>
         </div>
 
@@ -285,7 +222,7 @@ export default function BillingPage() {
         {subscription && subscription.tier !== "free" && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Current Plan</CardTitle>
+              <CardTitle className="text-base">Plano Atual</CardTitle>
               <CardDescription>
                 {subscription.tier.charAt(0).toUpperCase() + subscription.tier.slice(1)} plan
                 {subscription.billing_cycle
@@ -301,8 +238,8 @@ export default function BillingPage() {
                   </Badge>
                   {subscription.current_period_end && (
                     <span className="text-sm text-muted-foreground">
-                      Renews{" "}
-                      {new Date(subscription.current_period_end).toLocaleDateString()}
+                      Renova em{" "}
+                      {new Date(subscription.current_period_end).toLocaleDateString("pt-BR")}
                     </span>
                   )}
                 </div>
@@ -315,8 +252,8 @@ export default function BillingPage() {
                     <Clock className="h-4 w-4 text-amber-600" />
                     <span className="text-sm text-amber-800 dark:text-amber-200">
                       {subscription.pending_tier === "free"
-                        ? "Plan will be cancelled at end of period"
-                        : `Changing to ${subscription.pending_tier.charAt(0).toUpperCase() + subscription.pending_tier.slice(1)}${subscription.pending_billing_cycle ? ` (${subscription.pending_billing_cycle})` : ""} at next cycle`}
+                        ? "Plano será cancelado ao final do período"
+                        : `Mudando para ${subscription.pending_tier.charAt(0).toUpperCase() + subscription.pending_tier.slice(1)} no próximo ciclo`}
                     </span>
                   </div>
                   <Button
@@ -327,99 +264,64 @@ export default function BillingPage() {
                     className="h-7 px-2 text-amber-700 hover:text-amber-900"
                   >
                     <X className="h-3.5 w-3.5 mr-1" />
-                    Undo
+                    Desfazer
                   </Button>
                 </div>
+              )}
+
+              {subscription.pending_tier !== "free" && (
+                <p className="text-center pt-1">
+                  <Link
+                    href={`/dashboard/${slug}/subscription/cancel`}
+                    className="text-xs text-muted-foreground/70 hover:text-muted-foreground underline-offset-4 hover:underline"
+                  >
+                    Cancelar assinatura
+                  </Link>
+                </p>
               )}
             </CardContent>
           </Card>
         )}
 
-        {/* Billing cycle toggle */}
-        <div className="flex items-center justify-center gap-3">
-          <span
-            className={`text-sm ${!isAnnual ? "font-semibold" : "text-muted-foreground"}`}
-          >
-            Monthly
-          </span>
-          <button
-            onClick={() => setIsAnnual(!isAnnual)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              isAnnual ? "bg-violet-brand" : "bg-muted"
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                isAnnual ? "translate-x-6" : "translate-x-1"
-              }`}
-            />
-          </button>
-          <span
-            className={`text-sm ${isAnnual ? "font-semibold" : "text-muted-foreground"}`}
-          >
-            Annual
-            <Badge variant="secondary" className="ml-2 text-xs">
-              Save ~20%
-            </Badge>
-          </span>
-        </div>
-
         {/* Plan cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {PLANS.map((plan) => {
             const isCurrent = currentTier === plan.tier;
             const isPending = subscription?.pending_tier === plan.tier;
-            const price = plan.monthlyPrice !== null
-              ? isAnnual
-                ? Math.round(plan.annualPrice! / 12)
-                : plan.monthlyPrice
-              : null;
-
             const btn = getButtonProps(plan.tier);
 
             return (
               <Card
                 key={plan.tier}
                 className={`relative ${
-                  plan.popular ? "border-violet-brand shadow-md" : ""
-                } ${isCurrent ? "ring-2 ring-violet-brand" : ""} ${
+                  plan.popular ? "border-vf-lime shadow-md" : ""
+                } ${isCurrent ? "ring-2 ring-vf-lime" : ""} ${
                   isPending ? "ring-2 ring-amber-400" : ""
                 }`}
               >
                 {plan.popular && !isPending && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-violet-brand text-white">Popular</Badge>
+                    <Badge className="bg-vf-lime text-vf-ink font-semibold">Popular</Badge>
                   </div>
                 )}
                 {isPending && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <Badge className="bg-amber-500 text-white">
                       <Clock className="h-3 w-3 mr-1" />
-                      Next cycle
+                      Próximo ciclo
                     </Badge>
                   </div>
                 )}
                 <CardHeader className="pb-4">
                   <div className="flex items-center gap-2">
-                    <plan.icon className="h-5 w-5 text-violet-brand" />
+                    <plan.icon className="h-5 w-5 text-vf-ink" />
                     <CardTitle className="text-lg">{plan.name}</CardTitle>
                   </div>
                   <div className="mt-2">
-                    {price !== null ? (
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-3xl font-bold">R${price}</span>
-                        <span className="text-muted-foreground text-sm">/month</span>
-                      </div>
-                    ) : (
-                      <span className="text-lg font-semibold text-muted-foreground">
-                        Custom
-                      </span>
-                    )}
-                    {isAnnual && plan.annualPrice !== null && plan.annualPrice > 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        R${plan.annualPrice}/year
-                      </p>
-                    )}
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-bold">R${plan.monthlyPrice}</span>
+                      <span className="text-muted-foreground text-sm">/mês</span>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -432,23 +334,14 @@ export default function BillingPage() {
                     ))}
                   </ul>
 
-                  {plan.tier === "enterprise" ? (
-                    <Button variant="outline" className="w-full" asChild>
-                      <a href="mailto:contato@vibefly.io">
-                        <Mail className="mr-2 h-4 w-4" />
-                        Contact Sales
-                      </a>
-                    </Button>
-                  ) : (
-                    <Button
-                      className="w-full"
-                      variant={plan.popular && !isCurrent ? "default" : "outline"}
-                      disabled={btn.disabled || loadingAction !== null}
-                      onClick={btn.action}
-                    >
-                      {loadingAction?.includes(plan.tier) ? "Processing..." : btn.label}
-                    </Button>
-                  )}
+                  <Button
+                    className="w-full"
+                    variant={plan.popular && !isCurrent ? "default" : "outline"}
+                    disabled={btn.disabled || loadingAction !== null}
+                    onClick={btn.action}
+                  >
+                    {loadingAction?.includes(plan.tier) ? "Processando..." : btn.label}
+                  </Button>
                 </CardContent>
               </Card>
             );

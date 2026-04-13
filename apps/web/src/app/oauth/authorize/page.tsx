@@ -151,7 +151,7 @@ export default async function OAuthAuthorizePage({ searchParams }: PageProps) {
     { max: number; usedOthers: number; atLimit: boolean }
   > = {};
   for (const w of workspaces) {
-    const max = maxByWorkspace[w.id] ?? 1;
+    const max = maxByWorkspace[w.id] ?? 0;
     const usedOthers = otherActiveConnectionCount(w.id);
     const atLimit = max !== -1 && usedOthers >= max;
     mcpLimitByWorkspace[w.id] = { max, usedOthers, atLimit };

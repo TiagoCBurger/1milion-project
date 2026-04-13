@@ -29,6 +29,35 @@ export async function PATCH(
 
   const { is_enabled } = (await request.json()) as { is_enabled: boolean };
 
+  // When enabling an account, enforce the plan's ad account limit
+  if (is_enabled) {
+    const { data: sub } = await supabase
+      .from("subscriptions")
+      .select("max_ad_accounts")
+      .eq("workspace_id", workspaceId)
+      .single();
+
+    const maxAdAccounts = sub?.max_ad_accounts ?? 0;
+
+    if (maxAdAccounts !== -1) {
+      const { count: enabledCount } = await supabase
+        .from("ad_accounts")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId)
+        .eq("is_enabled", true)
+        .neq("id", accountId);
+
+      if ((enabledCount ?? 0) >= maxAdAccounts) {
+        return Response.json(
+          {
+            error: `Ad account limit reached (${maxAdAccounts} allowed on your plan). Disable another account first or upgrade your plan.`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from("ad_accounts")
     .update({ is_enabled })

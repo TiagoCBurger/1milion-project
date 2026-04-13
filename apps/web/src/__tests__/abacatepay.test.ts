@@ -120,8 +120,8 @@ describe("AbacatePay Client", () => {
       expect(getProductId("pro", "monthly")).toBe("prod_test_pro_m");
     });
 
-    it("returns correct product ID for max annually", () => {
-      expect(getProductId("max", "annually")).toBe("prod_test_max_a");
+    it("returns correct product ID for max monthly", () => {
+      expect(getProductId("max", "monthly")).toBe("prod_test_max_m");
     });
 
     it("throws for missing env var", () => {

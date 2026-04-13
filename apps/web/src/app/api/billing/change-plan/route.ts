@@ -10,7 +10,7 @@ const TIER_ORDER: Record<string, number> = {
 };
 
 const VALID_TIERS: SubscriptionTier[] = ["free", "pro", "max"];
-const VALID_CYCLES: BillingCycle[] = ["monthly", "annually"];
+const VALID_CYCLES: BillingCycle[] = ["monthly"];
 
 export async function POST(request: Request) {
   const supabase = await createClient();

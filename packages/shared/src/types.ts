@@ -60,7 +60,7 @@ export interface ApiKey {
 
 export type SubscriptionTier = "free" | "pro" | "max" | "enterprise";
 export type SubscriptionStatus = "active" | "canceled" | "past_due" | "trialing";
-export type BillingCycle = "monthly" | "annually";
+export type BillingCycle = "monthly";
 
 export interface Subscription {
   id: string;
@@ -74,6 +74,7 @@ export interface Subscription {
   requests_per_hour: number;
   requests_per_day: number;
   max_mcp_connections: number;
+  max_ad_accounts: number;
   pending_tier: SubscriptionTier | null;
   pending_billing_cycle: BillingCycle | null;
   created_at: string;
@@ -123,6 +124,7 @@ export interface ValidateApiKeyResult {
   requests_per_hour: number;
   requests_per_day: number;
   max_mcp_connections: number;
+  max_ad_accounts: number;
 }
 
 export interface CreateCheckoutRequest {

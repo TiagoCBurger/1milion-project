@@ -149,7 +149,7 @@ export default async function AdSetDetailPage({
                 Campanha:{" "}
                 <Link
                   href={`/dashboard/${slug}/campaigns/${graphCampaignId}?${q}`}
-                  className="text-violet-brand hover:underline"
+                  className="text-vf-ink hover:underline"
                 >
                   {campaignName}
                 </Link>

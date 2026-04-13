@@ -169,7 +169,7 @@ export default async function CampaignDetailPage({
                         <TableCell className="max-w-[200px] truncate font-medium">
                           <Link
                             href={`/dashboard/${slug}/campaigns/${campaignId}/adsets/${id}?${q}`}
-                            className="text-violet-brand hover:underline"
+                            className="text-vf-ink hover:underline"
                           >
                             {String(a["name"] ?? "")}
                           </Link>

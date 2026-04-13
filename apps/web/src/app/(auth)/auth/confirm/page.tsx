@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 
 function ConfirmContent() {
   const router = useRouter();
@@ -73,9 +74,7 @@ function ConfirmContent() {
     <main className="flex min-h-screen items-center justify-center p-4 bg-background">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <Link href="/" className="text-2xl font-light tracking-tight font-display bg-gradient-to-r from-violet-brand to-cyan-brand bg-clip-text text-transparent mb-2 inline-block">
-            VibeFly
-          </Link>
+          <BrandLogo href="/" className="mb-2 justify-center" />
 
           {status === "loading" && (
             <>

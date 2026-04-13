@@ -149,13 +149,11 @@ export async function createSubscriptionCheckout(
 // ── Product ID mapping ───────────────────────────────────────
 
 type PaidTier = "pro" | "max";
-type BillingCycle = "monthly" | "annually";
+type BillingCycle = "monthly";
 
 const PRODUCT_ENV_MAP: Record<`${PaidTier}_${BillingCycle}`, string> = {
   pro_monthly: "ABACATEPAY_PRODUCT_PRO_MONTHLY",
-  pro_annually: "ABACATEPAY_PRODUCT_PRO_ANNUALLY",
   max_monthly: "ABACATEPAY_PRODUCT_MAX_MONTHLY",
-  max_annually: "ABACATEPAY_PRODUCT_MAX_ANNUALLY",
 };
 
 export function getProductId(tier: PaidTier, cycle: BillingCycle): string {

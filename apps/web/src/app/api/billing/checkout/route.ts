@@ -8,7 +8,7 @@ import {
 import type { BillingCycle } from "@vibefly/shared";
 
 const VALID_TIERS = ["pro", "max"] as const;
-const VALID_CYCLES: BillingCycle[] = ["monthly", "annually"];
+const VALID_CYCLES: BillingCycle[] = ["monthly"];
 
 export async function POST(request: Request) {
   const supabase = await createClient();
