@@ -23,20 +23,7 @@ function ConfirmContent() {
     async function confirm() {
       const supabase = createClient();
 
-      // PKCE flow: Supabase verified OTP server-side and redirected with a code
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!error) {
-          setStatus("success");
-          setTimeout(() => router.push(destination), 2000);
-          return;
-        }
-        setErrorMessage("O link de confirmação expirou ou já foi utilizado.");
-        setStatus("error");
-        return;
-      }
-
-      // Token hash flow: direct OTP verification
+      // Token hash flow: direct OTP verification (recommended — no PKCE verifier needed)
       if (tokenHash && type) {
         const { error } = await supabase.auth.verifyOtp({
           type: type as "signup" | "email",
@@ -47,12 +34,27 @@ function ConfirmContent() {
           setTimeout(() => router.push(destination), 2000);
           return;
         }
+        console.error("[auth/confirm] verifyOtp error:", error);
         setErrorMessage("O link de confirmação expirou ou já foi utilizado.");
         setStatus("error");
         return;
       }
 
-      setErrorMessage("Link de confirmação inválido.");
+      // PKCE flow: Supabase verified OTP server-side and redirected with a code
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error) {
+          setStatus("success");
+          setTimeout(() => router.push(destination), 2000);
+          return;
+        }
+        console.error("[auth/confirm] exchangeCodeForSession error:", error);
+        setErrorMessage("O link de confirmação expirou ou já foi utilizado.");
+        setStatus("error");
+        return;
+      }
+
+      setErrorMessage("Link de confirmação inválido. Params recebidos: " + Array.from(searchParams.entries()).map(([k, v]) => `${k}=${v}`).join(", "));
       setStatus("error");
     }
 
