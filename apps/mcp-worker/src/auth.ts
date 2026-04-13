@@ -1,8 +1,75 @@
 import type { Env, WorkspaceContext } from "./types";
 import type { StoredAccessToken } from "./oauth/types";
 import { sha256Hex } from "./oauth/utils";
+import { intersectAllowedAccounts } from "./workspace-ad-accounts";
 
 const API_KEY_CACHE_TTL = 60; // seconds
+const ENABLED_AD_ACCOUNTS_CACHE_TTL = 30;
+
+/**
+ * Meta account IDs (as stored on ad_accounts.meta_account_id) with is_enabled = true.
+ * Fallback: if no accounts are explicitly enabled, return all accounts (prevents MCP lock-out).
+ */
+export async function fetchWorkspaceEnabledMetaAccountIds(
+  workspaceId: string,
+  env: Env
+): Promise<string[]> {
+  const cacheKey = `enabled_ad_accounts:${workspaceId}`;
+  const cached = await env.CACHE_KV.get(cacheKey, "json");
+  if (cached && Array.isArray(cached)) {
+    return cached as string[];
+  }
+
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/ad_accounts?workspace_id=eq.${workspaceId}&is_enabled=eq.true&select=meta_account_id`,
+    {
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    console.error(
+      "[auth] enabled ad_accounts fetch failed:",
+      response.status,
+      await response.text()
+    );
+    return [];
+  }
+
+  const rows = (await response.json()) as Array<{ meta_account_id: string }>;
+  let ids = rows.map((r) => r.meta_account_id);
+
+  // Fallback: if no accounts are explicitly enabled, return all accounts
+  // This prevents complete MCP lock-out when is_enabled defaults to false on new accounts
+  if (ids.length === 0) {
+    console.log(
+      "[auth] No explicitly enabled accounts for workspace, fetching all accounts as fallback"
+    );
+    const allResponse = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/ad_accounts?workspace_id=eq.${workspaceId}&select=meta_account_id`,
+      {
+        headers: {
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+      }
+    );
+
+    if (allResponse.ok) {
+      const allRows = (await allResponse.json()) as Array<{ meta_account_id: string }>;
+      ids = allRows.map((r) => r.meta_account_id);
+      console.log("[auth] Fallback returned", ids.length, "total accounts");
+    }
+  }
+
+  await env.CACHE_KV.put(cacheKey, JSON.stringify(ids), {
+    expirationTtl: ENABLED_AD_ACCOUNTS_CACHE_TTL,
+  });
+  return ids;
+}
 
 export type AuthResult =
   | { ok: true; workspace: WorkspaceContext }
@@ -19,7 +86,16 @@ export async function validateApiKey(
   const cacheKey = `apikey:${hashForCache(apiKey)}`;
   const cached = await env.CACHE_KV.get(cacheKey, "json");
   if (cached) {
-    return { ok: true, workspace: cached as WorkspaceContext };
+    const ctxBase = cached as Omit<WorkspaceContext, "allowedAccounts">;
+    // Fetch enabled accounts (with KV caching to avoid redundant Supabase queries)
+    const enabledIds = await fetchWorkspaceEnabledMetaAccountIds(
+      ctxBase.workspaceId,
+      env
+    );
+    return {
+      ok: true,
+      workspace: { ...ctxBase, allowedAccounts: enabledIds },
+    };
   }
 
   // Call Supabase RPC
@@ -57,7 +133,7 @@ export async function validateApiKey(
   }
 
   const row = rows[0];
-  const ctx: WorkspaceContext = {
+  const ctxBase: Omit<WorkspaceContext, "allowedAccounts"> = {
     workspaceId: row.workspace_id,
     apiKeyId: row.api_key_id,
     tier: row.tier,
@@ -68,11 +144,15 @@ export async function validateApiKey(
     enableMetaMutations: row.enable_meta_mutations === true,
   };
 
-  await env.CACHE_KV.put(cacheKey, JSON.stringify(ctx), {
+  await env.CACHE_KV.put(cacheKey, JSON.stringify(ctxBase), {
     expirationTtl: API_KEY_CACHE_TTL,
   });
 
-  return { ok: true, workspace: ctx };
+  const enabledIds = await fetchWorkspaceEnabledMetaAccountIds(row.workspace_id, env);
+  return {
+    ok: true,
+    workspace: { ...ctxBase, allowedAccounts: enabledIds },
+  };
 }
 
 /**
@@ -268,6 +348,38 @@ export async function assertOauthNewConnectionAllowed(
 }
 
 /**
+ * Read access-token metadata from KV. Workers KV is eventually consistent: a token
+ * just written by POST /token may not be visible immediately on another PoP, which
+ * surfaces as 401 on the next POST /mcp. Short backoff retries cover that window.
+ */
+async function getOauthAccessTokenRecord(
+  env: Env,
+  tokenHash: string
+): Promise<StoredAccessToken | null> {
+  const key = `oauth:token:${tokenHash}`;
+  const backoffMs = [0, 60, 180, 400];
+  for (let attempt = 0; attempt < backoffMs.length; attempt++) {
+    const wait = backoffMs[attempt];
+    if (wait > 0) {
+      await new Promise((r) => setTimeout(r, wait));
+    }
+    const stored = await env.OAUTH_KV.get<StoredAccessToken>(key, "json");
+    if (stored) {
+      if (attempt > 0) {
+        console.log(
+          "[oauth] token visible after KV retry attempt",
+          attempt,
+          "hash:",
+          tokenHash.slice(0, 8)
+        );
+      }
+      return stored;
+    }
+  }
+  return null;
+}
+
+/**
  * Verifies an OAuth access token and returns the workspace context.
  * Returns a descriptive error string on failure so callers can surface it to the user.
  */
@@ -275,11 +387,13 @@ export async function verifyOAuthAccessToken(
   token: string,
   env: Env
 ): Promise<AuthResult> {
-  const tokenHash = await sha256Hex(token);
-  const stored = await env.OAUTH_KV.get<StoredAccessToken>(
-    `oauth:token:${tokenHash}`,
-    "json"
-  );
+  const normalized = token.trim();
+  if (!normalized) {
+    return { ok: false, error: "OAuth token not found. Please re-authenticate." };
+  }
+
+  const tokenHash = await sha256Hex(normalized);
+  const stored = await getOauthAccessTokenRecord(env, tokenHash);
 
   if (!stored) {
     console.log("[oauth] token not found in KV, hash:", tokenHash.slice(0, 8));
@@ -314,7 +428,7 @@ export async function verifyOAuthAccessToken(
     return { ok: false, error: "Internal error loading workspace. Please try again." };
   }
 
-  const rows = (await response.json()) as Array<{
+  let rows: Array<{
     workspace_id: string;
     tier: "free" | "pro" | "max" | "enterprise";
     requests_per_hour: number;
@@ -323,6 +437,14 @@ export async function verifyOAuthAccessToken(
     max_ad_accounts: number;
     enable_meta_mutations?: boolean | null;
   }>;
+  try {
+    const bodyText = await response.text();
+    const parsed = bodyText ? JSON.parse(bodyText) : [];
+    rows = Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.error("[oauth] get_workspace_context JSON parse error:", e);
+    return { ok: false, error: "Internal error loading workspace. Please try again." };
+  }
 
   console.log("[oauth] get_workspace_context rows:", rows.length, rows[0] ? JSON.stringify(rows[0]) : "empty");
 
@@ -364,11 +486,18 @@ export async function verifyOAuthAccessToken(
   let allowedAccounts = stored.allowed_accounts;
 
   if (connResponse.ok) {
-    const connRows = (await connResponse.json()) as Array<{
+    let connRows: Array<{
       connection_id: string;
       is_active: boolean;
       allowed_accounts: string[];
-    }>;
+    }> = [];
+    try {
+      const connBody = await connResponse.text();
+      const parsed = connBody ? JSON.parse(connBody) : [];
+      connRows = Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error("[oauth] get_oauth_connection JSON parse error:", e);
+    }
 
     console.log("[oauth] get_oauth_connection rows:", connRows.length, connRows[0] ? JSON.stringify(connRows[0]) : "empty");
 
@@ -423,6 +552,12 @@ export async function verifyOAuthAccessToken(
     }
   }
 
+  const workspaceEnabled = await fetchWorkspaceEnabledMetaAccountIds(
+    stored.workspace_id,
+    env
+  );
+  const effectiveAllowed = intersectAllowedAccounts(workspaceEnabled, allowedAccounts);
+
   return {
     ok: true,
     workspace: {
@@ -434,7 +569,7 @@ export async function verifyOAuthAccessToken(
       maxMcpConnections: row.max_mcp_connections,
       maxAdAccounts: row.max_ad_accounts ?? 0,
       enableMetaMutations: row.enable_meta_mutations === true,
-      allowedAccounts,
+      allowedAccounts: effectiveAllowed,
     },
   };
 }

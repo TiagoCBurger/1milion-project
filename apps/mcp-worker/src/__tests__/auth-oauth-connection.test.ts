@@ -11,21 +11,25 @@ function requireAuthOk(result: AuthResult): Extract<AuthResult, { ok: true }> {
   return result;
 }
 
+function jsonResponse(data: unknown, ok = true): Response {
+  return new Response(JSON.stringify(data), {
+    status: ok ? 200 : 500,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function fetchUrl(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  if (input instanceof Request) return input.url;
+  return (input as URL).href;
+}
+
 /**
  * Tests for verifyOAuthAccessToken with the new Supabase connection checks.
- *
- * The function flow:
- * 1. sha256Hex(token) → lookup in OAUTH_KV
- * 2. Check expiration
- * 3. Fetch workspace context via get_workspace_context RPC
- * 4. Fetch oauth connection via get_oauth_connection RPC
- * 5. If connection exists and is_active: use DB allowed_accounts (source of truth)
- * 6. If connection is revoked: return { ok: false, error }
- * 7. If no connection record: fall back to KV allowed_accounts
- * 8. Update last_used_at (best-effort)
+ * Workspace-enabled ad accounts are loaded via REST and intersected with
+ * OAuth allowed_accounts (empty OAuth list = full workspace-enabled set).
  */
 
-// Mock sha256Hex to return a predictable hash
 vi.mock("../oauth/utils", async () => {
   const actual = await vi.importActual<typeof import("../oauth/utils")>(
     "../oauth/utils",
@@ -42,7 +46,7 @@ const STORED_TOKEN = {
   user_id: "user-1",
   scope: "mcp",
   allowed_accounts: ["act_from_kv"],
-  expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+  expires_at: Math.floor(Date.now() / 1000) + 3600,
   created_at: Math.floor(Date.now() / 1000) - 60,
 };
 
@@ -51,19 +55,50 @@ const WORKSPACE_ROW = {
   tier: "pro" as const,
   requests_per_hour: 200,
   requests_per_day: 1000,
-  max_mcp_connections: -1, // unlimited — these tests focus on OAuth, not connection limits
+  max_mcp_connections: -1,
+  max_ad_accounts: 5,
+  enable_meta_mutations: true,
 };
 
 describe("verifyOAuthAccessToken — connection checks", () => {
   const originalFetch = globalThis.fetch;
   let env: Env;
+  let oauthConnectionRows: Array<{
+    connection_id: string;
+    is_active: boolean;
+    allowed_accounts: string[];
+  }>;
+  let workspaceEnabledMetaIds: string[];
 
   beforeEach(() => {
-    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [], status: 200 });
+    oauthConnectionRows = [];
+    workspaceEnabledMetaIds = [
+      "act_from_kv",
+      "act_from_db_1",
+      "act_from_db_2",
+      "act_1",
+    ];
     env = createMockEnv();
-
-    // Default: OAUTH_KV returns our stored token
     (env.OAUTH_KV.get as any).mockResolvedValue(STORED_TOKEN);
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = fetchUrl(input);
+      if (url.includes("rpc/get_workspace_context")) {
+        return jsonResponse([WORKSPACE_ROW]);
+      }
+      if (url.includes("rpc/get_oauth_connection")) {
+        return jsonResponse(oauthConnectionRows);
+      }
+      if (url.includes("/rest/v1/ad_accounts?")) {
+        return jsonResponse(
+          workspaceEnabledMetaIds.map((meta_account_id) => ({ meta_account_id })),
+        );
+      }
+      if (url.includes("oauth_connections?id=eq.") || url.includes("upsert_oauth_connection")) {
+        return jsonResponse({});
+      }
+      return jsonResponse({});
+    });
   });
 
   afterEach(() => {
@@ -80,7 +115,7 @@ describe("verifyOAuthAccessToken — connection checks", () => {
   it("returns failure for expired token", async () => {
     (env.OAUTH_KV.get as any).mockResolvedValue({
       ...STORED_TOKEN,
-      expires_at: Math.floor(Date.now() / 1000) - 10, // expired
+      expires_at: Math.floor(Date.now() / 1000) - 10,
     });
 
     const result = await verifyOAuthAccessToken("expired-token", env);
@@ -88,9 +123,12 @@ describe("verifyOAuthAccessToken — connection checks", () => {
   });
 
   it("returns failure when get_workspace_context returns empty", async () => {
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [], // no workspace rows
+    (globalThis.fetch as any).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = fetchUrl(input);
+      if (url.includes("rpc/get_workspace_context")) {
+        return jsonResponse([]);
+      }
+      return jsonResponse({});
     });
 
     const result = await verifyOAuthAccessToken("test-token", env);
@@ -98,67 +136,43 @@ describe("verifyOAuthAccessToken — connection checks", () => {
   });
 
   it("falls back to KV allowed_accounts when no DB connection exists", async () => {
-    // 1st call: get_workspace_context — success
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [WORKSPACE_ROW],
-    });
-
-    // 2nd call: get_oauth_connection — empty result (no record)
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [],
-    });
+    oauthConnectionRows = [];
 
     const result = requireAuthOk(await verifyOAuthAccessToken("test-token", env));
 
     expect(result.workspace.allowedAccounts).toEqual(["act_from_kv"]);
   });
 
-  it("returns failure when connection is revoked (is_active=false)", async () => {
-    // 1st: workspace context
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [WORKSPACE_ROW],
-    });
+  it("intersects OAuth allowed_accounts with workspace-enabled accounts", async () => {
+    oauthConnectionRows = [];
+    workspaceEnabledMetaIds = ["act_other"];
 
-    // 2nd: connection is revoked
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [
-        {
-          connection_id: "conn-1",
-          is_active: false,
-          allowed_accounts: ["act_whatever"],
-        },
-      ],
-    });
+    const result = requireAuthOk(await verifyOAuthAccessToken("test-token", env));
+
+    expect(result.workspace.allowedAccounts).toEqual([]);
+  });
+
+  it("returns failure when connection is revoked (is_active=false)", async () => {
+    oauthConnectionRows = [
+      {
+        connection_id: "conn-1",
+        is_active: false,
+        allowed_accounts: ["act_whatever"],
+      },
+    ];
 
     const result = await verifyOAuthAccessToken("test-token", env);
     expect(result.ok).toBe(false);
   });
 
   it("overrides allowed_accounts from DB connection (source of truth)", async () => {
-    // 1st: workspace context
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [WORKSPACE_ROW],
-    });
-
-    // 2nd: connection has different accounts than KV
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [
-        {
-          connection_id: "conn-1",
-          is_active: true,
-          allowed_accounts: ["act_from_db_1", "act_from_db_2"],
-        },
-      ],
-    });
-
-    // 3rd: last_used_at PATCH (fire-and-forget)
-    (globalThis.fetch as any).mockResolvedValueOnce({ ok: true });
+    oauthConnectionRows = [
+      {
+        connection_id: "conn-1",
+        is_active: true,
+        allowed_accounts: ["act_from_db_1", "act_from_db_2"],
+      },
+    ];
 
     const result = requireAuthOk(await verifyOAuthAccessToken("test-token", env));
 
@@ -169,16 +183,18 @@ describe("verifyOAuthAccessToken — connection checks", () => {
   });
 
   it("falls back to KV when get_oauth_connection RPC fails", async () => {
-    // 1st: workspace context
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [WORKSPACE_ROW],
-    });
-
-    // 2nd: connection RPC fails
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: false,
-      status: 500,
+    (globalThis.fetch as any).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = fetchUrl(input);
+      if (url.includes("rpc/get_workspace_context")) {
+        return jsonResponse([WORKSPACE_ROW]);
+      }
+      if (url.includes("rpc/get_oauth_connection")) {
+        return new Response("", { status: 500 });
+      }
+      if (url.includes("/rest/v1/ad_accounts?")) {
+        return jsonResponse([{ meta_account_id: "act_from_kv" }]);
+      }
+      return jsonResponse({});
     });
 
     const result = requireAuthOk(await verifyOAuthAccessToken("test-token", env));
@@ -187,14 +203,7 @@ describe("verifyOAuthAccessToken — connection checks", () => {
   });
 
   it("sets apiKeyId to 'oauth:{client_id}'", async () => {
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [WORKSPACE_ROW],
-    });
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [],
-    });
+    oauthConnectionRows = [];
 
     const result = requireAuthOk(await verifyOAuthAccessToken("test-token", env));
 
@@ -202,14 +211,7 @@ describe("verifyOAuthAccessToken — connection checks", () => {
   });
 
   it("returns correct tier and rate limits from workspace context", async () => {
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [WORKSPACE_ROW],
-    });
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [],
-    });
+    oauthConnectionRows = [];
 
     const result = requireAuthOk(await verifyOAuthAccessToken("test-token", env));
 
@@ -220,63 +222,84 @@ describe("verifyOAuthAccessToken — connection checks", () => {
   });
 
   it("fires last_used_at update when connection exists", async () => {
-    // 1st: workspace context
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [WORKSPACE_ROW],
-    });
-
-    // 2nd: active connection
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [
-        {
-          connection_id: "conn-1",
-          is_active: true,
-          allowed_accounts: ["act_1"],
-        },
-      ],
-    });
-
-    // 3rd: last_used_at PATCH (fire-and-forget)
-    (globalThis.fetch as any).mockResolvedValueOnce({ ok: true });
+    oauthConnectionRows = [
+      {
+        connection_id: "conn-1",
+        is_active: true,
+        allowed_accounts: ["act_1"],
+      },
+    ];
 
     await verifyOAuthAccessToken("test-token", env);
 
-    // Wait a tick for the fire-and-forget fetch to execute
     await new Promise((r) => setTimeout(r, 10));
 
-    // Verify the PATCH call was made
-    const calls = (globalThis.fetch as any).mock.calls;
-    expect(calls.length).toBeGreaterThanOrEqual(3);
-
-    const patchCall = calls[2];
-    expect(patchCall[0]).toContain("oauth_connections");
-    expect(patchCall[0]).toContain("conn-1");
-    expect(patchCall[1].method).toBe("PATCH");
-    expect(JSON.parse(patchCall[1].body)).toHaveProperty("last_used_at");
+    const calls = (globalThis.fetch as any).mock.calls as [string, RequestInit?][];
+    const patchCall = calls.find(
+      (c) => typeof c[0] === "string" && c[0].includes("oauth_connections?id=eq."),
+    );
+    expect(patchCall).toBeDefined();
+    expect(patchCall![1]?.method).toBe("PATCH");
+    expect(JSON.parse(patchCall![1]!.body as string)).toHaveProperty("last_used_at");
   });
 
   it("calls get_oauth_connection RPC with correct params", async () => {
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [WORKSPACE_ROW],
-    });
-    (globalThis.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => [],
-    });
+    oauthConnectionRows = [];
 
     await verifyOAuthAccessToken("test-token", env);
 
-    // Second fetch call is get_oauth_connection
-    const [url, opts] = (globalThis.fetch as any).mock.calls[1];
-    expect(url).toBe(
-      "https://test.supabase.co/rest/v1/rpc/get_oauth_connection",
+    const calls = (globalThis.fetch as any).mock.calls as [string, RequestInit?][];
+    const connCall = calls.find(
+      (c) => typeof c[0] === "string" && c[0].includes("rpc/get_oauth_connection"),
     );
-    expect(opts.method).toBe("POST");
-    const body = JSON.parse(opts.body);
+    expect(connCall).toBeDefined();
+    expect(connCall![1]?.method).toBe("POST");
+    const body = JSON.parse(connCall![1]!.body as string);
     expect(body.p_workspace_id).toBe("ws-1");
     expect(body.p_client_id).toBe("client_abc");
+  });
+
+  it("falls back to all workspace accounts when none are explicitly enabled", async () => {
+    oauthConnectionRows = [
+      {
+        connection_id: "conn-1",
+        is_active: true,
+        allowed_accounts: [], // Empty OAuth filter means no extra restriction
+      },
+    ];
+    workspaceEnabledMetaIds = [];
+
+    (globalThis.fetch as any).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = fetchUrl(input);
+      if (url.includes("rpc/get_workspace_context")) {
+        return jsonResponse([WORKSPACE_ROW]);
+      }
+      if (url.includes("rpc/get_oauth_connection")) {
+        return jsonResponse(oauthConnectionRows);
+      }
+      if (url.includes("/rest/v1/ad_accounts?")) {
+        // First call: is_enabled=eq.true returns empty (no explicit enabled)
+        if (url.includes("is_enabled=eq.true")) {
+          return jsonResponse([]);
+        }
+        // Second call (fallback): fetch all accounts returns all accounts
+        return jsonResponse([
+          { meta_account_id: "act_fallback_1" },
+          { meta_account_id: "act_fallback_2" },
+        ]);
+      }
+      if (url.includes("oauth_connections?id=eq.") || url.includes("upsert_oauth_connection")) {
+        return jsonResponse({});
+      }
+      return jsonResponse({});
+    });
+
+    const result = requireAuthOk(await verifyOAuthAccessToken("test-token", env));
+
+    // Should fallback to all accounts when none are explicitly enabled + empty OAuth filter
+    expect(result.workspace.allowedAccounts).toEqual([
+      "act_fallback_1",
+      "act_fallback_2",
+    ]);
   });
 });
