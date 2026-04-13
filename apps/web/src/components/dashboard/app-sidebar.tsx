@@ -138,7 +138,6 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
             },
           ],
         },
-        { title: "Assinatura", url: `/dashboard/${slug}/billing`, icon: CreditCard },
       ]
     : []
 
@@ -226,6 +225,17 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" className="w-56">
+            {slug ? (
+              <>
+                <DropdownMenuItem asChild>
+                  <Link href={`/dashboard/${slug}/billing`}>
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Assinatura
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            ) : null}
             <DropdownMenuItem
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             >
