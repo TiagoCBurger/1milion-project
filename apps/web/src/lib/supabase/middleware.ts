@@ -25,6 +25,31 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
+  // Handle PKCE code exchange for email confirmation
+  if (
+    request.nextUrl.pathname === "/auth/confirm" &&
+    request.nextUrl.searchParams.get("code")
+  ) {
+    const code = request.nextUrl.searchParams.get("code")!;
+    const next = request.nextUrl.searchParams.get("next") ?? "/dashboard";
+    const destination = next.startsWith("/") ? next : "/dashboard";
+
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (!error) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/auth/confirm";
+      url.search = "?confirmed=true&next=" + encodeURIComponent(destination);
+      // Copy session cookies to the redirect response
+      const redirectResponse = NextResponse.redirect(url);
+      supabaseResponse.cookies.getAll().forEach((cookie) => {
+        redirectResponse.cookies.set(cookie.name, cookie.value);
+      });
+      return redirectResponse;
+    }
+    // If exchange fails, let the page render and show the error
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();

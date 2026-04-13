@@ -14,16 +14,24 @@ function ConfirmContent() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
+    const confirmed = searchParams.get("confirmed");
     const code = searchParams.get("code");
     const tokenHash = searchParams.get("token_hash");
     const type = searchParams.get("type");
     const next = searchParams.get("next") ?? "/dashboard";
     const destination = next.startsWith("/") ? next : "/dashboard";
 
+    // Middleware already exchanged the code successfully
+    if (confirmed === "true") {
+      setStatus("success");
+      setTimeout(() => router.push(destination), 2000);
+      return;
+    }
+
     async function confirm() {
       const supabase = createClient();
 
-      // Token hash flow: direct OTP verification (recommended — no PKCE verifier needed)
+      // Token hash flow: direct OTP verification (no PKCE verifier needed)
       if (tokenHash && type) {
         const { error } = await supabase.auth.verifyOtp({
           type: type as "signup" | "email",
@@ -40,7 +48,7 @@ function ConfirmContent() {
         return;
       }
 
-      // PKCE flow: Supabase verified OTP server-side and redirected with a code
+      // PKCE flow fallback: client-side code exchange
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (!error) {
@@ -49,12 +57,12 @@ function ConfirmContent() {
           return;
         }
         console.error("[auth/confirm] exchangeCodeForSession error:", error);
-        setErrorMessage("O link de confirmação expirou ou já foi utilizado.");
+        setErrorMessage(error.message || "O link de confirmação expirou ou já foi utilizado.");
         setStatus("error");
         return;
       }
 
-      setErrorMessage("Link de confirmação inválido. Params recebidos: " + Array.from(searchParams.entries()).map(([k, v]) => `${k}=${v}`).join(", "));
+      setErrorMessage("Link de confirmação inválido.");
       setStatus("error");
     }
 
