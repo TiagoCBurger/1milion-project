@@ -37,7 +37,6 @@ const TOOLS_THAT_BLOCK = new Set([
   "upload_ad_image",
   "upload_ad_video",
   "create_ad_creative",
-  "batch_marketing_api_reads",
 ]);
 
 // Tools that FILTER results to only allowed accounts
@@ -120,7 +119,6 @@ function getArgsWithAccount(
     upload_ad_image: { account_id: accountId, image_url: "https://example.com/img.jpg" },
     upload_ad_video: { account_id: accountId, video_url: "https://example.com/vid.mp4" },
     create_ad_creative: { account_id: accountId, page_id: "page_1" },
-    batch_marketing_api_reads: { account_id: accountId, calls_per_invocation: 10 },
     get_ad_accounts: { user_id: "me", limit: 200 },
     search: { query: "test" },
   };
