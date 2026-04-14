@@ -10,6 +10,7 @@ import { registerTargetingTools } from "./targeting";
 import { registerLibraryTools } from "./library";
 import { registerBudgetTools } from "./budget";
 import { registerSearchTools } from "./search";
+import { registerVolumeTools } from "./volume";
 
 export interface ToolContext {
   server: McpServer;
@@ -70,4 +71,5 @@ export function registerAllTools(ctx: ToolContext): void {
   registerLibraryTools(ctx);
   registerBudgetTools(ctx);
   registerSearchTools(ctx);
+  registerVolumeTools(ctx);
 }
