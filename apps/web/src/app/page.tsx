@@ -213,7 +213,12 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-vf-border py-8 px-6 bg-white/40">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-vf-muted">
-          <BrandLogo href="/" />
+          <div className="flex flex-col items-center sm:items-start gap-1">
+            <BrandLogo href="/" />
+            <span className="text-xs text-vf-muted/90">
+              CNPJ: 61.750.788/0001-48
+            </span>
+          </div>
           <div className="flex gap-6">
             <Link href="/terms" className="hover:text-vf-heading transition-colors">
               Termos
