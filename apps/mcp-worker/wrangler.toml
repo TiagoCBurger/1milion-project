@@ -1,0 +1,36 @@
+name = "mcp-worker"
+main = "src/index.ts"
+compatibility_date = "2025-03-15"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+# Secrets (set via `wrangler secret bulk` — NOT in this file):
+# SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, FACEBOOK_APP_ID,
+# FACEBOOK_APP_SECRET, OAUTH_SIGNING_SECRET, R2_ACCESS_KEY_ID,
+# R2_SECRET_ACCESS_KEY, R2_ACCOUNT_ID, R2_BUCKET_NAME
+
+[vars]
+MCP_SERVER_URL = "https://mcp-worker.ticburger.workers.dev"
+WEB_APP_URL = "https://vibefly.app"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "7067cb7cb6d84393a1819b641f5b9ddc"
+
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "46d024d9fa69492aaf953e85f1c35a5c"
+
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "463964027b9a436d92611c2596a250de"
+
+[[r2_buckets]]
+binding = "CREATIVES_R2"
+bucket_name = "vibefly-creatives"

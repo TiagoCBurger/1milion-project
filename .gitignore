@@ -9,6 +9,7 @@ dist/
 .wrangler
 .dev.vars
 wrangler.toml
+!apps/mcp-worker/wrangler.toml
 supabase/.temp/
 *.tsbuildinfo
 __pycache__/
