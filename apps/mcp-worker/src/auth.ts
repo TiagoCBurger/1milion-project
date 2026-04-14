@@ -3,8 +3,8 @@ import type { StoredAccessToken } from "./oauth/types";
 import { sha256Hex } from "./oauth/utils";
 import { intersectAllowedAccounts } from "./workspace-ad-accounts";
 
-const API_KEY_CACHE_TTL = 60; // seconds
-const ENABLED_AD_ACCOUNTS_CACHE_TTL = 30;
+const API_KEY_CACHE_TTL = 300; // 5 minutes
+const ENABLED_AD_ACCOUNTS_CACHE_TTL = 300; // 5 minutes — keeps daily KV writes low
 
 /**
  * Meta account IDs (as stored on ad_accounts.meta_account_id) with is_enabled = true.
