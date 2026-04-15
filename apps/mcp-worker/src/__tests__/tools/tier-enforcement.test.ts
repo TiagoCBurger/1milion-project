@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { createToolCapture, parseToolResult, createMockEnv } from "../helpers";
+import { createToolCapture, createMockEnv } from "../helpers";
 import { registerAllTools } from "../../tools";
-import { registerCommerceTools } from "../../tools/commerce";
-import * as workerAuth from "../../auth";
 import {
   FREE_TIER_TOOLS,
   TIER_LIMITS,
@@ -26,34 +24,7 @@ vi.mock("../../meta-api", async () => {
   };
 });
 
-vi.mock("@vibefly/hotmart", async (importOriginal) => {
-  const mod = await importOriginal<typeof import("@vibefly/hotmart")>();
-  return {
-    ...mod,
-    runHotmartInitialBackfill: vi
-      .fn()
-      .mockResolvedValue({ ok: true, errors: [] }),
-    syncHotmartEntity: vi.fn().mockResolvedValue({
-      syncLogId: "test-sync",
-      recordsSynced: 0,
-    }),
-  };
-});
-
 const originalFetch = globalThis.fetch;
-
-function stubFetchForHotmart() {
-  globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input.toString();
-    if (url.includes("hotmart_credentials?")) {
-      return new Response(JSON.stringify([{ id: "cred" }]), { status: 200 });
-    }
-    if (url.includes("/rest/v1/commerce_")) {
-      return new Response(JSON.stringify([]), { status: 200 });
-    }
-    return originalFetch(input, init);
-  }) as typeof globalThis.fetch;
-}
 
 const WRITE_TOOLS = new Set([
   "create_campaign",
@@ -67,7 +38,6 @@ const WRITE_TOOLS = new Set([
   "create_ad_creative",
   "update_ad_creative",
   "create_budget_schedule",
-  "commerce_trigger_sync",
 ]);
 
 const READ_TOOLS = new Set([
@@ -98,17 +68,6 @@ const READ_TOOLS = new Set([
   "fetch",
 ]);
 
-/** Commerce MCP tools (paid tier; local DB reads + sync, provider-agnostic). */
-const COMMERCE_READ_TOOLS = new Set([
-  "commerce_list_products",
-  "commerce_get_product",
-  "commerce_list_customers",
-  "commerce_get_customer",
-  "commerce_list_sales",
-  "commerce_get_sale",
-  "commerce_list_refunds",
-]);
-
 describe("Tier Enforcement", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
@@ -123,7 +82,6 @@ describe("Tier Enforcement", () => {
       vi.clearAllMocks();
       const capture = createToolCapture();
       registerAllTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
-      registerCommerceTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
 
       const args = getMinimalArgs(toolName);
       const result = await capture.callTool(toolName, args);
@@ -137,11 +95,8 @@ describe("Tier Enforcement", () => {
   it("pro tier allows ALL write tools (no tier error)", async () => {
     for (const toolName of WRITE_TOOLS) {
       vi.clearAllMocks();
-      vi.spyOn(workerAuth, "getHotmartAccessToken").mockResolvedValue("tok");
-      stubFetchForHotmart();
       const capture = createToolCapture();
       registerAllTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
-      registerCommerceTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
 
       const args = getMinimalArgs(toolName);
       const result = await capture.callTool(toolName, args);
@@ -151,19 +106,6 @@ describe("Tier Enforcement", () => {
       expect(text).not.toContain("requires a PRO");
       expect(text).not.toContain("Pro or Enterprise subscription");
       expect(text).not.toContain("Pro tier subscription");
-    }
-  });
-
-  it("free tier blocks commerce tools", async () => {
-    for (const toolName of [...COMMERCE_READ_TOOLS, "commerce_trigger_sync"]) {
-      vi.clearAllMocks();
-      const capture = createToolCapture();
-      registerCommerceTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws" });
-      const args = getMinimalArgs(toolName);
-      const result = await capture.callTool(toolName, args);
-      const text = (result as any).content?.[0]?.text ?? "";
-      expect((result as any).isError).toBe(true);
-      expect(text).toContain("paid plan");
     }
   });
 });
@@ -286,28 +228,6 @@ function getMinimalArgs(toolName: string): Record<string, unknown> {
       budget_value_type: "ABSOLUTE",
       time_start: 1700000000,
       time_end: 1700086400,
-    },
-    commerce_trigger_sync: { provider: "hotmart", entity: "all" },
-    commerce_list_products: { limit: 10, offset: 0, status: "", search: "" },
-    commerce_get_product: { product_id: "00000000-0000-4000-8000-000000000001" },
-    commerce_list_customers: { limit: 10, offset: 0, search: "", email: "" },
-    commerce_get_customer: { customer_id: "00000000-0000-4000-8000-000000000002", email: "" },
-    commerce_list_sales: {
-      limit: 10,
-      offset: 0,
-      start_date: "",
-      end_date: "",
-      product_id: "",
-      customer_email: "",
-      status: "",
-    },
-    commerce_get_sale: { transaction_id: "HP1" },
-    commerce_list_refunds: {
-      limit: 10,
-      offset: 0,
-      start_date: "",
-      end_date: "",
-      product_id: "",
     },
     // Read tools
     get_ad_accounts: { user_id: "me", limit: 10 },

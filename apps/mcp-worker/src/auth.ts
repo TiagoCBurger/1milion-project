@@ -196,57 +196,6 @@ export async function getMetaToken(
   return token;
 }
 
-const HOTMART_TOKEN_CACHE_TTL = 60;
-
-/**
- * Hotmart bearer token via Edge Function (refreshes when near expiry).
- */
-export async function getHotmartAccessToken(
-  workspaceId: string,
-  env: Env
-): Promise<string | null> {
-  const cacheKey = `hotmart:token:${workspaceId}`;
-  const cached = await env.CACHE_KV.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  const response = await fetch(
-    `${env.SUPABASE_URL}/functions/v1/decrypt-hotmart-credentials`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-      body: JSON.stringify({ workspaceId }),
-    }
-  );
-
-  if (!response.ok) {
-    console.error(
-      "decrypt-hotmart-credentials error:",
-      response.status,
-      await response.text()
-    );
-    return null;
-  }
-
-  const json = (await response.json()) as {
-    credentials?: { access_token?: string | null };
-  };
-  const token = json.credentials?.access_token;
-  if (!token) {
-    return null;
-  }
-
-  await env.CACHE_KV.put(cacheKey, token, {
-    expirationTtl: HOTMART_TOKEN_CACHE_TTL,
-  });
-
-  return token;
-}
-
 const MCP_CONN_COUNT_CACHE_TTL = 60;
 
 /**

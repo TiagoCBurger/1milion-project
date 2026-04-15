@@ -1,14 +1,5 @@
 import type { SubscriptionTier } from "./types";
 
-/** Hotmart integration is available on paid tiers only. */
-export function isHotmartIntegrationEnabled(tier: SubscriptionTier): boolean {
-  return tier !== "free";
-}
-
-export const INTEGRATION_PROVIDERS = {
-  HOTMART: "hotmart",
-} as const;
-
 // ============================================================
 // Tier limits
 // ============================================================

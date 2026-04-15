@@ -14,8 +14,9 @@ import {
   oauthError,
 } from "./utils";
 
-const ACCESS_TOKEN_TTL = 3600; // 1 hour
-const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days
+/** Opaque MCP access token (not the Meta token). Longer TTL = fewer refresh round-trips; clients should still refresh via refresh_token before expiry. */
+const ACCESS_TOKEN_TTL = 8 * 3600; // 8 hours (was 1h — Cursor/MCP often felt “caindo” hourly)
+const REFRESH_TOKEN_TTL = 90 * 24 * 60 * 60; // 90 days — re-login in browser less often
 
 /**
  * POST /token — Token endpoint.
