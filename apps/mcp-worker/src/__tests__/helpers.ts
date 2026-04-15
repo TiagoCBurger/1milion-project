@@ -70,6 +70,65 @@ export function createMockKV(): KVNamespace {
 }
 
 /**
+ * Create a mock RATE_LIMIT_DO namespace that emulates the DO fetch interface
+ * with in-memory per-workspace counters, so rate-limit.ts can be tested.
+ */
+export function createMockRateLimitDO(): DurableObjectNamespace {
+  type Counters = { minute: number; hour: number; day: number; uploads: Record<string, number> };
+  const byId = new Map<string, Counters>();
+
+  function counters(id: string): Counters {
+    let c = byId.get(id);
+    if (!c) {
+      c = { minute: 0, hour: 0, day: 0, uploads: {} };
+      byId.set(id, c);
+    }
+    return c;
+  }
+
+  function makeStub(id: string) {
+    return {
+      fetch: vi.fn(async (url: string | Request, init?: RequestInit) => {
+        const path = new URL(typeof url === "string" ? url : url.url).pathname;
+        const body = JSON.parse(String(init?.body ?? "{}"));
+        const c = counters(id);
+
+        if (path === "/check-rate") {
+          if (body.perMinute > 0 && c.minute >= body.perMinute) {
+            return Response.json({ limited: true, limit: body.perMinute, retryAfter: 60, scope: "minute", minuteCount: c.minute, hourCount: c.hour, dayCount: c.day });
+          }
+          if (body.perHour > 0 && c.hour >= body.perHour) {
+            return Response.json({ limited: true, limit: body.perHour, retryAfter: 3600, scope: "hour", minuteCount: c.minute, hourCount: c.hour, dayCount: c.day });
+          }
+          if (body.perDay > 0 && c.day >= body.perDay) {
+            return Response.json({ limited: true, limit: body.perDay, retryAfter: 86400, scope: "day", minuteCount: c.minute, hourCount: c.hour, dayCount: c.day });
+          }
+          c.minute += 1; c.hour += 1; c.day += 1;
+          return Response.json({ limited: false, minuteCount: c.minute, hourCount: c.hour, dayCount: c.day });
+        }
+        if (path === "/check-upload") {
+          const key = body.kind;
+          const current = c.uploads[key] ?? 0;
+          if (current >= body.perDay) {
+            return Response.json({ allowed: false, current, limit: body.perDay });
+          }
+          c.uploads[key] = current + 1;
+          return Response.json({ allowed: true, current: c.uploads[key], limit: body.perDay });
+        }
+        return new Response("Not found", { status: 404 });
+      }),
+    } as unknown as DurableObjectStub;
+  }
+
+  return {
+    idFromName: (name: string) => ({ toString: () => name, name }) as unknown as DurableObjectId,
+    idFromString: (id: string) => ({ toString: () => id, name: id }) as unknown as DurableObjectId,
+    newUniqueId: () => ({ toString: () => "unique", name: "unique" }) as unknown as DurableObjectId,
+    get: (id: DurableObjectId) => makeStub(String(id.toString())),
+  } as unknown as DurableObjectNamespace;
+}
+
+/**
  * Create a mock Env for testing.
  */
 export function createMockEnv(overrides?: Partial<Env>): Env {
@@ -77,6 +136,7 @@ export function createMockEnv(overrides?: Partial<Env>): Env {
     RATE_LIMIT_KV: createMockKV(),
     CACHE_KV: createMockKV(),
     OAUTH_KV: createMockKV(),
+    RATE_LIMIT_DO: createMockRateLimitDO(),
     CREATIVES_R2: {} as R2Bucket,
     SUPABASE_URL: "https://test.supabase.co",
     SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
@@ -98,6 +158,7 @@ export function createMockWorkspace(
     workspaceId: "ws-123",
     apiKeyId: "key-456",
     tier: "pro",
+    requestsPerMinute: 30,
     requestsPerHour: 200,
     requestsPerDay: 1000,
     maxMcpConnections: 1,

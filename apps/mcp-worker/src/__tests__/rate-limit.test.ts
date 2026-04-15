@@ -1,15 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { checkRateLimit } from "../rate-limit";
+import { checkRateLimit, checkUploadLimit } from "../rate-limit";
 import { createMockEnv, createMockWorkspace } from "./helpers";
 import type { Env, WorkspaceContext } from "../types";
 
-describe("checkRateLimit", () => {
+describe("checkRateLimit (DO-backed)", () => {
   let env: Env;
   let workspace: WorkspaceContext;
 
   beforeEach(() => {
     env = createMockEnv();
     workspace = createMockWorkspace({
+      requestsPerMinute: 3,
       requestsPerHour: 5,
       requestsPerDay: 100,
     });
@@ -17,54 +18,51 @@ describe("checkRateLimit", () => {
 
   it("allows request when under limits", async () => {
     const result = await checkRateLimit(workspace, env);
-
     expect(result.limited).toBe(false);
-    // Should have incremented counters
-    expect(env.RATE_LIMIT_KV.put).toHaveBeenCalledTimes(2);
   });
 
-  it("blocks when hour limit is reached", async () => {
-    // Pre-set counter to be at the limit
-    (env.RATE_LIMIT_KV.get as any).mockResolvedValueOnce("5"); // hour counter at limit
-    (env.RATE_LIMIT_KV.get as any).mockResolvedValueOnce("10"); // day counter under limit
-
+  it("blocks when minute limit is reached", async () => {
+    for (let i = 0; i < 3; i++) await checkRateLimit(workspace, env);
     const result = await checkRateLimit(workspace, env);
+    expect(result.limited).toBe(true);
+    expect(result.limit).toBe(3);
+    expect(result.scope).toBe("minute");
+  });
 
+  it("blocks when hour limit is reached (per-minute disabled)", async () => {
+    const ws = { ...workspace, requestsPerMinute: 0 };
+    for (let i = 0; i < 5; i++) await checkRateLimit(ws, env);
+    const result = await checkRateLimit(ws, env);
     expect(result.limited).toBe(true);
     expect(result.limit).toBe(5);
-    expect(result.retryAfter).toBe(3600);
+    expect(result.scope).toBe("hour");
   });
 
-  it("blocks when day limit is reached", async () => {
-    (env.RATE_LIMIT_KV.get as any).mockResolvedValueOnce("3"); // minute counter under
-    (env.RATE_LIMIT_KV.get as any).mockResolvedValueOnce("100"); // day counter at limit
+  it("isolates counters per workspace", async () => {
+    const ws1 = createMockWorkspace({ workspaceId: "a", requestsPerMinute: 1, requestsPerHour: 10, requestsPerDay: 10 });
+    const ws2 = createMockWorkspace({ workspaceId: "b", requestsPerMinute: 1, requestsPerHour: 10, requestsPerDay: 10 });
+    await checkRateLimit(ws1, env);
+    const blocked = await checkRateLimit(ws1, env);
+    const ws2Result = await checkRateLimit(ws2, env);
+    expect(blocked.limited).toBe(true);
+    expect(ws2Result.limited).toBe(false);
+  });
+});
 
-    const result = await checkRateLimit(workspace, env);
-
-    expect(result.limited).toBe(true);
-    expect(result.limit).toBe(100);
-    expect(result.retryAfter).toBe(3600);
+describe("checkUploadLimit (DO-backed)", () => {
+  it("allows under limit, blocks at limit", async () => {
+    const env = createMockEnv();
+    const first = await checkUploadLimit("ws-1", "images", 2, env);
+    const second = await checkUploadLimit("ws-1", "images", 2, env);
+    const third = await checkUploadLimit("ws-1", "images", 2, env);
+    expect(first.allowed).toBe(true);
+    expect(second.allowed).toBe(true);
+    expect(third.allowed).toBe(false);
   });
 
-  it("increments counters with correct TTL", async () => {
-    await checkRateLimit(workspace, env);
-
-    const putCalls = (env.RATE_LIMIT_KV.put as any).mock.calls;
-
-    // Hour counter: TTL 7200s
-    expect(putCalls[0][1]).toBe("1");
-    expect(putCalls[0][2]).toEqual({ expirationTtl: 7_200 });
-
-    // Day counter: TTL 90000s
-    expect(putCalls[1][1]).toBe("1");
-    expect(putCalls[1][2]).toEqual({ expirationTtl: 90_000 });
-  });
-
-  it("uses workspace-specific KV keys", async () => {
-    await checkRateLimit(workspace, env);
-
-    const getCalls = (env.RATE_LIMIT_KV.get as any).mock.calls;
-    expect(getCalls[0][0]).toContain("rl:ws-123:h:");
-    expect(getCalls[1][0]).toContain("rl:ws-123:d:");
+  it("Infinity limit short-circuits", async () => {
+    const env = createMockEnv();
+    const r = await checkUploadLimit("ws-1", "videos", Infinity, env);
+    expect(r.allowed).toBe(true);
   });
 });

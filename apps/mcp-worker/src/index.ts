@@ -8,6 +8,8 @@ import { registerAllTools } from "./tools";
 import { routeOAuth } from "./oauth/router";
 import type { Env, WorkspaceContext } from "./types";
 
+export { RateLimitDO } from "./rate-limit-do";
+
 export default {
   async fetch(
     request: Request,
@@ -129,9 +131,10 @@ async function handleFetch(
     // -------------------------------------------------------
     const rateResult = await checkRateLimit(workspace, env);
     if (rateResult.limited) {
+      const scopeLabel = rateResult.scope === "minute" ? "min" : rateResult.scope === "day" ? "day" : "hr";
       return jsonRpcError(
         -32600,
-        `Rate limit exceeded (${rateResult.limit}/hr). Retry after ${rateResult.retryAfter}s`,
+        `Rate limit exceeded (${rateResult.limit}/${scopeLabel}). Retry after ${rateResult.retryAfter}s`,
         null,
         429
       );

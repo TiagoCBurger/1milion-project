@@ -7,6 +7,7 @@ import type { SubscriptionTier } from "./types";
 export const TIER_LIMITS: Record<
   SubscriptionTier,
   {
+    requests_per_minute: number;
     requests_per_hour: number;
     requests_per_day: number;
     max_api_keys: number;
@@ -15,6 +16,7 @@ export const TIER_LIMITS: Record<
   }
 > = {
   free: {
+    requests_per_minute: 0,
     requests_per_hour: 0,
     requests_per_day: 0,
     max_api_keys: 0,
@@ -22,6 +24,7 @@ export const TIER_LIMITS: Record<
     max_ad_accounts: 0,
   },
   pro: {
+    requests_per_minute: 30,
     requests_per_hour: 200,
     requests_per_day: 1_000,
     max_api_keys: 1,
@@ -29,6 +32,7 @@ export const TIER_LIMITS: Record<
     max_ad_accounts: 1,
   },
   max: {
+    requests_per_minute: 60,
     requests_per_hour: 200,
     requests_per_day: 5_000,
     max_api_keys: 5,
@@ -36,7 +40,8 @@ export const TIER_LIMITS: Record<
     max_ad_accounts: 5,
   },
   enterprise: {
-    requests_per_hour: 0, // custom per contract
+    requests_per_minute: 0, // custom per contract
+    requests_per_hour: 0,
     requests_per_day: 0,
     max_api_keys: 0,
     max_mcp_connections: -1, // unlimited

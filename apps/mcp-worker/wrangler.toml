@@ -31,6 +31,14 @@ id = "46d024d9fa69492aaf953e85f1c35a5c"
 binding = "OAUTH_KV"
 id = "463964027b9a436d92611c2596a250de"
 
+[[durable_objects.bindings]]
+name = "RATE_LIMIT_DO"
+class_name = "RateLimitDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RateLimitDO"]
+
 [[r2_buckets]]
 binding = "CREATIVES_R2"
 bucket_name = "vibefly-creatives"

@@ -53,6 +53,7 @@ const STORED_TOKEN = {
 const WORKSPACE_ROW = {
   workspace_id: "ws-1",
   tier: "pro" as const,
+  requests_per_minute: 30,
   requests_per_hour: 200,
   requests_per_day: 1000,
   max_mcp_connections: -1,

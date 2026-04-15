@@ -119,6 +119,7 @@ describe("TIER_LIMITS constants", () => {
   });
 
   it("free tier has zero limits (no access)", () => {
+    expect(TIER_LIMITS.free.requests_per_minute).toBe(0);
     expect(TIER_LIMITS.free.requests_per_hour).toBe(0);
     expect(TIER_LIMITS.free.requests_per_day).toBe(0);
     expect(TIER_LIMITS.free.max_api_keys).toBe(0);
@@ -127,6 +128,7 @@ describe("TIER_LIMITS constants", () => {
   });
 
   it("pro tier has correct limits", () => {
+    expect(TIER_LIMITS.pro.requests_per_minute).toBe(30);
     expect(TIER_LIMITS.pro.requests_per_hour).toBe(200);
     expect(TIER_LIMITS.pro.requests_per_day).toBe(1_000);
     expect(TIER_LIMITS.pro.max_mcp_connections).toBe(1);
@@ -134,6 +136,7 @@ describe("TIER_LIMITS constants", () => {
   });
 
   it("max tier has correct limits", () => {
+    expect(TIER_LIMITS.max.requests_per_minute).toBe(60);
     expect(TIER_LIMITS.max.requests_per_hour).toBe(200);
     expect(TIER_LIMITS.max.requests_per_day).toBe(5_000);
     expect(TIER_LIMITS.max.max_mcp_connections).toBe(5);

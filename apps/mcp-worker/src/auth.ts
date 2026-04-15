@@ -121,6 +121,7 @@ export async function validateApiKey(
     workspace_id: string;
     api_key_id: string;
     tier: "free" | "pro" | "max" | "enterprise";
+    requests_per_minute: number | null;
     requests_per_hour: number;
     requests_per_day: number;
     max_mcp_connections: number;
@@ -137,6 +138,7 @@ export async function validateApiKey(
     workspaceId: row.workspace_id,
     apiKeyId: row.api_key_id,
     tier: row.tier,
+    requestsPerMinute: row.requests_per_minute ?? 0,
     requestsPerHour: row.requests_per_hour,
     requestsPerDay: row.requests_per_day,
     maxMcpConnections: row.max_mcp_connections,
@@ -380,6 +382,7 @@ export async function verifyOAuthAccessToken(
   let rows: Array<{
     workspace_id: string;
     tier: "free" | "pro" | "max" | "enterprise";
+    requests_per_minute: number | null;
     requests_per_hour: number;
     requests_per_day: number;
     max_mcp_connections: number;
@@ -513,6 +516,7 @@ export async function verifyOAuthAccessToken(
       workspaceId: row.workspace_id,
       apiKeyId: `oauth:${stored.client_id}`,
       tier: row.tier,
+      requestsPerMinute: row.requests_per_minute ?? 0,
       requestsPerHour: row.requests_per_hour,
       requestsPerDay: row.requests_per_day,
       maxMcpConnections: row.max_mcp_connections,
