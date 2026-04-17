@@ -129,8 +129,9 @@ export class RateLimitDO extends DurableObject {
   }
 
   private async checkUpload(body: UploadCheckBody): Promise<UploadCheckResponse> {
+    // Infinity = unlimited (short-circuit in rate-limit.ts, but guard here too)
     if (!Number.isFinite(body.perDay) || body.perDay <= 0) {
-      return { allowed: body.perDay === Infinity || body.perDay > 0, current: 0, limit: body.perDay };
+      return { allowed: !Number.isFinite(body.perDay), current: 0, limit: body.perDay };
     }
 
     const dayWindow = new Date().toISOString().slice(0, 10);
