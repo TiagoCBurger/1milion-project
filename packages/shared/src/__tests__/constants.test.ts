@@ -37,6 +37,7 @@ describe("TIER_LIMITS", () => {
 
   it("free tier: no access (all zeros)", () => {
     expect(TIER_LIMITS.free).toEqual({
+      requests_per_minute: 0,
       requests_per_hour: 0,
       requests_per_day: 0,
       max_api_keys: 0,
@@ -45,8 +46,9 @@ describe("TIER_LIMITS", () => {
     });
   });
 
-  it("pro tier: 200 req/hr, 1000 req/day, 1 key, 1 MCP, 1 ad account", () => {
+  it("pro tier: 30 req/min, 200 req/hr, 1000 req/day, 1 key, 1 MCP, 1 ad account", () => {
     expect(TIER_LIMITS.pro).toEqual({
+      requests_per_minute: 30,
       requests_per_hour: 200,
       requests_per_day: 1_000,
       max_api_keys: 1,
@@ -55,8 +57,9 @@ describe("TIER_LIMITS", () => {
     });
   });
 
-  it("max tier: 200 req/hr, 5000 req/day, 5 keys, 5 MCP, 5 ad accounts", () => {
+  it("max tier: 60 req/min, 200 req/hr, 5000 req/day, 5 keys, 5 MCP, 5 ad accounts", () => {
     expect(TIER_LIMITS.max).toEqual({
+      requests_per_minute: 60,
       requests_per_hour: 200,
       requests_per_day: 5_000,
       max_api_keys: 5,
@@ -67,6 +70,7 @@ describe("TIER_LIMITS", () => {
 
   it("enterprise tier: custom (0 = per contract, -1 = unlimited)", () => {
     expect(TIER_LIMITS.enterprise).toEqual({
+      requests_per_minute: 0,
       requests_per_hour: 0,
       requests_per_day: 0,
       max_api_keys: 0,

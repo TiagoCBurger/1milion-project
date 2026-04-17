@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { TIER_LIMITS } from "@vibefly/shared";
+import type { SubscriptionTier } from "@vibefly/shared";
 
 /**
  * Base URL of the MCP worker (no trailing slash). Used server-side only for the
@@ -87,12 +89,16 @@ export async function POST(request: NextRequest) {
 
   const { data: subRow } = await supabase
     .from("subscriptions")
-    .select("max_mcp_connections")
+    .select("tier, max_mcp_connections")
     .eq("workspace_id", body.workspace_id)
     .eq("status", "active")
     .maybeSingle();
 
-  const maxMcp = subRow?.max_mcp_connections ?? 0;
+  const tier = (subRow?.tier ?? "free") as SubscriptionTier;
+  const maxMcp =
+    tier === "enterprise"
+      ? (subRow?.max_mcp_connections ?? TIER_LIMITS.enterprise.max_mcp_connections)
+      : TIER_LIMITS[tier].max_mcp_connections;
 
   if (maxMcp !== -1) {
     let connQuery = supabase

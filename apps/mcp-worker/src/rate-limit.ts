@@ -1,83 +1,66 @@
 import type { Env, WorkspaceContext, RateLimitResult } from "./types";
+import type {
+  RateCheckResponse,
+  UploadCheckResponse,
+} from "./rate-limit-do";
 
 /**
- * Checks rate limits for a workspace using KV counters.
- * Two windows: per-hour and per-day.
+ * Delegates to the per-workspace RateLimitDO. See rate-limit-do.ts.
+ * Falls back to allowing the request if the DO is unavailable.
  */
 export async function checkRateLimit(
   workspace: WorkspaceContext,
-  env: Env
+  env: Env,
 ): Promise<RateLimitResult> {
-  const now = Date.now();
-  const hourWindow = Math.floor(now / 3_600_000);
-  const dayWindow = new Date().toISOString().slice(0, 10);
-
-  const hourKey = `rl:${workspace.workspaceId}:h:${hourWindow}`;
-  const dayKey = `rl:${workspace.workspaceId}:d:${dayWindow}`;
-
-  // Read both counters in parallel
-  const [hourStr, dayStr] = await Promise.all([
-    env.RATE_LIMIT_KV.get(hourKey),
-    env.RATE_LIMIT_KV.get(dayKey),
-  ]);
-
-  const hourCount = hourStr ? parseInt(hourStr, 10) : 0;
-  const dayCount = dayStr ? parseInt(dayStr, 10) : 0;
-
-  // Check limits before incrementing
-  if (hourCount >= workspace.requestsPerHour) {
-    return {
-      limited: true,
-      limit: workspace.requestsPerHour,
-      retryAfter: 3600,
-    };
+  try {
+    const stub = getStub(env, workspace.workspaceId);
+    const res = await stub.fetch("https://do/check-rate", {
+      method: "POST",
+      body: JSON.stringify({
+        perMinute: workspace.requestsPerMinute,
+        perHour: workspace.requestsPerHour,
+        perDay: workspace.requestsPerDay,
+      }),
+    });
+    const data = (await res.json()) as RateCheckResponse;
+    if (data.limited) {
+      return {
+        limited: true,
+        limit: data.limit,
+        retryAfter: data.retryAfter,
+        scope: data.scope,
+      };
+    }
+    return { limited: false };
+  } catch (err) {
+    console.error("RateLimitDO unavailable, allowing request:", err);
+    return { limited: false };
   }
-
-  if (dayCount >= workspace.requestsPerDay) {
-    return {
-      limited: true,
-      limit: workspace.requestsPerDay,
-      retryAfter: 3600,
-    };
-  }
-
-  // Increment counters (non-blocking, acceptable race condition)
-  await Promise.all([
-    env.RATE_LIMIT_KV.put(hourKey, String(hourCount + 1), {
-      expirationTtl: 7_200, // 2 hours
-    }),
-    env.RATE_LIMIT_KV.put(dayKey, String(dayCount + 1), {
-      expirationTtl: 90_000,
-    }),
-  ]);
-
-  return { limited: false };
 }
 
-/**
- * Checks daily upload limits for a workspace.
- */
 export async function checkUploadLimit(
   workspaceId: string,
   type: "images" | "videos",
   limit: number,
-  env: Env
+  env: Env,
 ): Promise<{ allowed: boolean; current: number }> {
   if (limit === Infinity) return { allowed: true, current: 0 };
 
-  const dayWindow = new Date().toISOString().slice(0, 10);
-  const key = `upload:${workspaceId}:${type}:${dayWindow}`;
-
-  const countStr = await env.RATE_LIMIT_KV.get(key);
-  const count = countStr ? parseInt(countStr, 10) : 0;
-
-  if (count >= limit) {
-    return { allowed: false, current: count };
+  try {
+    const stub = getStub(env, workspaceId);
+    const res = await stub.fetch("https://do/check-upload", {
+      method: "POST",
+      body: JSON.stringify({ kind: type, perDay: limit }),
+    });
+    const data = (await res.json()) as UploadCheckResponse;
+    return { allowed: data.allowed, current: data.current };
+  } catch (err) {
+    console.error("RateLimitDO unavailable for upload check, allowing:", err);
+    return { allowed: true, current: 0 };
   }
+}
 
-  await env.RATE_LIMIT_KV.put(key, String(count + 1), {
-    expirationTtl: 90_000,
-  });
-
-  return { allowed: true, current: count + 1 };
+function getStub(env: Env, workspaceId: string) {
+  const id = env.RATE_LIMIT_DO.idFromName(workspaceId);
+  return env.RATE_LIMIT_DO.get(id);
 }

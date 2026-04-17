@@ -33,7 +33,7 @@ claude mcp add --scope project vibefly --transport http "https://mcp-worker.ticb
 6. Click **Authorize** — tokens are issued and stored automatically
 7. Claude Code resumes the original request with the access token
 
-**Token lifecycle:** Access tokens last **1 hour**, refresh tokens last **30 days**. Claude Code renews them automatically in the background — you will not be prompted again until the refresh token expires.
+**Token lifecycle:** Access tokens last **8 hours**, refresh tokens last **90 days**. Compatible clients renew the access token with the refresh token in the background — you are only prompted again when the refresh token expires (or if the client does not implement refresh reliably).
 
 ---
 

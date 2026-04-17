@@ -4,6 +4,9 @@ export interface Env {
   CACHE_KV: KVNamespace;
   OAUTH_KV: KVNamespace;
 
+  // Durable Objects
+  RATE_LIMIT_DO: DurableObjectNamespace;
+
   // R2 Buckets
   CREATIVES_R2: R2Bucket;
 
@@ -22,6 +25,7 @@ export interface WorkspaceContext {
   workspaceId: string;
   apiKeyId: string;
   tier: "free" | "pro" | "max" | "enterprise";
+  requestsPerMinute: number;
   requestsPerHour: number;
   requestsPerDay: number;
   maxMcpConnections: number;
@@ -34,4 +38,5 @@ export interface RateLimitResult {
   limited: boolean;
   limit?: number;
   retryAfter?: number;
+  scope?: "minute" | "hour" | "day";
 }

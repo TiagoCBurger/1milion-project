@@ -354,7 +354,7 @@ describe("Token endpoint — connection recording", () => {
     expect(data.access_token).toBeDefined();
     expect(data.refresh_token).toBeDefined();
     expect(data.token_type).toBe("bearer");
-    expect(data.expires_in).toBe(3600);
+    expect(data.expires_in).toBe(8 * 3600);
     expect(data.scope).toBe("mcp");
   });
 });

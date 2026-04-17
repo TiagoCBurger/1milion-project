@@ -14,8 +14,8 @@ import {
   oauthError,
 } from "./utils";
 
-const ACCESS_TOKEN_TTL = 3600; // 1 hour
-const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days
+const ACCESS_TOKEN_TTL = 8 * 3600; // 8 hours
+const REFRESH_TOKEN_TTL = 90 * 24 * 60 * 60; // 90 days
 
 /**
  * POST /token — Token endpoint.

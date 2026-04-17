@@ -5,9 +5,10 @@ import { validateApiKey, getMetaToken, verifyOAuthAccessToken, type AuthResult }
 import { checkRateLimit } from "./rate-limit";
 import { logUsage } from "./usage";
 import { registerAllTools } from "./tools";
-import { registerCommerceTools } from "./tools/commerce";
 import { routeOAuth } from "./oauth/router";
 import type { Env, WorkspaceContext } from "./types";
+
+export { RateLimitDO } from "./rate-limit-do";
 
 export default {
   async fetch(
@@ -130,9 +131,10 @@ async function handleFetch(
     // -------------------------------------------------------
     const rateResult = await checkRateLimit(workspace, env);
     if (rateResult.limited) {
+      const scopeLabel = rateResult.scope === "minute" ? "min" : rateResult.scope === "day" ? "day" : "hr";
       return jsonRpcError(
         -32600,
-        `Rate limit exceeded (${rateResult.limit}/hr). Retry after ${rateResult.retryAfter}s`,
+        `Rate limit exceeded (${rateResult.limit}/${scopeLabel}). Retry after ${rateResult.retryAfter}s`,
         null,
         429
       );
@@ -218,13 +220,6 @@ function buildServer(
         isError: true,
       })
     );
-    registerCommerceTools({
-      server,
-      token: "",
-      tier: workspace.tier,
-      env,
-      workspaceId: workspace.workspaceId,
-    });
     return server;
   }
 
@@ -236,13 +231,6 @@ function buildServer(
     workspaceId: workspace.workspaceId,
     enableMetaMutations: workspace.enableMetaMutations,
     allowedAccounts: workspace.allowedAccounts,
-  });
-  registerCommerceTools({
-    server,
-    token: metaToken,
-    tier: workspace.tier,
-    env,
-    workspaceId: workspace.workspaceId,
   });
   return server;
 }
