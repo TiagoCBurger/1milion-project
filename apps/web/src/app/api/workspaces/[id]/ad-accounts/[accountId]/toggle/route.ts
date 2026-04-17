@@ -94,7 +94,7 @@ export async function PATCH(
 
     for (const conn of connections ?? []) {
       const prev = conn.allowed_accounts ?? [];
-      const next = prev.filter((x) => normMetaId(x) !== disabledNorm);
+      const next = prev.filter((x: string) => normMetaId(x) !== disabledNorm);
       if (next.length !== prev.length) {
         await supabase
           .from("oauth_connections")

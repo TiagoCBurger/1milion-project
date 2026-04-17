@@ -49,12 +49,7 @@ export function MetaWorkspaceAdAccounts({
 
       const next: Row[] = (bms ?? []).flatMap((bm) => {
         const name = (bm as { name: string }).name;
-        const accounts = ((bm as { ad_accounts?: Row[] }).ad_accounts ?? []) as Array<{
-          id: string;
-          meta_account_id: string;
-          name: string;
-          is_enabled: boolean;
-        }>;
+        const accounts = (bm as { ad_accounts?: Array<{ id: string; meta_account_id: string; name: string; is_enabled: boolean }> }).ad_accounts ?? [];
         return accounts.map((a) => ({
           id: a.id,
           meta_account_id: a.meta_account_id,
