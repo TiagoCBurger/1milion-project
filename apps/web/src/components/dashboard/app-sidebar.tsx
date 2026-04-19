@@ -14,7 +14,6 @@ import {
   Building2,
   Moon,
   Sun,
-  ShoppingCart,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -105,12 +104,6 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
             `/dashboard/${slug}/insights`,
             `/dashboard/${slug}/pages`,
           ],
-        },
-        {
-          title: "Vendas",
-          url: `/dashboard/${slug}/vendas`,
-          icon: ShoppingCart,
-          comingSoon: true,
         },
       ]
     : []
