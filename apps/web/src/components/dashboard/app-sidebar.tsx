@@ -15,7 +15,6 @@ import {
   Moon,
   Sun,
   ShoppingCart,
-  BarChart3,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -112,12 +111,6 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
           url: `/dashboard/${slug}/vendas`,
           icon: ShoppingCart,
           comingSoon: true,
-        },
-        {
-          title: "Analytics",
-          url: `/dashboard/${slug}/analytics`,
-          icon: BarChart3,
-          activePathPrefix: `/dashboard/${slug}/analytics`,
         },
       ]
     : []
