@@ -1,0 +1,17 @@
+# ─── track-worker local development variables ───────────────────────────────
+# Copy to .dev.vars (gitignored) and fill in real values.
+# Used by `wrangler dev` — equivalent to secrets in production.
+#
+# In production, set each with:
+#   wrangler secret put <NAME>
+
+# Supabase project URL  (Settings → API → Project URL)
+SUPABASE_URL=
+
+# Supabase service-role key  (Settings → API → service_role — never expose to browser)
+SUPABASE_SERVICE_ROLE_KEY=
+
+# 32-byte hex key used to encrypt/decrypt CAPI access tokens at rest in Postgres.
+# Generate: openssl rand -hex 32
+# Must match CAPI_ENCRYPTION_KEY in apps/web/.env.local.
+CAPI_ENCRYPTION_KEY=your-32-byte-hex-key

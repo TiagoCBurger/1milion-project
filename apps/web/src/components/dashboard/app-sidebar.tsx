@@ -15,7 +15,7 @@ import {
   Moon,
   Sun,
   ShoppingCart,
-  Radar,
+  BarChart3,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -114,11 +114,10 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
           comingSoon: true,
         },
         {
-          title: "Rastreamento Avançado",
-          url: `/dashboard/${slug}/rastreamento-avancado`,
-          icon: Radar,
-          activePathPrefix: `/dashboard/${slug}/rastreamento-avancado`,
-          comingSoon: true,
+          title: "Analytics",
+          url: `/dashboard/${slug}/analytics`,
+          icon: BarChart3,
+          activePathPrefix: `/dashboard/${slug}/analytics`,
         },
       ]
     : []

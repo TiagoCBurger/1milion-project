@@ -15,6 +15,10 @@ vi.mock("@/lib/supabase/admin", () => ({
   })),
 }));
 
+vi.mock("@/lib/workspace-write-guard", () => ({
+  assertWorkspaceCanWrite: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock("@/lib/r2-upload", () => ({
   uploadToR2: vi.fn().mockResolvedValue({
     key: "ws/images/123_test.jpg",

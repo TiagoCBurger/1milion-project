@@ -197,7 +197,7 @@ describe("POST /api/billing/webhook", () => {
         billing_cycle: "monthly",
         requests_per_hour: 200,
         requests_per_day: 1000,
-        max_mcp_connections: 3,
+        max_mcp_connections: 1,
         pending_tier: null,
         pending_billing_cycle: null,
       })
@@ -298,7 +298,7 @@ describe("POST /api/billing/webhook", () => {
     expect(updateChain.update).toHaveBeenCalledWith(
       expect.objectContaining({
         tier: "max",
-        requests_per_hour: 500,
+        requests_per_hour: 200,
         requests_per_day: 5000,
         pending_tier: null,
         pending_billing_cycle: null,
@@ -339,9 +339,9 @@ describe("POST /api/billing/webhook", () => {
       expect.objectContaining({
         tier: "free",
         status: "active",
-        requests_per_hour: 20,
-        requests_per_day: 20,
-        max_mcp_connections: 1,
+        requests_per_hour: 0,
+        requests_per_day: 0,
+        max_mcp_connections: 0,
       })
     );
   });

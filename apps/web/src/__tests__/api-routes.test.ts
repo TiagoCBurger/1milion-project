@@ -56,7 +56,7 @@ function mockApproveFromSuccess() {
       chain.select = vi.fn().mockReturnValue(chain);
       chain.eq = vi.fn().mockReturnValue(chain);
       chain.maybeSingle = vi.fn().mockResolvedValue({
-        data: { max_mcp_connections: 5 },
+        data: { tier: "pro", max_mcp_connections: 5 },
         error: null,
       });
       return chain;
@@ -473,7 +473,7 @@ describe("POST /api/oauth/approve", () => {
         chain.select = vi.fn().mockReturnValue(chain);
         chain.eq = vi.fn().mockReturnValue(chain);
         chain.maybeSingle = vi.fn().mockResolvedValue({
-          data: { max_mcp_connections: 1 },
+          data: { tier: "pro", max_mcp_connections: 1 },
           error: null,
         });
         return chain;
