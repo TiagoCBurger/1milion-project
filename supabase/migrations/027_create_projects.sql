@@ -6,7 +6,54 @@
 -- future migration when we need granular permissions.
 --
 -- Idempotent: safe to re-run if a previous apply partially failed.
+-- Also self-repairs when an earlier buggy attempt left behind a
+-- `projects` table with a different column shape.
 -- ============================================================
+
+DO $$
+DECLARE
+    v_row_count bigint;
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_tables
+        WHERE schemaname = 'public' AND tablename = 'projects'
+    ) THEN
+        -- Case A: table already matches (has organization_id) → nothing to do.
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'projects'
+              AND column_name = 'organization_id'
+        ) THEN
+            RAISE NOTICE 'public.projects already has organization_id — nothing to repair.';
+
+        -- Case B: legacy column name workspace_id → rename it.
+        ELSIF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'projects'
+              AND column_name = 'workspace_id'
+        ) THEN
+            RAISE NOTICE 'public.projects has legacy workspace_id — renaming.';
+            ALTER TABLE public.projects RENAME COLUMN workspace_id TO organization_id;
+
+        -- Case C: table exists but is unrecognisable.
+        --   * If empty, drop it so CREATE TABLE below recreates cleanly.
+        --   * Otherwise abort with a helpful message.
+        ELSE
+            EXECUTE 'SELECT COUNT(*) FROM public.projects' INTO v_row_count;
+            IF v_row_count = 0 THEN
+                RAISE NOTICE 'public.projects exists with no organization/workspace column and is empty — dropping so the migration can recreate it.';
+                DROP TABLE public.projects CASCADE;
+            ELSE
+                RAISE EXCEPTION
+                    'public.projects exists with % row(s) and no organization_id/workspace_id column. This is not a schema created by migration 027. Inspect the table and run DROP TABLE public.projects CASCADE; then re-apply migrations.',
+                    v_row_count;
+            END IF;
+        END IF;
+    END IF;
+END
+$$;
 
 CREATE TABLE IF NOT EXISTS public.projects (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -22,6 +69,15 @@ CREATE TABLE IF NOT EXISTS public.projects (
     CONSTRAINT projects_name_not_blank CHECK (length(trim(name)) > 0),
     UNIQUE (organization_id, slug)
 );
+
+-- Ensure every column is present even if the table predates this
+-- migration with a narrower schema. New columns added here are nullable
+-- or default so they work against a populated table.
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS description text;
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS is_default boolean NOT NULL DEFAULT false;
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_projects_organization ON public.projects(organization_id);
 
