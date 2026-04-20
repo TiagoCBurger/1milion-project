@@ -4,9 +4,11 @@
 -- Projects group ad_accounts and sites for dashboard + MCP scoping.
 -- Memberships remain org-level; project membership comes in a
 -- future migration when we need granular permissions.
+--
+-- Idempotent: safe to re-run if a previous apply partially failed.
 -- ============================================================
 
-CREATE TABLE public.projects (
+CREATE TABLE IF NOT EXISTS public.projects (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
     name text NOT NULL,
@@ -21,10 +23,10 @@ CREATE TABLE public.projects (
     UNIQUE (organization_id, slug)
 );
 
-CREATE INDEX idx_projects_organization ON public.projects(organization_id);
+CREATE INDEX IF NOT EXISTS idx_projects_organization ON public.projects(organization_id);
 
 -- Exactly one default project per organization
-CREATE UNIQUE INDEX idx_projects_default_per_org
+CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_default_per_org
     ON public.projects(organization_id)
     WHERE is_default = true;
 
@@ -41,6 +43,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS projects_set_updated_at ON public.projects;
 CREATE TRIGGER projects_set_updated_at
     BEFORE UPDATE ON public.projects
     FOR EACH ROW EXECUTE FUNCTION public.projects_set_updated_at();
@@ -51,10 +54,12 @@ CREATE TRIGGER projects_set_updated_at
 
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Members can view projects" ON public.projects;
 CREATE POLICY "Members can view projects"
     ON public.projects FOR SELECT
     USING (public.is_organization_member(organization_id));
 
+DROP POLICY IF EXISTS "Owners/admins can manage projects" ON public.projects;
 CREATE POLICY "Owners/admins can manage projects"
     ON public.projects FOR ALL
     USING (public.is_organization_owner(organization_id));

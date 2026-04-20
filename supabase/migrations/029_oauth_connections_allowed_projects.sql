@@ -4,10 +4,12 @@
 -- projects". allowed_accounts is kept DEPRECATED for one
 -- deprecation window so tokens minted before this migration
 -- continue to validate via the worker's compat shim.
+--
+-- Idempotent: safe to re-run.
 -- ============================================================
 
 ALTER TABLE public.oauth_connections
-    ADD COLUMN allowed_projects uuid[] NOT NULL DEFAULT '{}';
+    ADD COLUMN IF NOT EXISTS allowed_projects uuid[] NOT NULL DEFAULT '{}';
 
 COMMENT ON COLUMN public.oauth_connections.allowed_projects IS
     'Project IDs this connection is authorized to operate on. Source of truth for MCP scoping.';

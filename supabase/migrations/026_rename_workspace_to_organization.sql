@@ -15,8 +15,21 @@ DROP POLICY IF EXISTS "Users can view own memberships" ON public.memberships;
 DROP POLICY IF EXISTS "Members can view co-members" ON public.memberships;
 DROP POLICY IF EXISTS "Owners can manage memberships" ON public.memberships;
 
-DROP POLICY IF EXISTS "Members can view workspace" ON public.workspaces;
-DROP POLICY IF EXISTS "Owners/admins can update workspace" ON public.workspaces;
+-- Policies on public.workspaces only exist before the rename. If the
+-- rename already ran in a previous attempt, the relation is gone and
+-- DROP POLICY would error with "relation does not exist".
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relname = 'workspaces'
+    ) THEN
+        EXECUTE 'DROP POLICY IF EXISTS "Members can view workspace" ON public.workspaces';
+        EXECUTE 'DROP POLICY IF EXISTS "Owners/admins can update workspace" ON public.workspaces';
+    END IF;
+END
+$$;
 
 DROP POLICY IF EXISTS "Members can view token metadata" ON public.meta_tokens;
 DROP POLICY IF EXISTS "Owners/admins can manage tokens" ON public.meta_tokens;
@@ -53,6 +66,29 @@ DROP POLICY IF EXISTS "goals_write_admins" ON analytics.goals;
 DROP POLICY IF EXISTS "funnels_read_members" ON analytics.funnels;
 DROP POLICY IF EXISTS "funnels_write_admins" ON analytics.funnels;
 
+-- Drop any already-renamed policies too, so re-applying this migration
+-- after a partial success does not error with "policy already exists".
+-- Uses DO blocks because the post-rename target table (organizations)
+-- only exists after STEP 3 on a fresh run.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relname = 'organizations'
+    ) THEN
+        EXECUTE 'DROP POLICY IF EXISTS "Members can view organization" ON public.organizations';
+        EXECUTE 'DROP POLICY IF EXISTS "Owners/admins can update organization" ON public.organizations';
+    END IF;
+END
+$$;
+
+DROP POLICY IF EXISTS "Members can view organization api_keys" ON public.api_keys;
+DROP POLICY IF EXISTS "Members can view organization usage" ON public.usage_logs;
+DROP POLICY IF EXISTS "Members can view organization images" ON public.ad_images;
+DROP POLICY IF EXISTS "Members can view integration requests in organization" ON requests.integration_requests;
+DROP POLICY IF EXISTS "Owners and admins can update integration requests" ON requests.integration_requests;
+
 -- ───────────────────────────────────────────────────────────
 -- STEP 2: drop RPCs that reference workspace tables/columns.
 -- Function bodies hold literal identifiers, so rename alone
@@ -76,24 +112,66 @@ DROP FUNCTION IF EXISTS public.is_workspace_owner(UUID);
 DROP FUNCTION IF EXISTS analytics.get_site_by_public_key(TEXT);
 
 -- ───────────────────────────────────────────────────────────
--- STEP 3: rename table and columns (workspace_id → organization_id)
+-- STEP 3: rename table and columns (workspace_id → organization_id).
+-- Guarded so re-running (after a partial apply) is safe.
 -- ───────────────────────────────────────────────────────────
 
-ALTER TABLE public.workspaces RENAME TO organizations;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relname = 'workspaces'
+    ) THEN
+        ALTER TABLE public.workspaces RENAME TO organizations;
+    END IF;
+END
+$$;
 
-ALTER TABLE public.memberships          RENAME COLUMN workspace_id TO organization_id;
-ALTER TABLE public.meta_tokens          RENAME COLUMN workspace_id TO organization_id;
-ALTER TABLE public.api_keys             RENAME COLUMN workspace_id TO organization_id;
-ALTER TABLE public.subscriptions        RENAME COLUMN workspace_id TO organization_id;
-ALTER TABLE public.usage_logs           RENAME COLUMN workspace_id TO organization_id;
-ALTER TABLE public.business_managers    RENAME COLUMN workspace_id TO organization_id;
-ALTER TABLE public.ad_accounts          RENAME COLUMN workspace_id TO organization_id;
-ALTER TABLE public.oauth_connections    RENAME COLUMN workspace_id TO organization_id;
-ALTER TABLE public.billing_events       RENAME COLUMN workspace_id TO organization_id;
-ALTER TABLE public.ad_images            RENAME COLUMN workspace_id TO organization_id;
-ALTER TABLE public.email_events         RENAME COLUMN workspace_id TO organization_id;
-ALTER TABLE requests.integration_requests RENAME COLUMN workspace_id TO organization_id;
-ALTER TABLE analytics.sites             RENAME COLUMN workspace_id TO organization_id;
+-- Per-table column rename guarded individually.
+DO $$
+DECLARE
+    target record;
+BEGIN
+    FOR target IN
+        SELECT * FROM (VALUES
+            ('public',   'memberships'),
+            ('public',   'meta_tokens'),
+            ('public',   'api_keys'),
+            ('public',   'subscriptions'),
+            ('public',   'usage_logs'),
+            ('public',   'business_managers'),
+            ('public',   'ad_accounts'),
+            ('public',   'oauth_connections'),
+            ('public',   'billing_events'),
+            ('public',   'ad_images'),
+            ('public',   'email_events'),
+            ('requests', 'integration_requests'),
+            ('analytics','sites')
+        ) AS t(schema_name, table_name)
+    LOOP
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = target.schema_name
+              AND table_name = target.table_name
+              AND column_name = 'workspace_id'
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = target.schema_name
+              AND table_name = target.table_name
+              AND column_name = 'organization_id'
+        )
+        THEN
+            EXECUTE format(
+                'ALTER TABLE %I.%I RENAME COLUMN workspace_id TO organization_id',
+                target.schema_name,
+                target.table_name
+            );
+        END IF;
+    END LOOP;
+END
+$$;
 
 -- ───────────────────────────────────────────────────────────
 -- STEP 4: rename indexes for consistency
