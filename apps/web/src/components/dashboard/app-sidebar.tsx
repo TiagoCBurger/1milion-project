@@ -15,6 +15,8 @@ import {
   Moon,
   Sun,
   Plus,
+  Settings,
+  SlidersHorizontal,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -232,12 +234,26 @@ export function AppSidebar({ workspaces, currentWorkspace, currentProjectSlug, u
             </DropdownMenuSub>
 
             {slug ? (
-              <DropdownMenuItem asChild>
-                <Link href={`/dashboard/${slug}/billing`}>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Assinatura
-                </Link>
-              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Configurações
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-56">
+                  <DropdownMenuItem asChild>
+                    <Link href={`/dashboard/${slug}/billing`}>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Assinatura
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/dashboard/${slug}/settings`}>
+                      <SlidersHorizontal className="mr-2 h-4 w-4" />
+                      Configurações da organização
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
             ) : null}
 
             <DropdownMenuSeparator />
