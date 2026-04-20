@@ -1,20 +1,31 @@
 import { z } from "zod";
 import { metaApiGet, ensureActPrefix, textResult } from "../meta-api";
 import type { ToolContext } from "./index";
-import { isAccountAllowed, accountBlockedResult } from "./index";
+import {
+  isAccountAllowed,
+  accountBlockedResult,
+  getProjectAllowedAccounts,
+} from "./index";
 
 export function registerSearchTools(ctx: ToolContext): void {
-  const { server, token, allowedAccounts } = ctx;
+  const { server, token } = ctx;
   // ── search ───────────────────────────────────────────────────────────
   server.tool(
     "search",
     "Search across Meta Ads data including accounts, campaigns, pages, and businesses.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       query: z
         .string()
         .describe("The search query to match against object names."),
     },
     async (args) => {
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       const query = args.query.toLowerCase();
 
       const [accountsRes, businessesRes] = await Promise.all([
@@ -91,6 +102,10 @@ export function registerSearchTools(ctx: ToolContext): void {
     "search_pages_by_name",
     "Search for Facebook Pages associated with an ad account, optionally filtering by name.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe("The ad account ID (with or without act_ prefix)."),
@@ -102,6 +117,9 @@ export function registerSearchTools(ctx: ToolContext): void {
         ),
     },
     async (args) => {
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(args.account_id, allowedAccounts)) {
         return accountBlockedResult(args.account_id);
       }

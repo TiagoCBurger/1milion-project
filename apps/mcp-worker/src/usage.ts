@@ -1,7 +1,7 @@
 import type { Env } from "./types";
 
 interface UsageEvent {
-  workspaceId: string;
+  organizationId: string;
   apiKeyId: string;
   toolName: string;
   method: string;
@@ -25,7 +25,7 @@ export async function logUsage(event: UsageEvent, env: Env): Promise<void> {
         Prefer: "return=minimal",
       },
       body: JSON.stringify({
-        workspace_id: event.workspaceId,
+        organization_id: event.organizationId,
         api_key_id: event.apiKeyId,
         tool_name: event.toolName,
         method: event.method,

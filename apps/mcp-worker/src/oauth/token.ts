@@ -101,7 +101,7 @@ async function handleAuthorizationCodeGrant(
   }
 
   const limit = await assertOauthNewConnectionAllowed(
-    storedCode.workspace_id,
+    storedCode.organization_id,
     clientId,
     env
   );
@@ -113,7 +113,14 @@ async function handleAuthorizationCodeGrant(
   await env.OAUTH_KV.delete(`oauth:code:${codeHash}`);
 
   // Issue tokens
-  return issueTokens(clientId, storedCode.workspace_id, storedCode.user_id, storedCode.scope, storedCode.allowed_accounts, env);
+  return issueTokens(
+    clientId,
+    storedCode.organization_id,
+    storedCode.user_id,
+    storedCode.scope,
+    storedCode.allowed_projects,
+    env
+  );
 }
 
 async function handleRefreshTokenGrant(
@@ -143,16 +150,23 @@ async function handleRefreshTokenGrant(
   // Revoke old refresh token
   await env.OAUTH_KV.delete(`oauth:refresh:${tokenHash}`);
 
-  // Issue new tokens
-  return issueTokens(clientId, stored.workspace_id, stored.user_id, stored.scope, stored.allowed_accounts, env);
+  // Issue new tokens (carry forward whatever scope shape is present on the stored token)
+  return issueTokens(
+    clientId,
+    stored.organization_id,
+    stored.user_id,
+    stored.scope,
+    stored.allowed_projects,
+    env
+  );
 }
 
 async function issueTokens(
   clientId: string,
-  workspaceId: string,
+  organizationId: string,
   userId: string,
   scope: string | undefined,
-  allowedAccounts: string[] | undefined,
+  allowedProjects: string[] | undefined,
   env: Env
 ): Promise<Response> {
   const now = Math.floor(Date.now() / 1000);
@@ -162,10 +176,10 @@ async function issueTokens(
   const accessHash = await sha256Hex(accessToken);
   const storedAccess: StoredAccessToken = {
     client_id: clientId,
-    workspace_id: workspaceId,
+    organization_id: organizationId,
     user_id: userId,
     scope,
-    allowed_accounts: allowedAccounts,
+    allowed_projects: allowedProjects,
     expires_at: now + ACCESS_TOKEN_TTL,
     created_at: now,
   };
@@ -180,10 +194,10 @@ async function issueTokens(
   const refreshHash = await sha256Hex(refreshToken);
   const storedRefresh: StoredRefreshToken = {
     client_id: clientId,
-    workspace_id: workspaceId,
+    organization_id: organizationId,
     user_id: userId,
     scope,
-    allowed_accounts: allowedAccounts,
+    allowed_projects: allowedProjects,
     created_at: now,
   };
   await env.OAUTH_KV.put(
@@ -198,11 +212,11 @@ async function issueTokens(
     "json"
   );
   recordConnection(
-    workspaceId,
+    organizationId,
     clientId,
     clientMeta?.client_name || clientId,
     userId,
-    allowedAccounts || [],
+    allowedProjects || [],
     env
   ).catch((err) => console.error("Failed to record oauth connection:", err));
 
@@ -219,21 +233,24 @@ async function issueTokens(
  * Record/update the OAuth connection in Supabase so admins can manage it.
  */
 async function recordConnection(
-  workspaceId: string,
+  organizationId: string,
   clientId: string,
   clientName: string,
   userId: string,
-  allowedAccounts: string[],
+  allowedProjects: string[],
   env: Env
 ): Promise<void> {
   const payload = {
-    p_workspace_id: workspaceId,
+    p_organization_id: organizationId,
     p_client_id: clientId,
     p_client_name: clientName,
     p_user_id: userId,
-    p_allowed_accounts: allowedAccounts,
+    p_allowed_projects: allowedProjects,
   };
-  console.log("[oauth] Recording connection:", JSON.stringify({ workspaceId, clientId, clientName, userId }));
+  console.log(
+    "[oauth] Recording connection:",
+    JSON.stringify({ organizationId, clientId, clientName, userId })
+  );
 
   const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/upsert_oauth_connection`, {
     method: "POST",

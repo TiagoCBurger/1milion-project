@@ -22,7 +22,7 @@ describe("Creative Tools", () => {
     vi.clearAllMocks();
     const capture = createToolCapture();
     callTool = capture.callTool;
-    registerCreativeTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+    registerCreativeTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), organizationId: "test-ws", enableMetaMutations: true });
   });
 
   describe("get_ad_creatives", () => {
@@ -175,7 +175,7 @@ describe("Creative Tools", () => {
   describe("upload_ad_image (tier gating)", () => {
     it("blocks non-pro tier", async () => {
       const freeCapture = createToolCapture();
-      registerCreativeTools({ server: freeCapture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerCreativeTools({ server: freeCapture.server, token: TOKEN, tier: "free", env: createMockEnv(), organizationId: "test-ws", enableMetaMutations: true });
 
       const result = await freeCapture.callTool("upload_ad_image", {
         account_id: "act_123",
@@ -226,7 +226,7 @@ describe("Creative Tools", () => {
   describe("upload_ad_video", () => {
     it("blocks non-pro tier", async () => {
       const freeCapture = createToolCapture();
-      registerCreativeTools({ server: freeCapture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerCreativeTools({ server: freeCapture.server, token: TOKEN, tier: "free", env: createMockEnv(), organizationId: "test-ws", enableMetaMutations: true });
 
       const result = await freeCapture.callTool("upload_ad_video", {
         account_id: "act_123",
@@ -260,7 +260,7 @@ describe("Creative Tools", () => {
   describe("create_ad_creative (validation + tier gating)", () => {
     it("blocks non-pro tier", async () => {
       const freeCapture = createToolCapture();
-      registerCreativeTools({ server: freeCapture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerCreativeTools({ server: freeCapture.server, token: TOKEN, tier: "free", env: createMockEnv(), organizationId: "test-ws", enableMetaMutations: true });
 
       const result = await freeCapture.callTool("create_ad_creative", {
         account_id: "act_123",

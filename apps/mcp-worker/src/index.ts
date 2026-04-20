@@ -6,7 +6,7 @@ import { checkRateLimit } from "./rate-limit";
 import { logUsage } from "./usage";
 import { registerAllTools } from "./tools";
 import { routeOAuth } from "./oauth/router";
-import type { Env, WorkspaceContext } from "./types";
+import type { Env, OrganizationContext } from "./types";
 
 export { RateLimitDO } from "./rate-limit-do";
 
@@ -141,9 +141,9 @@ async function handleFetch(
     }
 
     // -------------------------------------------------------
-    // 4. Fetch Meta token for this workspace
+    // 4. Fetch Meta token for this organization
     // -------------------------------------------------------
-    const metaToken = await getMetaToken(workspace.workspaceId, env);
+    const metaToken = await getMetaToken(workspace.organizationId, env);
 
     // -------------------------------------------------------
     // 5. Handle MCP via stateless HTTP transport (POST only)
@@ -165,7 +165,7 @@ async function handleFetch(
     ctx.waitUntil(
       logUsage(
         {
-          workspaceId: workspace.workspaceId,
+          organizationId: workspace.organizationId,
           apiKeyId: workspace.apiKeyId,
           toolName: "mcp_request",
           method: request.method,
@@ -192,19 +192,28 @@ async function handleFetch(
 
 function buildServer(
   metaToken: string | null,
-  workspace: WorkspaceContext,
+  workspace: OrganizationContext,
   env: Env
 ): McpServer {
-  const server = new McpServer({
-    name: "vibefly",
-    version: "1.0.0",
-  });
+  const server = new McpServer(
+    {
+      name: "vibefly",
+      version: "1.0.0",
+    },
+    {
+      instructions: [
+        "This server is scoped by project. A project groups ad accounts and sites.",
+        "Before any data or mutation tool, call list_projects to discover the projects this connection has access to.",
+        "Pass the chosen project_id to subsequent tools. If only one project is authorized, project_id may be omitted.",
+      ].join(" "),
+    }
+  );
 
   if (!metaToken) {
     // No token connected — register a single tool that explains how to connect
     server.tool(
       "connect_required",
-      "No Meta account connected to this workspace",
+      "No Meta account connected to this organization",
       {},
       async () => ({
         content: [
@@ -213,7 +222,7 @@ function buildServer(
             text: JSON.stringify({
               error:
                 "No Meta account connected. Go to your dashboard to paste your Meta access token.",
-              help: "https://yourdomain.com/dashboard",
+              help: "https://vibefly.app/dashboard",
             }),
           },
         ],
@@ -228,9 +237,10 @@ function buildServer(
     token: metaToken,
     tier: workspace.tier,
     env,
-    workspaceId: workspace.workspaceId,
+    organizationId: workspace.organizationId,
     enableMetaMutations: workspace.enableMetaMutations,
-    allowedAccounts: workspace.allowedAccounts,
+    availableProjects: workspace.availableProjects,
+    allowedProjectIds: workspace.allowedProjectIds,
   });
   return server;
 }

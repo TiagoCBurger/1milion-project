@@ -81,7 +81,7 @@ describe("Tier Enforcement", () => {
     for (const toolName of WRITE_TOOLS) {
       vi.clearAllMocks();
       const capture = createToolCapture();
-      registerAllTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerAllTools({ server: capture.server, token: "test_token", tier: "free", env: createMockEnv(), organizationId: "test-ws", enableMetaMutations: true });
 
       const args = getMinimalArgs(toolName);
       const result = await capture.callTool(toolName, args);
@@ -96,7 +96,7 @@ describe("Tier Enforcement", () => {
     for (const toolName of WRITE_TOOLS) {
       vi.clearAllMocks();
       const capture = createToolCapture();
-      registerAllTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerAllTools({ server: capture.server, token: "test_token", tier: "pro", env: createMockEnv(), organizationId: "test-ws", enableMetaMutations: true });
 
       const args = getMinimalArgs(toolName);
       const result = await capture.callTool(toolName, args);

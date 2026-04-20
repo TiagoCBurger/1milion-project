@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { checkRateLimit, checkUploadLimit } from "../rate-limit";
 import { createMockEnv, createMockWorkspace } from "./helpers";
-import type { Env, WorkspaceContext } from "../types";
+import type { Env, OrganizationContext } from "../types";
 
 describe("checkRateLimit (DO-backed)", () => {
   let env: Env;
-  let workspace: WorkspaceContext;
+  let workspace: OrganizationContext;
 
   beforeEach(() => {
     env = createMockEnv();
@@ -38,9 +38,9 @@ describe("checkRateLimit (DO-backed)", () => {
     expect(result.scope).toBe("hour");
   });
 
-  it("isolates counters per workspace", async () => {
-    const ws1 = createMockWorkspace({ workspaceId: "a", requestsPerMinute: 1, requestsPerHour: 10, requestsPerDay: 10 });
-    const ws2 = createMockWorkspace({ workspaceId: "b", requestsPerMinute: 1, requestsPerHour: 10, requestsPerDay: 10 });
+  it("isolates counters per organization", async () => {
+    const ws1 = createMockWorkspace({ organizationId: "a", requestsPerMinute: 1, requestsPerHour: 10, requestsPerDay: 10 });
+    const ws2 = createMockWorkspace({ organizationId: "b", requestsPerMinute: 1, requestsPerHour: 10, requestsPerDay: 10 });
     await checkRateLimit(ws1, env);
     const blocked = await checkRateLimit(ws1, env);
     const ws2Result = await checkRateLimit(ws2, env);

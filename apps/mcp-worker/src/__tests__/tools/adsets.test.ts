@@ -23,7 +23,7 @@ describe("Adset Tools", () => {
       vi.clearAllMocks();
       const capture = createToolCapture();
       callTool = capture.callTool;
-      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), organizationId: "test-ws", enableMetaMutations: true });
     });
 
     it("fetches adsets by account ID", async () => {
@@ -63,7 +63,7 @@ describe("Adset Tools", () => {
   describe("create_adset (tier gating)", () => {
     it("blocks free tier", async () => {
       const capture = createToolCapture();
-      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "free", env: createMockEnv(), organizationId: "test-ws", enableMetaMutations: true });
 
       const result = await capture.callTool("create_adset", {
         account_id: "act_123",
@@ -79,7 +79,7 @@ describe("Adset Tools", () => {
 
     it("validates bid_amount required for COST_CAP strategy", async () => {
       const capture = createToolCapture();
-      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), organizationId: "test-ws", enableMetaMutations: true });
 
       const result = await capture.callTool("create_adset", {
         account_id: "act_123",
@@ -99,7 +99,7 @@ describe("Adset Tools", () => {
 
     it("creates adset with default targeting when none provided", async () => {
       const capture = createToolCapture();
-      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), organizationId: "test-ws", enableMetaMutations: true });
 
       (metaApiPost as any).mockResolvedValue({ id: "adset_new" });
 
@@ -123,7 +123,7 @@ describe("Adset Tools", () => {
   describe("update_adset (tier gating + budget)", () => {
     it("blocks free tier", async () => {
       const capture = createToolCapture();
-      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "free", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "free", env: createMockEnv(), organizationId: "test-ws", enableMetaMutations: true });
 
       const result = await capture.callTool("update_adset", {
         adset_id: "adset_1",
@@ -135,7 +135,7 @@ describe("Adset Tools", () => {
 
     it("updates budget for pro tier", async () => {
       const capture = createToolCapture();
-      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), organizationId: "test-ws", enableMetaMutations: true });
 
       (metaApiPost as any).mockResolvedValue({ success: true });
 
@@ -158,7 +158,7 @@ describe("Adset Tools", () => {
     it("JSON-stringifies targeting object", async () => {
       vi.clearAllMocks();
       const capture = createToolCapture();
-      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws", enableMetaMutations: true });
+      registerAdsetTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), organizationId: "test-ws", enableMetaMutations: true });
 
       (metaApiPost as any).mockResolvedValue({ success: true });
 

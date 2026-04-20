@@ -1,19 +1,19 @@
-import type { Env, WorkspaceContext, RateLimitResult } from "./types";
+import type { Env, OrganizationContext, RateLimitResult } from "./types";
 import type {
   RateCheckResponse,
   UploadCheckResponse,
 } from "./rate-limit-do";
 
 /**
- * Delegates to the per-workspace RateLimitDO. See rate-limit-do.ts.
+ * Delegates to the per-organization RateLimitDO. See rate-limit-do.ts.
  * Falls back to allowing the request if the DO is unavailable.
  */
 export async function checkRateLimit(
-  workspace: WorkspaceContext,
+  workspace: OrganizationContext,
   env: Env,
 ): Promise<RateLimitResult> {
   try {
-    const stub = getStub(env, workspace.workspaceId);
+    const stub = getStub(env, workspace.organizationId);
     const res = await stub.fetch("https://do/check-rate", {
       method: "POST",
       body: JSON.stringify({
@@ -39,7 +39,7 @@ export async function checkRateLimit(
 }
 
 export async function checkUploadLimit(
-  workspaceId: string,
+  organizationId: string,
   type: "images" | "videos",
   limit: number,
   env: Env,
@@ -47,7 +47,7 @@ export async function checkUploadLimit(
   if (limit === Infinity) return { allowed: true, current: 0 };
 
   try {
-    const stub = getStub(env, workspaceId);
+    const stub = getStub(env, organizationId);
     const res = await stub.fetch("https://do/check-upload", {
       method: "POST",
       body: JSON.stringify({ kind: type, perDay: limit }),
@@ -60,7 +60,7 @@ export async function checkUploadLimit(
   }
 }
 
-function getStub(env: Env, workspaceId: string) {
-  const id = env.RATE_LIMIT_DO.idFromName(workspaceId);
+function getStub(env: Env, organizationId: string) {
+  const id = env.RATE_LIMIT_DO.idFromName(organizationId);
   return env.RATE_LIMIT_DO.get(id);
 }

@@ -1,100 +1,38 @@
-import type { Env, WorkspaceContext } from "./types";
+import type { Env, OrganizationContext, ProjectSummary } from "./types";
 import type { StoredAccessToken } from "./oauth/types";
 import { sha256Hex } from "./oauth/utils";
-import { intersectAllowedAccounts } from "./workspace-ad-accounts";
+import { fetchOrganizationProjects } from "./project-ad-accounts";
 
 const API_KEY_CACHE_TTL = 300; // 5 minutes
-const ENABLED_AD_ACCOUNTS_CACHE_TTL = 300; // 5 minutes — keeps daily KV writes low
-
-/**
- * Meta account IDs (as stored on ad_accounts.meta_account_id) with is_enabled = true.
- * Fallback: if no accounts are explicitly enabled, return all accounts (prevents MCP lock-out).
- */
-export async function fetchWorkspaceEnabledMetaAccountIds(
-  workspaceId: string,
-  env: Env
-): Promise<string[]> {
-  const cacheKey = `enabled_ad_accounts:${workspaceId}`;
-  const cached = await env.CACHE_KV.get(cacheKey, "json");
-  if (cached && Array.isArray(cached)) {
-    return cached as string[];
-  }
-
-  const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/ad_accounts?workspace_id=eq.${workspaceId}&is_enabled=eq.true&select=meta_account_id`,
-    {
-      headers: {
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    console.error(
-      "[auth] enabled ad_accounts fetch failed:",
-      response.status,
-      await response.text()
-    );
-    return [];
-  }
-
-  const rows = (await response.json()) as Array<{ meta_account_id: string }>;
-  let ids = rows.map((r) => r.meta_account_id);
-
-  // Fallback: if no accounts are explicitly enabled, return all accounts
-  // This prevents complete MCP lock-out when is_enabled defaults to false on new accounts
-  if (ids.length === 0) {
-    console.log(
-      "[auth] No explicitly enabled accounts for workspace, fetching all accounts as fallback"
-    );
-    const allResponse = await fetch(
-      `${env.SUPABASE_URL}/rest/v1/ad_accounts?workspace_id=eq.${workspaceId}&select=meta_account_id`,
-      {
-        headers: {
-          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        },
-      }
-    );
-
-    if (allResponse.ok) {
-      const allRows = (await allResponse.json()) as Array<{ meta_account_id: string }>;
-      ids = allRows.map((r) => r.meta_account_id);
-      console.log("[auth] Fallback returned", ids.length, "total accounts");
-    }
-  }
-
-  await env.CACHE_KV.put(cacheKey, JSON.stringify(ids), {
-    expirationTtl: ENABLED_AD_ACCOUNTS_CACHE_TTL,
-  });
-  return ids;
-}
 
 export type AuthResult =
-  | { ok: true; workspace: WorkspaceContext }
+  | { ok: true; workspace: OrganizationContext }
   | { ok: false; error: string };
 
 /**
  * Validates an API key against Supabase, with KV caching.
+ * API keys grant access to every project inside the organization.
  */
 export async function validateApiKey(
   apiKey: string,
   env: Env
 ): Promise<AuthResult> {
   // Check KV cache first
-  const cacheKey = `apikey:${hashForCache(apiKey)}`;
+  const cacheKey = `v2:apikey:${hashForCache(apiKey)}`;
   const cached = await env.CACHE_KV.get(cacheKey, "json");
   if (cached) {
-    const ctxBase = cached as Omit<WorkspaceContext, "allowedAccounts">;
-    // Fetch enabled accounts (with KV caching to avoid redundant Supabase queries)
-    const enabledIds = await fetchWorkspaceEnabledMetaAccountIds(
-      ctxBase.workspaceId,
-      env
-    );
+    const ctxBase = cached as Omit<
+      OrganizationContext,
+      "availableProjects" | "allowedProjectIds"
+    >;
+    const projects = await fetchOrganizationProjects(ctxBase.organizationId, env);
     return {
       ok: true,
-      workspace: { ...ctxBase, allowedAccounts: enabledIds },
+      workspace: {
+        ...ctxBase,
+        availableProjects: projects,
+        allowedProjectIds: projects.map((p) => p.id),
+      },
     };
   }
 
@@ -118,7 +56,7 @@ export async function validateApiKey(
   }
 
   const rows = (await response.json()) as Array<{
-    workspace_id: string;
+    organization_id: string;
     api_key_id: string;
     tier: "free" | "pro" | "max" | "enterprise";
     requests_per_minute: number | null;
@@ -134,8 +72,8 @@ export async function validateApiKey(
   }
 
   const row = rows[0];
-  const ctxBase: Omit<WorkspaceContext, "allowedAccounts"> = {
-    workspaceId: row.workspace_id,
+  const ctxBase: Omit<OrganizationContext, "availableProjects" | "allowedProjectIds"> = {
+    organizationId: row.organization_id,
     apiKeyId: row.api_key_id,
     tier: row.tier,
     requestsPerMinute: row.requests_per_minute ?? 0,
@@ -150,22 +88,26 @@ export async function validateApiKey(
     expirationTtl: API_KEY_CACHE_TTL,
   });
 
-  const enabledIds = await fetchWorkspaceEnabledMetaAccountIds(row.workspace_id, env);
+  const projects = await fetchOrganizationProjects(row.organization_id, env);
   return {
     ok: true,
-    workspace: { ...ctxBase, allowedAccounts: enabledIds },
+    workspace: {
+      ...ctxBase,
+      availableProjects: projects,
+      allowedProjectIds: projects.map((p) => p.id),
+    },
   };
 }
 
 /**
- * Fetches decrypted Meta token for a workspace via Supabase Edge Function.
+ * Fetches decrypted Meta token for an organization via Supabase Edge Function.
  * Cached in KV for 5 minutes.
  */
 export async function getMetaToken(
-  workspaceId: string,
+  organizationId: string,
   env: Env
 ): Promise<string | null> {
-  const cacheKey = `token:${workspaceId}`;
+  const cacheKey = `v2:token:${organizationId}`;
   const cached = await env.CACHE_KV.get(cacheKey);
   if (cached) {
     return cached;
@@ -179,7 +121,9 @@ export async function getMetaToken(
         "Content-Type": "application/json",
         Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
       },
-      body: JSON.stringify({ workspaceId }),
+      // decrypt-token edge function still accepts legacy `workspaceId` key.
+      // Keep compat here; edge function can be updated independently.
+      body: JSON.stringify({ workspaceId: organizationId }),
     }
   );
 
@@ -201,12 +145,12 @@ export async function getMetaToken(
 const MCP_CONN_COUNT_CACHE_TTL = 60;
 
 /**
- * True if the workspace cannot add another OAuth MCP connection for this client
+ * True if the organization cannot add another OAuth MCP connection for this client
  * (other apps already use all slots). Excludes oauthClientId from the count so
  * reconnecting the same app does not consume an extra slot.
  */
 async function mcpConnectionLimitExceededMessage(
-  workspaceId: string,
+  organizationId: string,
   oauthClientId: string,
   maxMcpConnections: number,
   tier: string,
@@ -214,14 +158,14 @@ async function mcpConnectionLimitExceededMessage(
 ): Promise<string | null> {
   if (maxMcpConnections === -1) return null;
 
-  const connCacheKey = `mcp_conn:${workspaceId}:${hashForCache(oauthClientId)}`;
+  const connCacheKey = `v2:mcp_conn:${organizationId}:${hashForCache(oauthClientId)}`;
   let connCount: number | null = null;
   const cachedCount = await env.CACHE_KV.get(connCacheKey);
   if (cachedCount !== null) {
     connCount = parseInt(cachedCount, 10);
   } else {
     const countResp = await fetch(
-      `${env.SUPABASE_URL}/rest/v1/oauth_connections?workspace_id=eq.${workspaceId}&is_active=eq.true&client_id=neq.${encodeURIComponent(oauthClientId)}&select=id`,
+      `${env.SUPABASE_URL}/rest/v1/oauth_connections?organization_id=eq.${organizationId}&is_active=eq.true&client_id=neq.${encodeURIComponent(oauthClientId)}&select=id`,
       {
         headers: {
           apikey: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -250,12 +194,12 @@ async function mcpConnectionLimitExceededMessage(
  * a clear OAuth error instead of succeeding then failing on the first /mcp call.
  */
 export async function assertOauthNewConnectionAllowed(
-  workspaceId: string,
+  organizationId: string,
   oauthClientId: string,
   env: Env
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/rpc/get_workspace_context`,
+    `${env.SUPABASE_URL}/rest/v1/rpc/get_organization_context`,
     {
       method: "POST",
       headers: {
@@ -263,32 +207,32 @@ export async function assertOauthNewConnectionAllowed(
         apikey: env.SUPABASE_SERVICE_ROLE_KEY,
         Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
       },
-      body: JSON.stringify({ p_workspace_id: workspaceId }),
+      body: JSON.stringify({ p_organization_id: organizationId }),
     }
   );
 
   if (!response.ok) {
     console.error(
-      "[oauth] get_workspace_context error:",
+      "[oauth] get_organization_context error:",
       response.status,
       await response.text()
     );
-    return { ok: false, error: "Could not verify workspace limits. Please try again." };
+    return { ok: false, error: "Could not verify organization limits. Please try again." };
   }
 
   const rows = (await response.json()) as Array<{
-    workspace_id: string;
+    organization_id: string;
     tier: "free" | "pro" | "max" | "enterprise";
     max_mcp_connections: number;
   }>;
 
   if (!rows || rows.length === 0) {
-    return { ok: false, error: "Workspace not found or inactive." };
+    return { ok: false, error: "Organization not found or inactive." };
   }
 
   const row = rows[0];
   const msg = await mcpConnectionLimitExceededMessage(
-    workspaceId,
+    organizationId,
     oauthClientId,
     row.max_mcp_connections,
     row.tier,
@@ -331,7 +275,7 @@ async function getOauthAccessTokenRecord(
 }
 
 /**
- * Verifies an OAuth access token and returns the workspace context.
+ * Verifies an OAuth access token and returns the organization context.
  * Returns a descriptive error string on failure so callers can surface it to the user.
  */
 export async function verifyOAuthAccessToken(
@@ -351,18 +295,26 @@ export async function verifyOAuthAccessToken(
     return { ok: false, error: "OAuth token not found. Please re-authenticate." };
   }
 
+  // Shim: tokens issued before migration 029 have organization_id stored under
+  // the legacy `workspace_id` field. Resolve that here so older sessions keep working.
+  const legacyOrgId = (stored as unknown as { workspace_id?: string }).workspace_id;
+  const organizationId = stored.organization_id || legacyOrgId;
+  if (!organizationId) {
+    return { ok: false, error: "OAuth token malformed. Please re-authenticate." };
+  }
+
   // Check expiration
   const now = Math.floor(Date.now() / 1000);
   if (stored.expires_at < now) {
-    console.log("[oauth] token expired, workspace:", stored.workspace_id);
+    console.log("[oauth] token expired, organization:", organizationId);
     return { ok: false, error: "OAuth token expired. Please re-authenticate." };
   }
 
-  console.log("[oauth] token OK, workspace:", stored.workspace_id, "client:", stored.client_id);
+  console.log("[oauth] token OK, organization:", organizationId, "client:", stored.client_id);
 
-  // Resolve workspace context from Supabase
+  // Resolve organization context from Supabase
   const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/rpc/get_workspace_context`,
+    `${env.SUPABASE_URL}/rest/v1/rpc/get_organization_context`,
     {
       method: "POST",
       headers: {
@@ -370,17 +322,17 @@ export async function verifyOAuthAccessToken(
         apikey: env.SUPABASE_SERVICE_ROLE_KEY,
         Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
       },
-      body: JSON.stringify({ p_workspace_id: stored.workspace_id }),
+      body: JSON.stringify({ p_organization_id: organizationId }),
     }
   );
 
   if (!response.ok) {
-    console.error("[oauth] get_workspace_context error:", response.status, await response.text());
-    return { ok: false, error: "Internal error loading workspace. Please try again." };
+    console.error("[oauth] get_organization_context error:", response.status, await response.text());
+    return { ok: false, error: "Internal error loading organization. Please try again." };
   }
 
   let rows: Array<{
-    workspace_id: string;
+    organization_id: string;
     tier: "free" | "pro" | "max" | "enterprise";
     requests_per_minute: number | null;
     requests_per_hour: number;
@@ -394,20 +346,20 @@ export async function verifyOAuthAccessToken(
     const parsed = bodyText ? JSON.parse(bodyText) : [];
     rows = Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    console.error("[oauth] get_workspace_context JSON parse error:", e);
-    return { ok: false, error: "Internal error loading workspace. Please try again." };
+    console.error("[oauth] get_organization_context JSON parse error:", e);
+    return { ok: false, error: "Internal error loading organization. Please try again." };
   }
 
-  console.log("[oauth] get_workspace_context rows:", rows.length, rows[0] ? JSON.stringify(rows[0]) : "empty");
+  console.log("[oauth] get_organization_context rows:", rows.length, rows[0] ? JSON.stringify(rows[0]) : "empty");
 
   if (!rows || rows.length === 0) {
-    return { ok: false, error: "Workspace not found or inactive." };
+    return { ok: false, error: "Organization not found or inactive." };
   }
 
   const row = rows[0];
 
   const limitMsg = await mcpConnectionLimitExceededMessage(
-    stored.workspace_id,
+    organizationId,
     stored.client_id,
     row.max_mcp_connections,
     row.tier,
@@ -418,7 +370,8 @@ export async function verifyOAuthAccessToken(
     return { ok: false, error: limitMsg };
   }
 
-  // Check Supabase for the latest connection state (allowed_accounts + is_active).
+  // Pull allowed_projects from DB (source of truth); fall back to KV copy
+  // and, for legacy tokens, derive projects from the stored allowed_accounts.
   const connResponse = await fetch(
     `${env.SUPABASE_URL}/rest/v1/rpc/get_oauth_connection`,
     {
@@ -429,19 +382,20 @@ export async function verifyOAuthAccessToken(
         Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
       },
       body: JSON.stringify({
-        p_workspace_id: stored.workspace_id,
+        p_organization_id: organizationId,
         p_client_id: stored.client_id,
       }),
     }
   );
 
-  let allowedAccounts = stored.allowed_accounts;
+  let allowedProjects: string[] = stored.allowed_projects ?? [];
 
   if (connResponse.ok) {
     let connRows: Array<{
       connection_id: string;
       is_active: boolean;
-      allowed_accounts: string[];
+      allowed_projects: string[] | null;
+      allowed_accounts: string[] | null;
     }> = [];
     try {
       const connBody = await connResponse.text();
@@ -451,7 +405,11 @@ export async function verifyOAuthAccessToken(
       console.error("[oauth] get_oauth_connection JSON parse error:", e);
     }
 
-    console.log("[oauth] get_oauth_connection rows:", connRows.length, connRows[0] ? JSON.stringify(connRows[0]) : "empty");
+    console.log(
+      "[oauth] get_oauth_connection rows:",
+      connRows.length,
+      connRows[0] ? JSON.stringify(connRows[0]) : "empty"
+    );
 
     if (connRows && connRows.length > 0) {
       const conn = connRows[0];
@@ -464,7 +422,7 @@ export async function verifyOAuthAccessToken(
         };
       }
 
-      allowedAccounts = conn.allowed_accounts;
+      allowedProjects = conn.allowed_projects ?? [];
 
       // Update last_used_at (best-effort)
       fetch(
@@ -494,26 +452,41 @@ export async function verifyOAuthAccessToken(
           Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
         },
         body: JSON.stringify({
-          p_workspace_id: stored.workspace_id,
+          p_organization_id: organizationId,
           p_client_id: stored.client_id,
           p_client_name: clientMeta?.client_name || stored.client_id,
           p_user_id: stored.user_id,
-          p_allowed_accounts: stored.allowed_accounts || [],
+          p_allowed_projects: allowedProjects,
         }),
       }).catch((err) => console.error("[oauth] Auto-register connection failed:", err));
     }
   }
 
-  const workspaceEnabled = await fetchWorkspaceEnabledMetaAccountIds(
-    stored.workspace_id,
-    env
-  );
-  const effectiveAllowed = intersectAllowedAccounts(workspaceEnabled, allowedAccounts);
+  const projects = await fetchOrganizationProjects(organizationId, env);
+
+  // If no allowed_projects on the token or connection, infer from legacy
+  // allowed_accounts (tokens minted before 029). Fall back to all projects
+  // so the session doesn't lock the user out while the DB catches up.
+  if (allowedProjects.length === 0) {
+    const legacyAccounts = stored.allowed_accounts ?? [];
+    if (legacyAccounts.length > 0) {
+      allowedProjects = await resolveProjectsFromLegacyAccounts(
+        organizationId,
+        legacyAccounts,
+        env
+      );
+    }
+    if (allowedProjects.length === 0) {
+      allowedProjects = projects.map((p) => p.id);
+    }
+  }
+
+  const visibleProjects = projects.filter((p) => allowedProjects.includes(p.id));
 
   return {
     ok: true,
     workspace: {
-      workspaceId: row.workspace_id,
+      organizationId,
       apiKeyId: `oauth:${stored.client_id}`,
       tier: row.tier,
       requestsPerMinute: row.requests_per_minute ?? 0,
@@ -522,9 +495,39 @@ export async function verifyOAuthAccessToken(
       maxMcpConnections: row.max_mcp_connections,
       maxAdAccounts: row.max_ad_accounts ?? 0,
       enableMetaMutations: row.enable_meta_mutations === true,
-      allowedAccounts: effectiveAllowed,
+      availableProjects: visibleProjects.length > 0 ? visibleProjects : projects,
+      allowedProjectIds:
+        visibleProjects.length > 0 ? visibleProjects.map((p) => p.id) : allowedProjects,
     },
   };
+}
+
+/**
+ * Legacy-token shim: map a list of Meta ad account IDs to the set of
+ * project IDs that contain any of them, inside the given organization.
+ */
+async function resolveProjectsFromLegacyAccounts(
+  organizationId: string,
+  metaAccountIds: string[],
+  env: Env
+): Promise<string[]> {
+  const normalized = metaAccountIds.map((id) => id.replace(/^act_/, ""));
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/ad_accounts`);
+  url.searchParams.set("organization_id", `eq.${organizationId}`);
+  url.searchParams.set("meta_account_id", `in.(${normalized.join(",")})`);
+  url.searchParams.set("select", "project_id");
+  const res = await fetch(url.toString(), {
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+  });
+  if (!res.ok) {
+    console.error("[oauth/legacy] ad_accounts fetch failed:", res.status);
+    return [];
+  }
+  const rows = (await res.json()) as Array<{ project_id: string }>;
+  return [...new Set(rows.map((r) => r.project_id))];
 }
 
 /**
@@ -539,3 +542,7 @@ function hashForCache(input: string): string {
   }
   return hash.toString(36);
 }
+
+// Re-export the projects helper so callers that previously imported from
+// workspace-ad-accounts find it here.
+export { fetchOrganizationProjects } from "./project-ad-accounts";

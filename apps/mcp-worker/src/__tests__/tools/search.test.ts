@@ -21,7 +21,7 @@ describe("Search Tools", () => {
     vi.clearAllMocks();
     const capture = createToolCapture();
     callTool = capture.callTool;
-    registerSearchTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
+    registerSearchTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), organizationId: "test-ws" });
   });
 
   describe("search", () => {

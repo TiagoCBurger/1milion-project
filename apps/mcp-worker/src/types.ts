@@ -21,8 +21,15 @@ export interface Env {
   WEB_APP_URL: string;
 }
 
-export interface WorkspaceContext {
-  workspaceId: string;
+export interface ProjectSummary {
+  id: string;
+  slug: string;
+  name: string;
+  isDefault: boolean;
+}
+
+export interface OrganizationContext {
+  organizationId: string;
   apiKeyId: string;
   tier: "free" | "pro" | "max" | "enterprise";
   requestsPerMinute: number;
@@ -31,7 +38,14 @@ export interface WorkspaceContext {
   maxMcpConnections: number;
   maxAdAccounts: number;
   enableMetaMutations: boolean;
-  allowedAccounts?: string[];
+  /** Every project visible to this org (read from DB at auth time). */
+  availableProjects: ProjectSummary[];
+  /**
+   * Subset of availableProjects the current credential is authorized to operate on.
+   * - API key: defaults to every project in the org.
+   * - OAuth: taken from oauth_connections.allowed_projects.
+   */
+  allowedProjectIds: string[];
 }
 
 export interface RateLimitResult {

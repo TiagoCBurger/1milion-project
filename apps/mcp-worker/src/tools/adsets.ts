@@ -1,10 +1,14 @@
 import { z } from "zod";
 import { metaApiGet, metaApiPost, ensureActPrefix, textResult } from "../meta-api";
 import type { ToolContext } from "./index";
-import { isAccountAllowed, accountBlockedResult } from "./index";
+import {
+  isAccountAllowed,
+  accountBlockedResult,
+  getProjectAllowedAccounts,
+} from "./index";
 
 export function registerAdsetTools(ctx: ToolContext) {
-  const { server, token, tier, allowedAccounts } = ctx;
+  const { server, token, tier } = ctx;
   // ---------------------------------------------------------------
   // get_adsets
   // ---------------------------------------------------------------
@@ -12,6 +16,10 @@ export function registerAdsetTools(ctx: ToolContext) {
     "get_adsets",
     "List ad sets for a Meta Ads account or a specific campaign",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe("Meta Ads account ID (with or without act_ prefix)"),
@@ -30,7 +38,11 @@ export function registerAdsetTools(ctx: ToolContext) {
           "Pagination cursor from paging.cursors.after of a previous response.",
         ),
     },
-    async ({ account_id, limit, campaign_id, after }) => {
+    async (args) => {
+      const { account_id, limit, campaign_id, after } = args;
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(account_id, allowedAccounts)) {
         return accountBlockedResult(account_id);
       }
@@ -88,6 +100,10 @@ export function registerAdsetTools(ctx: ToolContext) {
     "create_adset",
     "Create a new ad set in a Meta Ads campaign (Pro tier required)",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe("Meta Ads account ID (with or without act_ prefix)"),
@@ -159,6 +175,9 @@ export function registerAdsetTools(ctx: ToolContext) {
         .describe("Frequency control specs as a JSON string (e.g. [{event:'IMPRESSIONS', interval_days:7, max_frequency:2}])"),
     },
     async (args) => {
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(args.account_id, allowedAccounts)) {
         return accountBlockedResult(args.account_id);
       }

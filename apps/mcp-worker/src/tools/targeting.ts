@@ -1,10 +1,14 @@
 import { z } from "zod";
 import { metaApiGet, ensureActPrefix, textResult } from "../meta-api";
 import type { ToolContext } from "./index";
-import { isAccountAllowed, accountBlockedResult } from "./index";
+import {
+  isAccountAllowed,
+  accountBlockedResult,
+  getProjectAllowedAccounts,
+} from "./index";
 
 export function registerTargetingTools(ctx: ToolContext): void {
-  const { server, token, allowedAccounts } = ctx;
+  const { server, token } = ctx;
   // ── search_interests ─────────────────────────────────────────────────
   server.tool(
     "search_interests",
@@ -68,6 +72,10 @@ export function registerTargetingTools(ctx: ToolContext): void {
     "estimate_audience_size",
     "Estimate the audience size for a given targeting spec. Returns lower bound, upper bound, and midpoint estimates.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe("The ad account ID (with or without act_ prefix)."),
@@ -84,6 +92,9 @@ export function registerTargetingTools(ctx: ToolContext): void {
         ),
     },
     async (args) => {
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(args.account_id, allowedAccounts)) {
         return accountBlockedResult(args.account_id);
       }

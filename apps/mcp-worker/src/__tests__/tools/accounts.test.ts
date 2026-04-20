@@ -23,7 +23,7 @@ describe("Account Tools", () => {
     vi.clearAllMocks();
     const capture = createToolCapture();
     callTool = capture.callTool;
-    registerAccountsTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
+    registerAccountsTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), organizationId: "test-ws" });
   });
 
   describe("get_ad_accounts", () => {

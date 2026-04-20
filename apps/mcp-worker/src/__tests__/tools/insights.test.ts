@@ -21,7 +21,7 @@ describe("Insight Tools", () => {
     vi.clearAllMocks();
     const capture = createToolCapture();
     callTool = capture.callTool;
-    registerInsightTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), workspaceId: "test-ws" });
+    registerInsightTools({ server: capture.server, token: TOKEN, tier: "pro", env: createMockEnv(), organizationId: "test-ws" });
   });
 
   describe("get_insights", () => {

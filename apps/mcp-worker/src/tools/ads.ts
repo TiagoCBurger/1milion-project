@@ -1,10 +1,14 @@
 import { z } from "zod";
 import { metaApiGet, metaApiPost, ensureActPrefix, textResult } from "../meta-api";
 import type { ToolContext } from "./index";
-import { isAccountAllowed, accountBlockedResult } from "./index";
+import {
+  isAccountAllowed,
+  accountBlockedResult,
+  getProjectAllowedAccounts,
+} from "./index";
 
 export function registerAdTools(ctx: ToolContext) {
-  const { server, token, tier, allowedAccounts } = ctx;
+  const { server, token, tier } = ctx;
   // ---------------------------------------------------------------
   // get_ads
   // ---------------------------------------------------------------
@@ -12,6 +16,10 @@ export function registerAdTools(ctx: ToolContext) {
     "get_ads",
     "List ads for a Meta Ads account, campaign, or ad set",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe("Meta Ads account ID (with or without act_ prefix)"),
@@ -34,7 +42,11 @@ export function registerAdTools(ctx: ToolContext) {
           "Pagination cursor from paging.cursors.after of a previous response.",
         ),
     },
-    async ({ account_id, limit, campaign_id, adset_id, after }) => {
+    async (args) => {
+      const { account_id, limit, campaign_id, adset_id, after } = args;
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(account_id, allowedAccounts)) {
         return accountBlockedResult(account_id);
       }
@@ -93,6 +105,10 @@ export function registerAdTools(ctx: ToolContext) {
     "create_ad",
     "Create a new ad in a Meta Ads ad set (Pro tier required)",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe("Meta Ads account ID (with or without act_ prefix)"),
@@ -115,6 +131,9 @@ export function registerAdTools(ctx: ToolContext) {
         .describe("Tracking specs as an array of objects"),
     },
     async (args) => {
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(args.account_id, allowedAccounts)) {
         return accountBlockedResult(args.account_id);
       }

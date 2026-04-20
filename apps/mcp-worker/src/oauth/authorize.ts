@@ -168,11 +168,12 @@ export async function handleOAuthCallback(
 
   const storedCode: StoredAuthCode = {
     client_id: authRequest.client_id,
-    workspace_id: payload.workspace_id,
+    organization_id: payload.organization_id,
     user_id: payload.user_id,
     code_challenge: authRequest.code_challenge,
     redirect_uri: authRequest.redirect_uri,
     scope: authRequest.scope,
+    allowed_projects: payload.allowed_projects,
     allowed_accounts: payload.allowed_accounts,
     created_at: Math.floor(Date.now() / 1000),
   };
