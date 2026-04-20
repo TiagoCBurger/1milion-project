@@ -7,8 +7,41 @@
 --
 -- Idempotent: safe to re-run if a previous apply partially failed.
 -- Also self-repairs when an earlier buggy attempt left behind a
--- `projects` table with a different column shape.
+-- `projects` table with a different column shape, and re-creates the
+-- is_organization_member / is_organization_owner helpers if 026 was
+-- applied from an older revision that lacked them.
 -- ============================================================
+
+-- ───────────────────────────────────────────────────────────
+-- RLS helpers (defensive: 026 should have created these, but older
+-- snapshots of 026 did not). CREATE OR REPLACE is idempotent.
+-- ───────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.is_organization_member(p_organization_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.memberships
+        WHERE organization_id = p_organization_id
+          AND user_id = auth.uid()
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
+CREATE OR REPLACE FUNCTION public.is_organization_owner(p_organization_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.memberships
+        WHERE organization_id = p_organization_id
+          AND user_id = auth.uid()
+          AND role = 'owner'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
+GRANT EXECUTE ON FUNCTION public.is_organization_member(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_organization_owner(UUID) TO authenticated;
 
 DO $$
 DECLARE
