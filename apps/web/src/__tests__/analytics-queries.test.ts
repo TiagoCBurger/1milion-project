@@ -33,8 +33,8 @@ describe("SQL templates", () => {
   });
 
   it("timeseriesSql groups by hour or day", () => {
-    expect(timeseriesSql(SITE, START, END, "hour")).toContain("INTERVAL 1 HOUR");
-    expect(timeseriesSql(SITE, START, END, "day")).toContain("INTERVAL 1 DAY");
+    expect(timeseriesSql(SITE, START, END, "hour")).toContain("INTERVAL '1' HOUR");
+    expect(timeseriesSql(SITE, START, END, "day")).toContain("INTERVAL '1' DAY");
   });
 
   it("topSql maps dimension to correct blob slot and caps limit", () => {
@@ -47,7 +47,7 @@ describe("SQL templates", () => {
   });
 
   it("liveSql uses 5 minute window", () => {
-    expect(liveSql(SITE)).toContain("INTERVAL 5 MINUTE");
+    expect(liveSql(SITE)).toContain("INTERVAL '5' MINUTE");
     expect(liveSql(SITE)).toContain(`index1 = '${SITE}'`);
   });
 

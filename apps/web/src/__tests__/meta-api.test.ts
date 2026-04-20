@@ -41,7 +41,7 @@ describe("Meta API Layer", () => {
       const token = await getDecryptedToken("ws-123");
       expect(token).toBe("EAABx123...");
       expect(mockRpc).toHaveBeenCalledWith("decrypt_meta_token", {
-        p_workspace_id: "ws-123",
+        p_organization_id: "ws-123",
         p_encryption_key: process.env.TOKEN_ENCRYPTION_KEY,
       });
     });

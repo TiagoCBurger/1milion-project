@@ -54,6 +54,9 @@ function mockApproveFromSuccess() {
     if (table === "memberships") {
       return mockQueryChain({ data: { role: "owner" }, error: null });
     }
+    if (table === "projects") {
+      return mockQueryChain({ data: [{ id: "proj-1" }], error: null });
+    }
     if (table === "subscriptions") {
       const chain: any = {};
       chain.select = vi.fn().mockReturnValue(chain);
@@ -101,7 +104,7 @@ describe("Security: Authentication enforcement", () => {
         ? JSON.stringify(route.name === "connect"
           ? { token: "EAA123456789" }
           : route.name === "oauth-approve"
-          ? { request_id: "r", workspace_id: "w", user_id: "u" }
+          ? { request_id: "r", organization_id: "w", user_id: "u" }
           : { is_enabled: true })
         : undefined;
 
@@ -241,7 +244,7 @@ describe("Security: Input validation", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           request_id: "req-1",
-          workspace_id: "ws-1",
+          organization_id: "ws-1",
           user_id: "attacker-user-id",
         }),
       })
@@ -314,7 +317,12 @@ describe("Security: JWT token generation", () => {
       new NextRequest("http://localhost/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request_id: "req-1", workspace_id: "ws-1", user_id: "user-123" }),
+        body: JSON.stringify({
+          request_id: "req-1",
+          organization_id: "ws-1",
+          user_id: "user-123",
+          allowed_projects: ["proj-1"],
+        }),
       })
     );
 
@@ -336,9 +344,9 @@ describe("Security: JWT token generation", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           request_id: "req-1",
-          workspace_id: "ws-1",
+          organization_id: "ws-1",
           user_id: "user-123",
-          allowed_accounts: ["act_111", "act_222"],
+          allowed_projects: ["proj-1"],
         }),
       })
     );
@@ -348,9 +356,9 @@ describe("Security: JWT token generation", () => {
     const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
 
     expect(payload.request_id).toBe("req-1");
-    expect(payload.workspace_id).toBe("ws-1");
+    expect(payload.organization_id).toBe("ws-1");
     expect(payload.user_id).toBe("user-123");
-    expect(payload.allowed_accounts).toEqual(["act_111", "act_222"]);
+    expect(payload.allowed_projects).toEqual(["proj-1"]);
     expect(payload.iat).toBeDefined();
     expect(payload.exp).toBeDefined();
   });

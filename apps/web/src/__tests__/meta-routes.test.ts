@@ -15,8 +15,8 @@ vi.mock("@/lib/supabase/admin", () => ({
   })),
 }));
 
-vi.mock("@/lib/workspace-write-guard", () => ({
-  assertWorkspaceCanWrite: vi.fn().mockResolvedValue(null),
+vi.mock("@/lib/organization-write-guard", () => ({
+  assertOrganizationCanWrite: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/lib/r2-upload", () => ({

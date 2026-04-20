@@ -66,14 +66,14 @@ describe("POST /api/billing/checkout", () => {
   it("returns 401 when not authenticated", async () => {
     setupAuth(null);
     const res = await handler.POST(
-      jsonRequest({ workspace_id: "ws-1", tier: "pro", cycle: "monthly" })
+      jsonRequest({ organization_id: "ws-1", tier: "pro", cycle: "monthly" })
     );
     expect(res.status).toBe(401);
   });
 
   it("returns 400 for missing fields", async () => {
     setupAuth(mockUser());
-    const res = await handler.POST(jsonRequest({ workspace_id: "ws-1" }));
+    const res = await handler.POST(jsonRequest({ organization_id: "ws-1" }));
     const { status, body } = await parseJsonResponse(res);
     expect(status).toBe(400);
     expect(body.error).toContain("Missing required");
@@ -82,7 +82,7 @@ describe("POST /api/billing/checkout", () => {
   it("returns 400 for invalid tier", async () => {
     setupAuth(mockUser());
     const res = await handler.POST(
-      jsonRequest({ workspace_id: "ws-1", tier: "ultra", cycle: "monthly" })
+      jsonRequest({ organization_id: "ws-1", tier: "ultra", cycle: "monthly" })
     );
     expect(res.status).toBe(400);
   });
@@ -90,7 +90,7 @@ describe("POST /api/billing/checkout", () => {
   it("returns 400 for invalid cycle", async () => {
     setupAuth(mockUser());
     const res = await handler.POST(
-      jsonRequest({ workspace_id: "ws-1", tier: "pro", cycle: "weekly" })
+      jsonRequest({ organization_id: "ws-1", tier: "pro", cycle: "weekly" })
     );
     expect(res.status).toBe(400);
   });
@@ -100,7 +100,7 @@ describe("POST /api/billing/checkout", () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: null, error: null }));
 
     const res = await handler.POST(
-      jsonRequest({ workspace_id: "ws-1", tier: "pro", cycle: "monthly" })
+      jsonRequest({ organization_id: "ws-1", tier: "pro", cycle: "monthly" })
     );
     expect(res.status).toBe(403);
   });
@@ -142,7 +142,7 @@ describe("POST /api/billing/checkout", () => {
     });
 
     const res = await handler.POST(
-      jsonRequest({ workspace_id: "ws-1", tier: "pro", cycle: "monthly" })
+      jsonRequest({ organization_id: "ws-1", tier: "pro", cycle: "monthly" })
     );
     const { status, body } = await parseJsonResponse(res);
     expect(status).toBe(200);
@@ -166,12 +166,12 @@ describe("GET /api/billing/status", () => {
   it("returns 401 when not authenticated", async () => {
     setupAuth(null);
     const res = await handler.GET(
-      new Request("http://localhost/api/billing/status?workspace_id=ws-1")
+      new Request("http://localhost/api/billing/status?organization_id=ws-1")
     );
     expect(res.status).toBe(401);
   });
 
-  it("returns 400 when missing workspace_id", async () => {
+  it("returns 400 when missing organization_id", async () => {
     setupAuth(mockUser());
     const res = await handler.GET(
       new Request("http://localhost/api/billing/status")
@@ -184,7 +184,7 @@ describe("GET /api/billing/status", () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: null, error: null }));
 
     const res = await handler.GET(
-      new Request("http://localhost/api/billing/status?workspace_id=ws-1")
+      new Request("http://localhost/api/billing/status?organization_id=ws-1")
     );
     expect(res.status).toBe(403);
   });
@@ -202,7 +202,7 @@ describe("POST /api/billing/cancel", () => {
 
   it("returns 401 when not authenticated", async () => {
     setupAuth(null);
-    const res = await handler.POST(jsonRequest({ workspace_id: "ws-1" }));
+    const res = await handler.POST(jsonRequest({ organization_id: "ws-1" }));
     expect(res.status).toBe(401);
   });
 
@@ -210,7 +210,7 @@ describe("POST /api/billing/cancel", () => {
     setupAuth(mockUser());
     mockFrom.mockReturnValue(mockQueryChain({ data: null, error: null }));
 
-    const res = await handler.POST(jsonRequest({ workspace_id: "ws-1" }));
+    const res = await handler.POST(jsonRequest({ organization_id: "ws-1" }));
     expect(res.status).toBe(403);
   });
 
@@ -223,7 +223,7 @@ describe("POST /api/billing/cancel", () => {
     const adminChain = mockQueryChain({ data: null, error: null });
     mockAdminFrom.mockReturnValue(adminChain);
 
-    const res = await handler.POST(jsonRequest({ workspace_id: "ws-1" }));
+    const res = await handler.POST(jsonRequest({ organization_id: "ws-1" }));
     const { status, body } = await parseJsonResponse(res);
     expect(status).toBe(200);
     expect(body.success).toBe(true);

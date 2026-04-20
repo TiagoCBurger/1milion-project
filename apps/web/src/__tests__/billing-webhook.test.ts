@@ -82,7 +82,7 @@ function makeV2Payload(
         amount: 3700,
         paidAmount: 3700,
         status: "PAID",
-        metadata: overrides?.metadata ?? { workspace_id: "ws-1", tier: "pro", cycle: "monthly" },
+        metadata: overrides?.metadata ?? { organization_id: "ws-1", tier: "pro", cycle: "monthly" },
         createdAt: "2026-04-01T00:00:00Z",
         updatedAt: "2026-04-01T00:00:05Z",
       },
@@ -166,7 +166,7 @@ describe("POST /api/billing/webhook", () => {
     mockParseWebhookPayload.mockReturnValue(
       makeV2Payload("evt_new", "subscription.completed", {
         subscriptionId: "subs_abc",
-        metadata: { workspace_id: "ws-1", tier: "pro", cycle: "monthly" },
+        metadata: { organization_id: "ws-1", tier: "pro", cycle: "monthly" },
       })
     );
 
@@ -204,11 +204,11 @@ describe("POST /api/billing/webhook", () => {
     );
   });
 
-  it("extracts workspace_id from checkout.externalId as fallback", async () => {
+  it("extracts organization_id from checkout.externalId as fallback", async () => {
     mockVerifyWebhookSignature.mockResolvedValue(true);
     mockParseWebhookPayload.mockReturnValue(
       makeV2Payload("evt_ext", "subscription.completed", {
-        metadata: {}, // no workspace_id in metadata
+        metadata: {}, // no organization_id in metadata
         externalId: "ws-from-external",
       })
     );
@@ -230,8 +230,8 @@ describe("POST /api/billing/webhook", () => {
     const res = await handler.POST(makeWebhookRequest('{"id":"evt_ext"}'));
     expect(res.status).toBe(200);
 
-    // Verify workspace_id came from externalId
-    expect(updateChain.eq).toHaveBeenCalledWith("workspace_id", "ws-from-external");
+    // Verify organization_id came from externalId
+    expect(updateChain.eq).toHaveBeenCalledWith("organization_id", "ws-from-external");
   });
 
   it("handles subscription.renewed without pending change", async () => {

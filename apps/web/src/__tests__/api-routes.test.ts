@@ -51,6 +51,10 @@ function mockApproveFromSuccess() {
     if (table === "memberships") {
       return mockQueryChain({ data: { role: "owner" }, error: null });
     }
+    if (table === "projects") {
+      // Validate allowed_projects belong to this organization.
+      return mockQueryChain({ data: [{ id: "proj-1" }], error: null });
+    }
     if (table === "subscriptions") {
       const chain: any = {};
       chain.select = vi.fn().mockReturnValue(chain);
@@ -140,7 +144,7 @@ describe("POST /api/organizations/[id]/disconnect", () => {
     expect(tables).toContain("memberships");
     expect(tables).toContain("meta_tokens");
     expect(tables).toContain("business_managers");
-    expect(tables).toContain("workspaces");
+    expect(tables).toContain("organizations");
   });
 });
 
@@ -387,7 +391,7 @@ describe("POST /api/oauth/approve", () => {
       new Request("http://localhost/api/oauth/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request_id: "req-1", workspace_id: "ws-1", user_id: "user-123" }),
+        body: JSON.stringify({ request_id: "req-1", organization_id: "ws-1", user_id: "user-123" }),
       })
     );
     expect(res.status).toBe(401);
@@ -399,7 +403,7 @@ describe("POST /api/oauth/approve", () => {
       new Request("http://localhost/api/oauth/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace_id: "ws-1", user_id: "user-123" }),
+        body: JSON.stringify({ organization_id: "ws-1", user_id: "user-123" }),
       })
     );
     expect(res.status).toBe(400);
@@ -411,7 +415,7 @@ describe("POST /api/oauth/approve", () => {
       new Request("http://localhost/api/oauth/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request_id: "req-1", workspace_id: "ws-1", user_id: "user-DIFFERENT" }),
+        body: JSON.stringify({ request_id: "req-1", organization_id: "ws-1", user_id: "user-DIFFERENT" }),
       })
     );
     expect(res.status).toBe(403);
@@ -427,7 +431,7 @@ describe("POST /api/oauth/approve", () => {
       new Request("http://localhost/api/oauth/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request_id: "req-1", workspace_id: "ws-1", user_id: "user-123" }),
+        body: JSON.stringify({ request_id: "req-1", organization_id: "ws-1", user_id: "user-123" }),
       })
     );
     expect(res.status).toBe(403);
@@ -441,7 +445,12 @@ describe("POST /api/oauth/approve", () => {
       new Request("http://localhost/api/oauth/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request_id: "req-1", workspace_id: "ws-1", user_id: "user-123" }),
+        body: JSON.stringify({
+          request_id: "req-1",
+          organization_id: "ws-1",
+          user_id: "user-123",
+          allowed_projects: ["proj-1"],
+        }),
       })
     );
     expect(res.status).toBe(200);
@@ -456,7 +465,7 @@ describe("POST /api/oauth/approve", () => {
     // Verify payload
     const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
     expect(payload.request_id).toBe("req-1");
-    expect(payload.workspace_id).toBe("ws-1");
+    expect(payload.organization_id).toBe("ws-1");
     expect(payload.user_id).toBe("user-123");
     expect(payload.exp).toBeGreaterThan(payload.iat);
     expect(payload.exp - payload.iat).toBe(30); // 30 seconds TTL
@@ -467,6 +476,9 @@ describe("POST /api/oauth/approve", () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === "memberships") {
         return mockQueryChain({ data: { role: "owner" }, error: null });
+      }
+      if (table === "projects") {
+        return mockQueryChain({ data: [{ id: "proj-1" }], error: null });
       }
       if (table === "subscriptions") {
         const chain: any = {};
@@ -490,9 +502,10 @@ describe("POST /api/oauth/approve", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           request_id: "req-1",
-          workspace_id: "ws-1",
+          organization_id: "ws-1",
           user_id: "user-123",
           oauth_client_id: "client_new",
+          allowed_projects: ["proj-1"],
         }),
       })
     );
