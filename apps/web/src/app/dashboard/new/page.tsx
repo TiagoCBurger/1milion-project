@@ -11,9 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type CreateOrgRow = {
-  organization_id: string;
-  default_project_id: string;
-  default_project_slug: string;
+  out_organization_id: string;
+  out_default_project_id: string;
+  out_default_project_slug: string;
 };
 
 export default function NewOrganizationPage() {
@@ -59,7 +59,7 @@ export default function NewOrganizationPage() {
     }
 
     const result = (Array.isArray(data) ? data[0] : data) as CreateOrgRow | null;
-    const projectSlug = result?.default_project_slug ?? "default";
+    const projectSlug = result?.out_default_project_slug ?? "default";
 
     router.refresh();
     router.push(`/dashboard/${slug}/${projectSlug}`);
