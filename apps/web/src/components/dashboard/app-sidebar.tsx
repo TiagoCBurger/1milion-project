@@ -10,10 +10,11 @@ import {
   Cable,
   CreditCard,
   LogOut,
-  ChevronsUpDown,
   Building2,
+  Check,
   Moon,
   Sun,
+  Plus,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -23,6 +24,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -145,48 +149,6 @@ export function AppSidebar({ workspaces, currentWorkspace, currentProjectSlug, u
         <BrandLogo href={homeDashboardHref} sidebar />
       </div>
 
-      <div className="px-3 pb-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-sidebar-accent transition-colors">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-vf-lime/20 text-vf-ink">
-                <Building2 className="h-4 w-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">
-                  {currentWorkspace?.name ??
-                    (workspaces.length === 0 ? "Criar organização" : "Selecionar organização")}
-                </p>
-                {currentWorkspace?.meta_business_name && (
-                  <p className="text-xs text-muted-foreground truncate">
-                    {currentWorkspace.meta_business_name}
-                  </p>
-                )}
-              </div>
-              <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="start">
-            <DropdownMenuLabel>Organizações</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {workspaces.map((org) => (
-              <DropdownMenuItem key={org.id} asChild>
-                <Link href={`/dashboard/${org.slug}`}>
-                  <Building2 className="mr-2 h-4 w-4" />
-                  {org.name}
-                </Link>
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/dashboard/new" className="text-muted-foreground">
-                + Nova organização
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
       {slug ? (
         <div className="px-3 pb-2">
           <ProjectSwitcher orgSlug={slug} currentProjectSlug={resolvedProjectSlug} />
@@ -216,22 +178,70 @@ export function AppSidebar({ workspaces, currentWorkspace, currentProjectSlug, u
               </Avatar>
               <div className="flex-1 min-w-0 text-left">
                 <p className="text-sm font-medium truncate">{user.name ?? user.email.split("@")[0]}</p>
-                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {currentWorkspace?.name ?? user.email}
+                </p>
               </div>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" className="w-56">
-            {slug ? (
-              <>
+          <DropdownMenuContent side="top" align="start" className="w-60">
+            <DropdownMenuLabel className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium truncate">
+                {user.name ?? user.email.split("@")[0]}
+              </span>
+              <span className="text-xs text-muted-foreground truncate font-normal">
+                {user.email}
+              </span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Building2 className="mr-2 h-4 w-4" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate">Organização</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {currentWorkspace?.name ?? "Selecionar"}
+                  </p>
+                </div>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-56">
+                <DropdownMenuLabel>Organizações</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {workspaces.map((org) => (
+                  <DropdownMenuItem key={org.id} asChild>
+                    <Link href={`/dashboard/${org.slug}`}>
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          currentWorkspace?.id === org.id ? "opacity-100" : "opacity-0",
+                        )}
+                      />
+                      <span className="truncate">{org.name}</span>
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+                {workspaces.length > 0 && <DropdownMenuSeparator />}
                 <DropdownMenuItem asChild>
-                  <Link href={`/dashboard/${slug}/billing`}>
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Assinatura
+                  <Link href="/dashboard/new" className="text-muted-foreground">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nova organização
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            {slug ? (
+              <DropdownMenuItem asChild>
+                <Link href={`/dashboard/${slug}/billing`}>
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Assinatura
+                </Link>
+              </DropdownMenuItem>
             ) : null}
+
+            <DropdownMenuSeparator />
+
             <DropdownMenuItem
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             >
@@ -250,7 +260,7 @@ export function AppSidebar({ workspaces, currentWorkspace, currentProjectSlug, u
                 void handleSignOut()
               }}
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-4 w-4 mr-2" />
               Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
