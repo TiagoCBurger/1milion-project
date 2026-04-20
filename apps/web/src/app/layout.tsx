@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
-import Script from 'next/script'
+import { HimetricaTracker } from "@/components/himetrica-tracker";
 
 export const metadata: Metadata = {
   title: "VibeFly",
@@ -27,11 +27,7 @@ export default function RootLayout({
         <meta property="fb:app_id" content="1330746402408443" />
       </head>
       <body className="min-h-screen antialiased">
-      <Script
-  src="https://cdn.himetrica.com/tracker.js"
-  data-api-key="hm_b95710e72e1cf9aa202028638f70eaa9313d4a3747881e4a"
-  strategy="afterInteractive"
-/>
+        <HimetricaTracker />
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
