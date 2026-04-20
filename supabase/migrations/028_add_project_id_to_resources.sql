@@ -1,6 +1,8 @@
 -- ============================================================
 -- 028_add_project_id_to_resources.sql
 -- Wires ad_accounts and analytics.sites to projects.
+-- Step 0: reconcile 026 (workspaces → organizations) if the tracking
+--         row says it was applied but the DB still has workspaces.
 -- Step 1: seed one Default project per existing organization.
 -- Step 2: add project_id column (nullable), backfill, enforce NOT NULL.
 -- Step 3: use a composite FK so project_id always belongs to the
@@ -8,6 +10,84 @@
 --
 -- Idempotent: safe to re-run.
 -- ============================================================
+
+-- ───────────────────────────────────────────────────────────
+-- STEP 0: reconcile the 026 rename if it was skipped.
+-- Some projects landed in production with 026 marked applied in
+-- schema_migrations, but the actual rename never ran. Re-do the
+-- essential parts here so 028 can proceed.
+-- ───────────────────────────────────────────────────────────
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relname = 'organizations'
+    ) THEN
+        IF EXISTS (
+            SELECT 1 FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relname = 'workspaces'
+        ) THEN
+            RAISE NOTICE 'Reconciling 026: renaming public.workspaces → public.organizations.';
+            ALTER TABLE public.workspaces RENAME TO organizations;
+        ELSE
+            RAISE EXCEPTION 'Neither public.workspaces nor public.organizations exists. Migration 026 has not been applied. Run it before 028.';
+        END IF;
+    END IF;
+END
+$$;
+
+-- Per-table column rename (only where still workspace_id).
+DO $$
+DECLARE
+    target record;
+BEGIN
+    FOR target IN
+        SELECT * FROM (VALUES
+            ('public',   'memberships'),
+            ('public',   'meta_tokens'),
+            ('public',   'api_keys'),
+            ('public',   'subscriptions'),
+            ('public',   'usage_logs'),
+            ('public',   'business_managers'),
+            ('public',   'ad_accounts'),
+            ('public',   'oauth_connections'),
+            ('public',   'billing_events'),
+            ('public',   'ad_images'),
+            ('public',   'email_events'),
+            ('requests', 'integration_requests'),
+            ('analytics','sites')
+        ) AS t(schema_name, table_name)
+    LOOP
+        IF EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = target.schema_name
+              AND table_name = target.table_name
+        )
+        AND EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = target.schema_name
+              AND table_name = target.table_name
+              AND column_name = 'workspace_id'
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = target.schema_name
+              AND table_name = target.table_name
+              AND column_name = 'organization_id'
+        )
+        THEN
+            EXECUTE format(
+                'ALTER TABLE %I.%I RENAME COLUMN workspace_id TO organization_id',
+                target.schema_name,
+                target.table_name
+            );
+        END IF;
+    END LOOP;
+END
+$$;
 
 -- ───────────────────────────────────────────────────────────
 -- STEP 1: Default project per organization
