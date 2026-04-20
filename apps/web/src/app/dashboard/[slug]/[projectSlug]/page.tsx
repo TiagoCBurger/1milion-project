@@ -1,12 +1,16 @@
-import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchProjectBySlug } from "@/lib/projects";
 
 /**
- * Project-scoped dashboard root. For now this lands on the existing
- * org-level dashboard while preserving the project context via cookie.
- * A project-filtered dashboard UI is a follow-up.
+ * Project-scoped dashboard root. For now this validates the project
+ * exists under the organization and lands on the existing org-level
+ * dashboard. A project-filtered dashboard UI is a follow-up.
+ *
+ * The ProjectSwitcher client component takes care of persisting the
+ * user's project pick in the `last_project:<orgSlug>` cookie when they
+ * switch — we don't set it here because Server Components can't
+ * mutate cookies.
  */
 export default async function ProjectHomePage({
   params,
@@ -31,15 +35,5 @@ export default async function ProjectHomePage({
   const project = await fetchProjectBySlug(supabase, org.id, projectSlug);
   if (!project) notFound();
 
-  // Persist the chosen project for the sidebar switcher.
-  const cookieStore = await cookies();
-  cookieStore.set(`last_project:${slug}`, projectSlug, {
-    path: "/",
-    maxAge: 60 * 60 * 24 * 180,
-    sameSite: "lax",
-  });
-
-  // The org-level dashboard lives at /dashboard/[slug]. Until we build a
-  // project-scoped view, send users there.
   redirect(`/dashboard/${slug}`);
 }
