@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     return redirectError(null, "invalid_state");
   }
 
-  const { workspaceId, slug } = stateData;
+  const { organizationId, slug } = stateData;
 
   // Verify user is still authenticated
   const supabase = await createClient();
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     // 4. Encrypt and store token
     const { error: encryptError } = await supabase.rpc("encrypt_meta_token", {
-      p_workspace_id: workspaceId,
+      p_organization_id: organizationId,
       p_token: longLivedToken,
       p_encryption_key: TOKEN_ENCRYPTION_KEY,
       p_token_type: "long_lived",
@@ -102,13 +102,13 @@ export async function GET(request: NextRequest) {
     // 5. Update workspace with primary BM info
     if (inspection.bmId) {
       await supabase
-        .from("workspaces")
+        .from("organizations")
         .update({
           meta_business_id: inspection.bmId,
           meta_business_name: inspection.bmName,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", workspaceId);
+        .eq("id", organizationId);
     }
 
     // 6. Sync all BMs and their ad accounts
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
       const { error: syncError } = await supabase.rpc(
         "sync_business_managers",
         {
-          p_workspace_id: workspaceId,
+          p_organization_id: organizationId,
           p_business_managers: inspection.businessManagers,
         }
       );
@@ -129,14 +129,14 @@ export async function GET(request: NextRequest) {
     const { data: existingKeys } = await supabase
       .from("api_keys")
       .select("id")
-      .eq("workspace_id", workspaceId)
+      .eq("organization_id", organizationId)
       .eq("is_active", true)
       .limit(1);
 
     let apiKeyParam = "";
     if (!existingKeys?.length) {
       const { data: keyData } = await supabase.rpc("generate_api_key", {
-        p_workspace_id: workspaceId,
+        p_organization_id: organizationId,
         p_created_by: user.id,
         p_name: "Auto-generated",
       });

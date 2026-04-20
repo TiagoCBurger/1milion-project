@@ -28,7 +28,7 @@ export default async function IntegrationsHubPage({
   if (!user) redirect("/login");
 
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id")
     .eq("slug", slug)
     .single();
@@ -37,7 +37,7 @@ export default async function IntegrationsHubPage({
   const { data: metaTok } = await supabase
     .from("meta_tokens")
     .select("id")
-    .eq("workspace_id", workspace.id)
+    .eq("organization_id", workspace.id)
     .eq("is_valid", true)
     .maybeSingle();
 
@@ -47,7 +47,7 @@ export default async function IntegrationsHubPage({
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Integrações" },
         ]}

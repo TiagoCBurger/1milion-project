@@ -5,7 +5,7 @@ const MAX_AGE = 600; // 10 minutes
 
 interface OAuthStatePayload {
   state: string;
-  workspaceId: string;
+  organizationId: string;
   slug: string;
 }
 
@@ -14,13 +14,13 @@ interface OAuthStatePayload {
  * Returns the state string and the Set-Cookie header value.
  */
 export function createOAuthStateCookie(
-  workspaceId: string,
+  organizationId: string,
   slug: string,
   isSecure: boolean
 ): { state: string; cookieHeader: string } {
   const state = randomBytes(32).toString("hex");
 
-  const payload: OAuthStatePayload = { state, workspaceId, slug };
+  const payload: OAuthStatePayload = { state, organizationId, slug };
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
 
   const parts = [
@@ -42,7 +42,7 @@ export function createOAuthStateCookie(
 export function validateOAuthStateCookie(
   cookieValue: string | undefined,
   receivedState: string
-): { workspaceId: string; slug: string } | null {
+): { organizationId: string; slug: string } | null {
   if (!cookieValue) return null;
 
   try {
@@ -51,7 +51,7 @@ export function validateOAuthStateCookie(
 
     if (payload.state !== receivedState) return null;
 
-    return { workspaceId: payload.workspaceId, slug: payload.slug };
+    return { organizationId: payload.organizationId, slug: payload.slug };
   } catch {
     return null;
   }

@@ -93,9 +93,9 @@ export function invalidateCache(pattern?: string): void {
 
 // ── Token decryption ──────────────────────────────────────────
 
-export async function getDecryptedToken(workspaceId: string): Promise<string | null> {
+export async function getDecryptedToken(organizationId: string): Promise<string | null> {
   // Check token cache first
-  const tokenCacheKey = `token:${workspaceId}`;
+  const tokenCacheKey = `token:${organizationId}`;
   const cachedToken = getCached(tokenCacheKey);
   if (cachedToken) {
     return cachedToken._token as string;
@@ -108,7 +108,7 @@ export async function getDecryptedToken(workspaceId: string): Promise<string | n
   }
   const supabase = createAdminClient();
   const { data, error } = await supabase.rpc("decrypt_meta_token", {
-    p_workspace_id: workspaceId,
+    p_organization_id: organizationId,
     p_encryption_key: encKey,
   });
   if (error) {

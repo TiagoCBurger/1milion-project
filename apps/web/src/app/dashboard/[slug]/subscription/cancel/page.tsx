@@ -12,7 +12,7 @@ export default function SubscriptionCancelPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
   const supabase = createClient();
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [organizationId, setWorkspaceId] = useState<string | null>(null);
   const [tier, setTier] = useState<string | null>(null);
   const [pendingTier, setPendingTier] = useState<string | null>(null);
   const [resolved, setResolved] = useState(false);
@@ -24,7 +24,7 @@ export default function SubscriptionCancelPage() {
     let cancelled = false;
     async function init() {
       const { data } = await supabase
-        .from("workspaces")
+        .from("organizations")
         .select("id")
         .eq("slug", slug)
         .single();
@@ -42,10 +42,10 @@ export default function SubscriptionCancelPage() {
   }, [slug, supabase, router]);
 
   useEffect(() => {
-    if (!workspaceId) return;
+    if (!organizationId) return;
     let cancelled = false;
     async function load() {
-      const res = await fetch(`/api/billing/status?workspace_id=${workspaceId}`);
+      const res = await fetch(`/api/billing/status?organization_id=${organizationId}`);
       if (cancelled) return;
       if (!res.ok) {
         router.replace(billingHref);
@@ -65,16 +65,16 @@ export default function SubscriptionCancelPage() {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, router, billingHref]);
+  }, [organizationId, router, billingHref]);
 
   async function handleConfirm() {
-    if (!workspaceId || !confirm("Tem certeza? Seu plano será cancelado ao final do período atual.")) return;
+    if (!organizationId || !confirm("Tem certeza? Seu plano será cancelado ao final do período atual.")) return;
     setSubmitting(true);
     try {
       const res = await fetch("/api/billing/cancel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace_id: workspaceId }),
+        body: JSON.stringify({ organization_id: organizationId }),
       });
       if (res.ok) {
         router.push(billingHref);

@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getDecryptedToken, fetchInsights } from "@/lib/meta-api";
-import { getEnabledAdAccounts } from "@/lib/workspace-data";
+import { getEnabledAdAccounts } from "@/lib/organization-data";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
@@ -30,7 +30,7 @@ export default async function InsightsPage({
   if (!user) redirect("/login");
 
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id")
     .eq("slug", slug)
     .single();
@@ -43,7 +43,7 @@ export default async function InsightsPage({
     return (
       <>
         <PageHeader breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Insights" },
         ]} />
@@ -91,7 +91,7 @@ export default async function InsightsPage({
   return (
     <>
       <PageHeader breadcrumbs={[
-        { label: "Espaços de trabalho", href: "/dashboard" },
+        { label: "Organizações", href: "/dashboard" },
         { label: slug, href: `/dashboard/${slug}` },
         { label: "Insights" },
       ]} />

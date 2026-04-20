@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getDecryptedToken, fetchCampaigns } from "@/lib/meta-api";
-import { getEnabledAdAccounts } from "@/lib/workspace-data";
+import { getEnabledAdAccounts } from "@/lib/organization-data";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
@@ -49,7 +49,7 @@ export default async function CampaignsPage({
   if (!user) redirect("/login");
 
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id, enable_meta_mutations")
     .eq("slug", slug)
     .single();
@@ -63,7 +63,7 @@ export default async function CampaignsPage({
       <>
         <PageHeader
           breadcrumbs={[
-            { label: "Espaços de trabalho", href: "/dashboard" },
+            { label: "Organizações", href: "/dashboard" },
             { label: slug, href: `/dashboard/${slug}` },
             { label: "Campanhas" },
           ]}
@@ -102,7 +102,7 @@ export default async function CampaignsPage({
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Campanhas" },
         ]}
@@ -120,7 +120,7 @@ export default async function CampaignsPage({
           </div>
           <div className="flex items-center gap-2">
             {workspace.enable_meta_mutations && (
-              <CreateCampaignDialog workspaceId={workspace.id} accountId={selectedAccount} />
+              <CreateCampaignDialog organizationId={workspace.id} accountId={selectedAccount} />
             )}
             <AccountSelector accounts={accounts} current={selectedAccount} />
           </div>
@@ -191,7 +191,7 @@ export default async function CampaignsPage({
                         <TableCell>
                           {workspace.enable_meta_mutations && (
                             <CampaignActions
-                              workspaceId={workspace.id}
+                              organizationId={workspace.id}
                               campaignId={id}
                               currentStatus={String(c["status"] ?? "")}
                             />

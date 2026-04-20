@@ -18,7 +18,7 @@ export default async function AnalyticsLayout({
   if (!user) redirect("/login");
 
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id")
     .eq("slug", slug)
     .maybeSingle();
@@ -28,7 +28,7 @@ export default async function AnalyticsLayout({
     .from("memberships")
     .select("role")
     .eq("user_id", user.id)
-    .eq("workspace_id", workspace.id)
+    .eq("organization_id", workspace.id)
     .maybeSingle();
   if (!membership) notFound();
 
@@ -36,7 +36,7 @@ export default async function AnalyticsLayout({
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Analytics" },
         ]}

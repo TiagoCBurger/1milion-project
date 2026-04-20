@@ -7,7 +7,7 @@ import {
   metaApiGet,
   metaUserFacingError,
 } from "@/lib/meta-api";
-import { getEnabledAdAccounts } from "@/lib/workspace-data";
+import { getEnabledAdAccounts } from "@/lib/organization-data";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
@@ -55,7 +55,7 @@ export default async function CampaignDetailPage({
   if (!user) redirect("/login");
 
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id")
     .eq("slug", slug)
     .single();
@@ -69,7 +69,7 @@ export default async function CampaignDetailPage({
       <>
         <PageHeader
           breadcrumbs={[
-            { label: "Espaços de trabalho", href: "/dashboard" },
+            { label: "Organizações", href: "/dashboard" },
             { label: slug, href: `/dashboard/${slug}` },
             { label: "Campanhas", href: `/dashboard/${slug}/campaigns` },
             { label: campaignId },
@@ -118,7 +118,7 @@ export default async function CampaignDetailPage({
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Campanhas", href: `/dashboard/${slug}/campaigns` },
           { label: campaignName },

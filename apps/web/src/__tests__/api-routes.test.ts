@@ -76,21 +76,21 @@ function setupAuth(user: ReturnType<typeof mockUser> | null) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// API Route: POST /api/workspaces/[id]/disconnect
+// API Route: POST /api/organizations/[id]/disconnect
 // ══════════════════════════════════════════════════════════════
 
-describe("POST /api/workspaces/[id]/disconnect", () => {
+describe("POST /api/organizations/[id]/disconnect", () => {
   let handler: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    handler = await import("@/app/api/workspaces/[id]/disconnect/route");
+    handler = await import("@/app/api/organizations/[id]/disconnect/route");
   });
 
   it("returns 401 when not authenticated", async () => {
     setupAuth(null);
     const res = await handler.POST(
-      new Request("http://localhost/api/workspaces/ws-1/disconnect", { method: "POST" }),
+      new Request("http://localhost/api/organizations/ws-1/disconnect", { method: "POST" }),
       { params: Promise.resolve({ id: "ws-1" }) }
     );
     const { status, body } = await parseJsonResponse(res);
@@ -105,7 +105,7 @@ describe("POST /api/workspaces/[id]/disconnect", () => {
     mockFrom.mockReturnValue(chain);
 
     const res = await handler.POST(
-      new Request("http://localhost/api/workspaces/ws-1/disconnect", { method: "POST" }),
+      new Request("http://localhost/api/organizations/ws-1/disconnect", { method: "POST" }),
       { params: Promise.resolve({ id: "ws-1" }) }
     );
     const { status, body } = await parseJsonResponse(res);
@@ -128,7 +128,7 @@ describe("POST /api/workspaces/[id]/disconnect", () => {
     });
 
     const res = await handler.POST(
-      new Request("http://localhost/api/workspaces/ws-1/disconnect", { method: "POST" }),
+      new Request("http://localhost/api/organizations/ws-1/disconnect", { method: "POST" }),
       { params: Promise.resolve({ id: "ws-1" }) }
     );
     const { status, body } = await parseJsonResponse(res);
@@ -145,15 +145,15 @@ describe("POST /api/workspaces/[id]/disconnect", () => {
 });
 
 // ══════════════════════════════════════════════════════════════
-// API Route: PATCH /api/workspaces/[id]/ad-accounts/[accountId]/toggle
+// API Route: PATCH /api/organizations/[id]/ad-accounts/[accountId]/toggle
 // ══════════════════════════════════════════════════════════════
 
-describe("PATCH /api/workspaces/[id]/ad-accounts/[accountId]/toggle", () => {
+describe("PATCH /api/organizations/[id]/ad-accounts/[accountId]/toggle", () => {
   let handler: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    handler = await import("@/app/api/workspaces/[id]/ad-accounts/[accountId]/toggle/route");
+    handler = await import("@/app/api/organizations/[id]/ad-accounts/[accountId]/toggle/route");
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -208,15 +208,15 @@ describe("PATCH /api/workspaces/[id]/ad-accounts/[accountId]/toggle", () => {
 });
 
 // ══════════════════════════════════════════════════════════════
-// API Route: POST /api/workspaces/[id]/connect
+// API Route: POST /api/organizations/[id]/connect
 // ══════════════════════════════════════════════════════════════
 
-describe("POST /api/workspaces/[id]/connect", () => {
+describe("POST /api/organizations/[id]/connect", () => {
   let handler: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    handler = await import("@/app/api/workspaces/[id]/connect/route");
+    handler = await import("@/app/api/organizations/[id]/connect/route");
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -279,15 +279,15 @@ describe("POST /api/workspaces/[id]/connect", () => {
 });
 
 // ══════════════════════════════════════════════════════════════
-// API Route: GET /api/workspaces/[id]/oauth-connections
+// API Route: GET /api/organizations/[id]/oauth-connections
 // ══════════════════════════════════════════════════════════════
 
-describe("GET /api/workspaces/[id]/oauth-connections", () => {
+describe("GET /api/organizations/[id]/oauth-connections", () => {
   let handler: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    handler = await import("@/app/api/workspaces/[id]/oauth-connections/route");
+    handler = await import("@/app/api/organizations/[id]/oauth-connections/route");
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -312,15 +312,15 @@ describe("GET /api/workspaces/[id]/oauth-connections", () => {
 });
 
 // ══════════════════════════════════════════════════════════════
-// API Route: PATCH & DELETE /api/workspaces/[id]/oauth-connections/[connectionId]
+// API Route: PATCH & DELETE /api/organizations/[id]/oauth-connections/[connectionId]
 // ══════════════════════════════════════════════════════════════
 
-describe("PATCH /api/workspaces/[id]/oauth-connections/[connectionId]", () => {
+describe("PATCH /api/organizations/[id]/oauth-connections/[connectionId]", () => {
   let handler: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    handler = await import("@/app/api/workspaces/[id]/oauth-connections/[connectionId]/route");
+    handler = await import("@/app/api/organizations/[id]/oauth-connections/[connectionId]/route");
   });
 
   it("returns 401 when not authenticated", async () => {

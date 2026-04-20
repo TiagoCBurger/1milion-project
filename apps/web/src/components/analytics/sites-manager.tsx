@@ -19,11 +19,11 @@ import { InstallSnippet } from "./install-snippet";
 import { SiteEditor } from "./site-editor";
 
 interface Props {
-  workspaceId: string;
+  organizationId: string;
   sites: SiteRow[];
 }
 
-export function SitesManager({ workspaceId, sites }: Props) {
+export function SitesManager({ organizationId, sites }: Props) {
   const router = useRouter();
   const [addOpen, setAddOpen] = useState(sites.length === 0);
   const [step, setStep] = useState<"form" | "done">("form");
@@ -39,7 +39,7 @@ export function SitesManager({ workspaceId, sites }: Props) {
     const trimmedName = name.trim();
     const trimmedDomain = domain.trim().toLowerCase();
     if (!trimmedName || !trimmedDomain) return;
-    const res = await fetch(`/api/workspaces/${workspaceId}/analytics/sites`, {
+    const res = await fetch(`/api/organizations/${organizationId}/analytics/sites`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: trimmedName, domain: trimmedDomain }),
@@ -73,7 +73,7 @@ export function SitesManager({ workspaceId, sites }: Props) {
   async function removeSite(id: string) {
     if (!confirm("Remover este site? Os eventos passados ficam preservados.")) return;
     const res = await fetch(
-      `/api/workspaces/${workspaceId}/analytics/sites/${id}`,
+      `/api/organizations/${organizationId}/analytics/sites/${id}`,
       { method: "DELETE" },
     );
     if (!res.ok) {
@@ -89,7 +89,7 @@ export function SitesManager({ workspaceId, sites }: Props) {
     setActiveBusyId(siteId);
     try {
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/analytics/sites/${siteId}`,
+        `/api/organizations/${organizationId}/analytics/sites/${siteId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -243,7 +243,7 @@ export function SitesManager({ workspaceId, sites }: Props) {
                   <CardContent className="space-y-4">
                     <InstallSnippet publicKey={s.public_key} />
                     <SiteEditor
-                      workspaceId={workspaceId}
+                      organizationId={organizationId}
                       siteId={s.id}
                       pixelId={s.pixel_id}
                     />

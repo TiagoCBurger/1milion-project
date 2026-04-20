@@ -7,12 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 interface Props {
-  workspaceId: string;
+  organizationId: string;
   siteId: string;
   pixelId: string | null;
 }
 
-export function SiteEditor({ workspaceId, siteId, pixelId }: Props) {
+export function SiteEditor({ organizationId, siteId, pixelId }: Props) {
   const router = useRouter();
   const [pixel, setPixel] = useState(pixelId ?? "");
   const [token, setToken] = useState("");
@@ -29,7 +29,7 @@ export function SiteEditor({ workspaceId, siteId, pixelId }: Props) {
     if (token.trim()) body.capi_access_token = token.trim();
 
     const res = await fetch(
-      `/api/workspaces/${workspaceId}/analytics/sites/${siteId}`,
+      `/api/organizations/${organizationId}/analytics/sites/${siteId}`,
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -50,7 +50,7 @@ export function SiteEditor({ workspaceId, siteId, pixelId }: Props) {
     setErr(null);
     setOk(false);
     const res = await fetch(
-      `/api/workspaces/${workspaceId}/analytics/sites/${siteId}`,
+      `/api/organizations/${organizationId}/analytics/sites/${siteId}`,
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

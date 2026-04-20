@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getDecryptedToken, fetchInsights } from "@/lib/meta-api";
-import { getEnabledAdAccounts } from "@/lib/workspace-data";
+import { getEnabledAdAccounts } from "@/lib/organization-data";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -71,7 +71,7 @@ export default async function WorkspacePage({
   if (!user) redirect("/login");
 
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id, name, slug")
     .eq("slug", slug)
     .single();
@@ -81,7 +81,7 @@ export default async function WorkspacePage({
   const { data: metaToken } = await supabase
     .from("meta_tokens")
     .select("is_valid")
-    .eq("workspace_id", workspace.id)
+    .eq("organization_id", workspace.id)
     .maybeSingle();
 
   const metaConnected = metaToken?.is_valid === true;
@@ -89,13 +89,13 @@ export default async function WorkspacePage({
   const { data: activeApiKeys } = await supabase
     .from("api_keys")
     .select("id")
-    .eq("workspace_id", workspace.id)
+    .eq("organization_id", workspace.id)
     .eq("is_active", true);
 
   const { data: activeOAuth } = await supabase
     .from("oauth_connections")
     .select("id")
-    .eq("workspace_id", workspace.id)
+    .eq("organization_id", workspace.id)
     .eq("is_active", true);
 
   const mcpConfigured =
@@ -186,7 +186,7 @@ export default async function WorkspacePage({
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: workspace.name },
         ]}
       />

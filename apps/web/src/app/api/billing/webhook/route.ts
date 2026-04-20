@@ -51,11 +51,11 @@ export async function POST(request: Request) {
   const subscriptionId = data.subscription?.id ?? null;
   const checkout = data.checkout;
   const metadata = checkout?.metadata as Record<string, string> | null;
-  const workspaceId = metadata?.workspace_id ?? checkout?.externalId ?? null;
+  const organizationId = metadata?.organization_id ?? checkout?.externalId ?? null;
 
-  if (!workspaceId) {
-    console.error("[billing-webhook] No workspace_id in payload:", eventId);
-    return Response.json({ error: "Missing workspace_id" }, { status: 400 });
+  if (!organizationId) {
+    console.error("[billing-webhook] No organization_id in payload:", eventId);
+    return Response.json({ error: "Missing organization_id" }, { status: 400 });
   }
 
   // Record the event for idempotency
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     event_id: eventId,
     event_type: event,
     abacatepay_subscription_id: subscriptionId,
-    workspace_id: workspaceId,
+    organization_id: organizationId,
     payload: data,
   });
 
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
   const { data: currentSub } = await admin
     .from("subscriptions")
     .select("id, tier, pending_tier, pending_billing_cycle")
-    .eq("workspace_id", workspaceId)
+    .eq("organization_id", organizationId)
     .single();
 
   switch (event) {
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
           pending_billing_cycle: null,
           updated_at: new Date().toISOString(),
         })
-        .eq("workspace_id", workspaceId);
+        .eq("organization_id", organizationId);
 
       // Send billing receipt email + sync to paid audience
       const ownerEmail = data.customer?.email;
@@ -132,7 +132,7 @@ export async function POST(request: Request) {
     case "subscription.renewed": {
       if (currentSub?.pending_tier) {
         // Apply pending plan change at renewal
-        await applyPendingChange(admin, workspaceId, currentSub);
+        await applyPendingChange(admin, organizationId, currentSub);
       } else {
         // No pending change — just update the period
         await admin
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
             current_period_end: data.subscription?.updatedAt ?? null,
             updated_at: new Date().toISOString(),
           })
-          .eq("workspace_id", workspaceId);
+          .eq("organization_id", organizationId);
       }
       break;
     }
@@ -150,7 +150,7 @@ export async function POST(request: Request) {
     case "subscription.cancelled": {
       if (currentSub?.pending_tier) {
         // Subscription cancelled with pending change — apply it
-        await applyPendingChange(admin, workspaceId, currentSub);
+        await applyPendingChange(admin, organizationId, currentSub);
       } else {
         // No pending change — downgrade to free
         const freeLimits = TIER_LIMITS.free;
@@ -171,7 +171,7 @@ export async function POST(request: Request) {
             pending_billing_cycle: null,
             updated_at: new Date().toISOString(),
           })
-          .eq("workspace_id", workspaceId);
+          .eq("organization_id", organizationId);
       }
 
       // Send plan canceling email
@@ -215,7 +215,7 @@ export async function POST(request: Request) {
  */
 async function applyPendingChange(
   admin: ReturnType<typeof createAdminClient>,
-  workspaceId: string,
+  organizationId: string,
   currentSub: { pending_tier: string; pending_billing_cycle: string | null }
 ) {
   const newTier = currentSub.pending_tier as SubscriptionTier;
@@ -241,7 +241,7 @@ async function applyPendingChange(
         pending_billing_cycle: null,
         updated_at: new Date().toISOString(),
       })
-      .eq("workspace_id", workspaceId);
+      .eq("organization_id", organizationId);
   } else {
     // Change to different paid tier — update limits, mark as needing new checkout
     const limits = TIER_LIMITS[newTier];
@@ -261,6 +261,6 @@ async function applyPendingChange(
         pending_billing_cycle: null,
         updated_at: new Date().toISOString(),
       })
-      .eq("workspace_id", workspaceId);
+      .eq("organization_id", organizationId);
   }
 }

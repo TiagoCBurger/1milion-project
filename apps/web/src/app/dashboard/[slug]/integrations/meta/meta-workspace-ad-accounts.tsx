@@ -15,11 +15,11 @@ type Row = {
 };
 
 export function MetaWorkspaceAdAccounts({
-  workspaceId,
+  organizationId,
   slug,
   canManage,
 }: {
-  workspaceId: string;
+  organizationId: string;
   slug: string;
   canManage: boolean;
 }) {
@@ -36,11 +36,11 @@ export function MetaWorkspaceAdAccounts({
         supabase
           .from("business_managers")
           .select("name, ad_accounts(id, meta_account_id, name, is_enabled)")
-          .eq("workspace_id", workspaceId),
+          .eq("organization_id", organizationId),
         supabase
           .from("subscriptions")
           .select("max_ad_accounts")
-          .eq("workspace_id", workspaceId)
+          .eq("organization_id", organizationId)
           .eq("status", "active")
           .maybeSingle(),
       ]);
@@ -67,7 +67,7 @@ export function MetaWorkspaceAdAccounts({
     return () => {
       cancelled = true;
     };
-  }, [workspaceId]);
+  }, [organizationId]);
 
   const enabledCount = rows.filter((r) => r.is_enabled).length;
 
@@ -131,7 +131,7 @@ export function MetaWorkspaceAdAccounts({
               </div>
               {canManage ? (
                 <AdAccountToggle
-                  workspaceId={workspaceId}
+                  organizationId={organizationId}
                   accountId={r.id}
                   enabled={r.is_enabled}
                   onApplied={(next) => {

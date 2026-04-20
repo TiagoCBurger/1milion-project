@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getDecryptedToken, fetchAdSets, fetchCampaigns } from "@/lib/meta-api";
-import { getEnabledAdAccounts } from "@/lib/workspace-data";
+import { getEnabledAdAccounts } from "@/lib/organization-data";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
@@ -38,7 +38,7 @@ export default async function AdSetsPage({
   if (!user) redirect("/login");
 
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id, enable_meta_mutations")
     .eq("slug", slug)
     .single();
@@ -51,7 +51,7 @@ export default async function AdSetsPage({
     return (
       <>
         <PageHeader breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Conjuntos de anúncio" },
         ]} />
@@ -86,7 +86,7 @@ export default async function AdSetsPage({
   return (
     <>
       <PageHeader breadcrumbs={[
-        { label: "Espaços de trabalho", href: "/dashboard" },
+        { label: "Organizações", href: "/dashboard" },
         { label: slug, href: `/dashboard/${slug}` },
         { label: "Conjuntos de anúncio" },
       ]} />
@@ -101,7 +101,7 @@ export default async function AdSetsPage({
           </div>
           <div className="flex items-center gap-2">
             {workspace.enable_meta_mutations && (
-              <CreateAdSetDialog workspaceId={workspace.id} accountId={selectedAccount} campaigns={campaignOptions} />
+              <CreateAdSetDialog organizationId={workspace.id} accountId={selectedAccount} campaigns={campaignOptions} />
             )}
             <AccountSelector accounts={accounts} current={selectedAccount} />
           </div>

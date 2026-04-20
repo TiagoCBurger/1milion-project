@@ -4,7 +4,7 @@ import { createAnalyticsAdminClient } from "@/lib/supabase/analytics";
 export interface SiteAccess {
   site: {
     id: string;
-    workspace_id: string;
+    organization_id: string;
     domain: string;
     public_key: string;
     pixel_id: string | null;
@@ -27,7 +27,7 @@ export async function getSiteAccess(siteId: string): Promise<SiteAccessResult> {
   const analytics = createAnalyticsAdminClient();
   const { data: site, error } = await analytics
     .from("sites")
-    .select("id, workspace_id, domain, public_key, pixel_id, is_active")
+    .select("id, organization_id, domain, public_key, pixel_id, is_active")
     .eq("id", siteId)
     .maybeSingle();
 
@@ -37,7 +37,7 @@ export async function getSiteAccess(siteId: string): Promise<SiteAccessResult> {
     .from("memberships")
     .select("role")
     .eq("user_id", user.id)
-    .eq("workspace_id", site.workspace_id)
+    .eq("organization_id", site.organization_id)
     .maybeSingle();
 
   if (!membership) return { ok: false, status: 403, error: "Not a member" };

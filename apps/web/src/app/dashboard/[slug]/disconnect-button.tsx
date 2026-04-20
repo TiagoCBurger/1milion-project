@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Unlink } from "lucide-react";
 
 interface Props {
-  workspaceId: string;
+  organizationId: string;
   slug: string;
 }
 
-export function DisconnectButton({ workspaceId, slug }: Props) {
+export function DisconnectButton({ organizationId, slug }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -18,7 +18,7 @@ export function DisconnectButton({ workspaceId, slug }: Props) {
   async function handleDisconnect() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/disconnect`, {
+      const res = await fetch(`/api/organizations/${organizationId}/disconnect`, {
         method: "POST",
       });
       if (res.ok) {

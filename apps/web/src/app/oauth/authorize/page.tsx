@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { fetchOrganizationProjects } from "@/lib/projects";
 import { OAuthConsentForm } from "./consent-form";
 
 interface PageProps {
@@ -35,147 +36,119 @@ export default async function OAuthAuthorizePage({ searchParams }: PageProps) {
     redirect(`/login?next=${encodeURIComponent(`/oauth/authorize?${nextQs.toString()}`)}`);
   }
 
-  // Fetch user's workspaces with their BMs and ad accounts
   const { data: memberships } = await supabase
     .from("memberships")
-    .select(
-      "role, workspace:workspaces(id, name, slug)"
-    )
+    .select("role, organization:organizations(id, name, slug)")
     .eq("user_id", user.id);
 
-  const workspaceIds =
+  const organizationIds =
     memberships?.map((m) => {
-      const ws = m.workspace as unknown as { id: string };
-      return ws.id;
+      const org = m.organization as unknown as { id: string };
+      return org.id;
     }) ?? [];
 
-  // Fetch BMs and ad accounts for all user workspaces
-  interface BmRow {
-    id: string;
-    workspace_id: string;
-    meta_bm_id: string;
-    name: string;
-    ad_accounts: Array<{
+  // Load projects + counts per organization so the consent form can show them
+  // with "N contas · N sites".
+  const projectsByOrg: Record<
+    string,
+    Array<{
       id: string;
-      meta_account_id: string;
       name: string;
-      account_status: number | null;
-      currency: string | null;
-    }>;
+      slug: string;
+      is_default: boolean;
+      ad_account_count: number;
+      site_count: number;
+    }>
+  > = {};
+  for (const orgId of organizationIds) {
+    projectsByOrg[orgId] = await fetchOrganizationProjects(supabase, orgId);
   }
 
-  let bms: BmRow[] = [];
-  if (workspaceIds.length > 0) {
-    const { data } = await supabase
-      .from("business_managers")
-      .select("id, workspace_id, meta_bm_id, name, ad_accounts(id, meta_account_id, name, account_status, currency)")
-      .in("workspace_id", workspaceIds);
-    bms = (data ?? []) as unknown as BmRow[];
-  }
-
-  // Group BMs by workspace_id
-  const bmsByWorkspace: Record<string, BmRow[]> = {};
-  for (const bm of bms) {
-    const wsId = bm.workspace_id;
-    if (!bmsByWorkspace[wsId]) bmsByWorkspace[wsId] = [];
-    bmsByWorkspace[wsId].push(bm);
-  }
-
-  const workspaces =
+  const organizations =
     memberships?.map((m) => {
-      const ws = m.workspace as unknown as {
+      const org = m.organization as unknown as {
         id: string;
         name: string;
         slug: string;
       };
       return {
-        id: ws.id,
-        name: ws.name,
-        slug: ws.slug,
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
         role: m.role,
-        businessManagers: (bmsByWorkspace[ws.id] ?? []).map((bm) => ({
-          id: bm.id,
-          metaBmId: bm.meta_bm_id,
-          name: bm.name,
-          adAccounts: ((bm.ad_accounts ?? []) as Array<{
-            id: string;
-            meta_account_id: string;
-            name: string;
-            account_status: number | null;
-            currency: string | null;
-          }>).map((acc) => ({
-            id: acc.id,
-            metaAccountId: acc.meta_account_id,
-            name: acc.name,
-            accountStatus: acc.account_status,
-            currency: acc.currency,
-          })),
-        })),
+        projects: projectsByOrg[org.id] ?? [],
       };
     }) ?? [];
 
   const { data: subsRows } =
-    workspaceIds.length > 0
+    organizationIds.length > 0
       ? await supabase
           .from("subscriptions")
-          .select("workspace_id, max_mcp_connections")
-          .in("workspace_id", workspaceIds)
+          .select("organization_id, max_mcp_connections")
+          .in("organization_id", organizationIds)
           .eq("status", "active")
-      : { data: [] as { workspace_id: string; max_mcp_connections: number }[] };
+      : {
+          data: [] as {
+            organization_id: string;
+            max_mcp_connections: number;
+          }[],
+        };
 
-  const maxByWorkspace: Record<string, number> = {};
+  const maxByOrg: Record<string, number> = {};
   for (const s of subsRows ?? []) {
-    maxByWorkspace[s.workspace_id] = s.max_mcp_connections;
+    maxByOrg[s.organization_id] = s.max_mcp_connections;
   }
 
-  let activeConnections: { workspace_id: string; client_id: string }[] = [];
-  if (workspaceIds.length > 0) {
+  let activeConnections: { organization_id: string; client_id: string }[] = [];
+  if (organizationIds.length > 0) {
     const { data: connData } = await supabase
       .from("oauth_connections")
-      .select("workspace_id, client_id")
-      .in("workspace_id", workspaceIds)
+      .select("organization_id, client_id")
+      .in("organization_id", organizationIds)
       .eq("is_active", true);
-    activeConnections = (connData ?? []) as { workspace_id: string; client_id: string }[];
+    activeConnections =
+      (connData ?? []) as { organization_id: string; client_id: string }[];
   }
 
-  function otherActiveConnectionCount(workspaceId: string): number {
+  function otherActiveConnectionCount(orgId: string): number {
     return activeConnections.filter(
       (c) =>
-        c.workspace_id === workspaceId &&
+        c.organization_id === orgId &&
         (!oauthClientId || c.client_id !== oauthClientId)
     ).length;
   }
 
-  const mcpLimitByWorkspace: Record<
+  const mcpLimitByOrg: Record<
     string,
     { max: number; usedOthers: number; atLimit: boolean }
   > = {};
-  for (const w of workspaces) {
-    const max = maxByWorkspace[w.id] ?? 0;
-    const usedOthers = otherActiveConnectionCount(w.id);
+  for (const o of organizations) {
+    const max = maxByOrg[o.id] ?? 0;
+    const usedOthers = otherActiveConnectionCount(o.id);
     const atLimit = max !== -1 && usedOthers >= max;
-    mcpLimitByWorkspace[w.id] = { max, usedOthers, atLimit };
+    mcpLimitByOrg[o.id] = { max, usedOthers, atLimit };
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-lg rounded-lg border bg-white p-8 shadow-sm">
-        <h1 className="text-xl font-bold text-gray-900">Authorize Access</h1>
+        <h1 className="text-xl font-bold text-gray-900">Autorizar acesso</h1>
         <p className="mt-2 text-sm text-gray-600">
-          <span className="font-medium">{client_name || "An application"}</span>{" "}
-          wants to access your Vibefly workspace via MCP.
+          <span className="font-medium">{client_name || "Um aplicativo"}</span>{" "}
+          quer acessar seus dados Vibefly via MCP. Escolha a organização e os
+          projetos que ele poderá operar.
         </p>
 
-        {workspaces.length === 0 ? (
+        {organizations.length === 0 ? (
           <div className="mt-6 rounded-md bg-amber-50 p-4 text-sm text-amber-700">
-            You don&apos;t have any workspaces yet. Create one first in the dashboard.
+            Você ainda não tem organizações. Crie uma primeiro no dashboard.
           </div>
         ) : (
           <OAuthConsentForm
             requestId={request_id}
             oauthClientId={oauthClientId ?? ""}
-            workspaces={workspaces}
-            mcpLimitByWorkspace={mcpLimitByWorkspace}
+            organizations={organizations}
+            mcpLimitByOrg={mcpLimitByOrg}
             userId={user.id}
           />
         )}

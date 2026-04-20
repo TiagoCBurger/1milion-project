@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { listSitesForWorkspace } from "@/lib/analytics/sites";
+import { listSitesForOrganization } from "@/lib/analytics/sites";
 import { SitesManager } from "@/components/analytics/sites-manager";
 
 export default async function AnalyticsSettingsPage({
@@ -16,17 +16,17 @@ export default async function AnalyticsSettingsPage({
   if (!user) redirect("/login");
 
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id")
     .eq("slug", slug)
     .maybeSingle();
   if (!workspace) notFound();
 
-  const sites = await listSitesForWorkspace(workspace.id);
+  const sites = await listSitesForOrganization(workspace.id);
 
   return (
     <div className="max-w-3xl p-6">
-      <SitesManager workspaceId={workspace.id} sites={sites} />
+      <SitesManager organizationId={workspace.id} sites={sites} />
     </div>
   );
 }

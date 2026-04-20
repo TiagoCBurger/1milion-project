@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
-import { fetchSidebarWorkspaces } from "@/lib/dashboard-workspaces";
+import { fetchSidebarOrganizations } from "@/lib/organizations";
 
 export default async function NewWorkspaceLayout({
   children,
@@ -13,7 +13,7 @@ export default async function NewWorkspaceLayout({
 
   if (!user) redirect("/login");
 
-  const workspaces = await fetchSidebarWorkspaces(supabase, user.id);
+  const workspaces = await fetchSidebarOrganizations(supabase, user.id);
 
   const displayName =
     user.user_metadata?.display_name ??

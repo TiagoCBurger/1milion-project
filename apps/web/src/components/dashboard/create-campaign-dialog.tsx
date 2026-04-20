@@ -32,10 +32,10 @@ const SPECIAL_CATEGORIES = [
 ];
 
 export function CreateCampaignDialog({
-  workspaceId,
+  organizationId,
   accountId,
 }: {
-  workspaceId: string;
+  organizationId: string;
   accountId: string;
 }) {
   const router = useRouter();
@@ -54,7 +54,7 @@ export function CreateCampaignDialog({
     setError("");
 
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/meta/campaigns`, {
+      const res = await fetch(`/api/organizations/${organizationId}/meta/campaigns`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

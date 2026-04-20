@@ -11,12 +11,12 @@ import {
 } from "@/components/ui/dialog";
 
 export function UploadImageDialog({
-  workspaceId,
+  organizationId,
   accountId,
   onUploaded,
   trigger,
 }: {
-  workspaceId: string;
+  organizationId: string;
   accountId: string;
   onUploaded?: (imageHash: string, r2Url: string) => void;
   trigger?: React.ReactNode;
@@ -54,7 +54,7 @@ export function UploadImageDialog({
       formData.append("account_id", accountId);
       formData.append("name", fileName || file.name);
 
-      const res = await fetch(`/api/workspaces/${workspaceId}/meta/images`, {
+      const res = await fetch(`/api/organizations/${organizationId}/meta/images`, {
         method: "POST",
         body: formData,
       });

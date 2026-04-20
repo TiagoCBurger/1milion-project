@@ -6,11 +6,11 @@ import { Pause, Play, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function CampaignActions({
-  workspaceId,
+  organizationId,
   campaignId,
   currentStatus,
 }: {
-  workspaceId: string;
+  organizationId: string;
   campaignId: string;
   currentStatus: string;
 }) {
@@ -24,7 +24,7 @@ export function CampaignActions({
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/meta/campaigns/${campaignId}`,
+        `/api/organizations/${organizationId}/meta/campaigns/${campaignId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },

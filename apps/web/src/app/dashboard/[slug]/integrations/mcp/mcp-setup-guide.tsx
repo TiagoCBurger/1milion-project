@@ -81,7 +81,7 @@ export function McpSetupGuide() {
             Salve como{" "}
             <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">.mcp.json</code> na raiz do
             projeto (ou use o CLI abaixo). Na primeira conexão o app abre o navegador para você entrar e
-            escolher o espaço de trabalho.
+            escolher o organização.
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
             CLI:{" "}

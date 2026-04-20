@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
-import { fetchSidebarWorkspaces } from "@/lib/dashboard-workspaces";
+import { fetchSidebarOrganizations } from "@/lib/organizations";
 
 export default async function WorkspaceLayout({
   children,
@@ -16,7 +16,7 @@ export default async function WorkspaceLayout({
 
   if (!user) redirect("/login");
 
-  const workspaces = await fetchSidebarWorkspaces(supabase, user.id);
+  const workspaces = await fetchSidebarOrganizations(supabase, user.id);
 
   const currentWorkspace = workspaces.find((ws) => ws.slug === slug);
   if (!currentWorkspace) notFound();

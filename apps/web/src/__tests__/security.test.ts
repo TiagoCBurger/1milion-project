@@ -82,12 +82,12 @@ describe("Security: Authentication enforcement", () => {
   });
 
   const routes = [
-    { name: "disconnect", path: "@/app/api/workspaces/[id]/disconnect/route", method: "POST", params: { id: "ws-1" } },
-    { name: "connect", path: "@/app/api/workspaces/[id]/connect/route", method: "POST", params: { id: "ws-1" } },
-    { name: "ad-account-toggle", path: "@/app/api/workspaces/[id]/ad-accounts/[accountId]/toggle/route", method: "PATCH", params: { id: "ws-1", accountId: "acc-1" } },
-    { name: "oauth-connections-list", path: "@/app/api/workspaces/[id]/oauth-connections/route", method: "GET", params: { id: "ws-1" } },
-    { name: "oauth-connection-update", path: "@/app/api/workspaces/[id]/oauth-connections/[connectionId]/route", method: "PATCH", params: { id: "ws-1", connectionId: "conn-1" } },
-    { name: "oauth-connection-delete", path: "@/app/api/workspaces/[id]/oauth-connections/[connectionId]/route", method: "DELETE", params: { id: "ws-1", connectionId: "conn-1" } },
+    { name: "disconnect", path: "@/app/api/organizations/[id]/disconnect/route", method: "POST", params: { id: "ws-1" } },
+    { name: "connect", path: "@/app/api/organizations/[id]/connect/route", method: "POST", params: { id: "ws-1" } },
+    { name: "ad-account-toggle", path: "@/app/api/organizations/[id]/ad-accounts/[accountId]/toggle/route", method: "PATCH", params: { id: "ws-1", accountId: "acc-1" } },
+    { name: "oauth-connections-list", path: "@/app/api/organizations/[id]/oauth-connections/route", method: "GET", params: { id: "ws-1" } },
+    { name: "oauth-connection-update", path: "@/app/api/organizations/[id]/oauth-connections/[connectionId]/route", method: "PATCH", params: { id: "ws-1", connectionId: "conn-1" } },
+    { name: "oauth-connection-delete", path: "@/app/api/organizations/[id]/oauth-connections/[connectionId]/route", method: "DELETE", params: { id: "ws-1", connectionId: "conn-1" } },
     { name: "oauth-approve", path: "@/app/api/oauth/approve/route", method: "POST", params: {} },
   ];
 
@@ -129,7 +129,7 @@ describe("Security: Authorization (RBAC)", () => {
   it("member role cannot disconnect workspace", async () => {
     // member (not owner/admin) → 403
     mockFrom.mockReturnValue(mockQueryChain({ data: null, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/disconnect/route");
+    const handler = await import("@/app/api/organizations/[id]/disconnect/route");
 
     const res = await handler.POST(
       new Request("http://localhost/test", { method: "POST" }),
@@ -140,7 +140,7 @@ describe("Security: Authorization (RBAC)", () => {
 
   it("member role cannot toggle ad accounts", async () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: null, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/ad-accounts/[accountId]/toggle/route");
+    const handler = await import("@/app/api/organizations/[id]/ad-accounts/[accountId]/toggle/route");
 
     const res = await handler.PATCH(
       jsonRequest({ is_enabled: true }, "PATCH"),
@@ -151,7 +151,7 @@ describe("Security: Authorization (RBAC)", () => {
 
   it("member role cannot update OAuth connections", async () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: null, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/oauth-connections/[connectionId]/route");
+    const handler = await import("@/app/api/organizations/[id]/oauth-connections/[connectionId]/route");
 
     const res = await handler.PATCH(
       jsonRequest({ allowed_accounts: ["act_123"] }, "PATCH"),
@@ -162,7 +162,7 @@ describe("Security: Authorization (RBAC)", () => {
 
   it("member role cannot revoke OAuth connections", async () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: null, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/oauth-connections/[connectionId]/route");
+    const handler = await import("@/app/api/organizations/[id]/oauth-connections/[connectionId]/route");
 
     const res = await handler.DELETE(
       new Request("http://localhost/test", { method: "DELETE" }),
@@ -182,7 +182,7 @@ describe("Security: Authorization (RBAC)", () => {
       return chain;
     });
 
-    const handler = await import("@/app/api/workspaces/[id]/oauth-connections/route");
+    const handler = await import("@/app/api/organizations/[id]/oauth-connections/route");
     const res = await handler.GET(
       new Request("http://localhost/test"),
       { params: Promise.resolve({ id: "ws-1" }) }
@@ -200,7 +200,7 @@ describe("Security: Input validation", () => {
 
   it("connect route rejects empty token", async () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: { role: "owner" }, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/connect/route");
+    const handler = await import("@/app/api/organizations/[id]/connect/route");
 
     const res = await handler.POST(
       jsonRequest({ token: "" }),
@@ -211,7 +211,7 @@ describe("Security: Input validation", () => {
 
   it("connect route rejects numeric token", async () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: { role: "owner" }, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/connect/route");
+    const handler = await import("@/app/api/organizations/[id]/connect/route");
 
     const res = await handler.POST(
       jsonRequest({ token: 123456789012345 }),
@@ -222,7 +222,7 @@ describe("Security: Input validation", () => {
 
   it("connect route rejects array token", async () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: { role: "owner" }, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/connect/route");
+    const handler = await import("@/app/api/organizations/[id]/connect/route");
 
     const res = await handler.POST(
       jsonRequest({ token: ["EAA", "123"] }),
@@ -259,7 +259,7 @@ describe("Security: Input validation", () => {
       return mockQueryChain({ data: null, error: null });
     });
 
-    const handler = await import("@/app/api/workspaces/[id]/oauth-connections/[connectionId]/route");
+    const handler = await import("@/app/api/organizations/[id]/oauth-connections/[connectionId]/route");
     const res = await handler.PATCH(
       jsonRequest({}, "PATCH"),
       { params: Promise.resolve({ id: "ws-1", connectionId: "conn-1" }) }

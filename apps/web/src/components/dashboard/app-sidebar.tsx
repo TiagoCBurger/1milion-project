@@ -28,9 +28,10 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { defaultWorkspaceSlug } from "@/lib/dashboard-workspaces"
+import { defaultOrganizationSlug } from "@/lib/organizations"
+import { ProjectSwitcher } from "./project-switcher"
 
-interface Workspace {
+interface Organization {
   id: string
   name: string
   slug: string
@@ -39,8 +40,9 @@ interface Workspace {
 }
 
 interface AppSidebarProps {
-  workspaces: Workspace[]
-  currentWorkspace?: Workspace | null
+  workspaces: Organization[]
+  currentWorkspace?: Organization | null
+  currentProjectSlug?: string
   user: { email: string; name?: string }
 }
 
@@ -67,12 +69,18 @@ function isNavActive(pathname: string, item: NavItem): boolean {
   return pathname === item.url
 }
 
-export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarProps) {
+export function AppSidebar({ workspaces, currentWorkspace, currentProjectSlug, user }: AppSidebarProps) {
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
   const slug = currentWorkspace?.slug
-  const fallbackSlug = defaultWorkspaceSlug(workspaces)
+  const fallbackSlug = defaultOrganizationSlug(workspaces)
   const effectiveSlug = slug ?? fallbackSlug
+  // Parse project slug from the URL when the route has the nested shape
+  // /dashboard/[orgSlug]/[projectSlug]/... — fall back to the prop.
+  const pathParts = pathname.split("/")
+  const urlProjectSlug =
+    pathParts[1] === "dashboard" && pathParts[2] === slug ? pathParts[3] : undefined
+  const resolvedProjectSlug = currentProjectSlug ?? urlProjectSlug
   const homeDashboardHref = effectiveSlug
     ? `/dashboard/${effectiveSlug}`
     : "/dashboard/new"
@@ -147,7 +155,7 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold truncate">
                   {currentWorkspace?.name ??
-                    (workspaces.length === 0 ? "Criar espaço" : "Selecionar espaço")}
+                    (workspaces.length === 0 ? "Criar organização" : "Selecionar organização")}
                 </p>
                 {currentWorkspace?.meta_business_name && (
                   <p className="text-xs text-muted-foreground truncate">
@@ -159,25 +167,31 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56" align="start">
-            <DropdownMenuLabel>Espaços de trabalho</DropdownMenuLabel>
+            <DropdownMenuLabel>Organizações</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {workspaces.map((ws) => (
-              <DropdownMenuItem key={ws.id} asChild>
-                <Link href={`/dashboard/${ws.slug}`}>
+            {workspaces.map((org) => (
+              <DropdownMenuItem key={org.id} asChild>
+                <Link href={`/dashboard/${org.slug}`}>
                   <Building2 className="mr-2 h-4 w-4" />
-                  {ws.name}
+                  {org.name}
                 </Link>
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href="/dashboard/new" className="text-muted-foreground">
-                + Novo espaço
+                + Nova organização
               </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {slug ? (
+        <div className="px-3 pb-2">
+          <ProjectSwitcher orgSlug={slug} currentProjectSlug={resolvedProjectSlug} />
+        </div>
+      ) : null}
 
       <div className="mx-3 h-px bg-border" />
 

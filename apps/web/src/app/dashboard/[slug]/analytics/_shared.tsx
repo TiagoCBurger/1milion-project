@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { listSitesForWorkspace, type SiteRow } from "@/lib/analytics/sites";
+import { listSitesForOrganization, type SiteRow } from "@/lib/analytics/sites";
 import { parseRange } from "@/lib/analytics/range";
 import { SiteSelector } from "@/components/analytics/site-selector";
 import { TimeRangePicker } from "@/components/analytics/time-range-picker";
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 
 export interface ResolvedContext {
   slug: string;
-  workspaceId: string;
+  organizationId: string;
   sites: SiteRow[];
   site: SiteRow | null;
   range: string;
@@ -31,13 +31,13 @@ export async function resolveContext(
   if (!user) redirect("/login");
 
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id")
     .eq("slug", slug)
     .maybeSingle();
   if (!workspace) notFound();
 
-  const sites = await listSitesForWorkspace(workspace.id);
+  const sites = await listSitesForOrganization(workspace.id);
   const rawSite = searchParams.site;
   const siteId = Array.isArray(rawSite) ? rawSite[0] : rawSite;
   const site = sites.find((s) => s.id === siteId) ?? sites[0] ?? null;
@@ -45,7 +45,7 @@ export async function resolveContext(
   const rawRange = searchParams.range;
   const range = parseRange(Array.isArray(rawRange) ? rawRange[0] : rawRange);
 
-  return { slug, workspaceId: workspace.id, sites, site, range };
+  return { slug, organizationId: workspace.id, sites, site, range };
 }
 
 export function AnalyticsToolbar({

@@ -58,23 +58,23 @@ const PLANS = [
 export default function BillingPage() {
   const { slug } = useParams<{ slug: string }>();
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [organizationId, setWorkspaceId] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const supabase = createClient();
 
   const loadSubscription = useCallback(async () => {
-    if (!workspaceId) return;
-    const res = await fetch(`/api/billing/status?workspace_id=${workspaceId}`);
+    if (!organizationId) return;
+    const res = await fetch(`/api/billing/status?organization_id=${organizationId}`);
     if (res.ok) {
       const data = await res.json();
       setSubscription(data.subscription);
     }
-  }, [workspaceId]);
+  }, [organizationId]);
 
   useEffect(() => {
     async function init() {
       const { data } = await supabase
-        .from("workspaces")
+        .from("organizations")
         .select("id")
         .eq("slug", slug)
         .single();
@@ -91,14 +91,14 @@ export default function BillingPage() {
   const hasPending = !!subscription?.pending_tier;
 
   async function handleCheckout(tier: "pro" | "max") {
-    if (!workspaceId) return;
+    if (!organizationId) return;
     setLoadingAction(tier);
     try {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          workspace_id: workspaceId,
+          organization_id: organizationId,
           tier,
           cycle: "monthly",
         }),
@@ -113,14 +113,14 @@ export default function BillingPage() {
   }
 
   async function handleChangePlan(tier: string) {
-    if (!workspaceId) return;
+    if (!organizationId) return;
     setLoadingAction(`change-${tier}`);
     try {
       const res = await fetch("/api/billing/change-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          workspace_id: workspaceId,
+          organization_id: organizationId,
           tier,
           cycle: tier === "free" ? undefined : "monthly",
         }),
@@ -132,10 +132,10 @@ export default function BillingPage() {
   }
 
   async function handleCancelPending() {
-    if (!workspaceId) return;
+    if (!organizationId) return;
     setLoadingAction("cancel-pending");
     try {
-      await fetch(`/api/billing/change-plan?workspace_id=${workspaceId}`, {
+      await fetch(`/api/billing/change-plan?organization_id=${organizationId}`, {
         method: "DELETE",
       });
       loadSubscription();

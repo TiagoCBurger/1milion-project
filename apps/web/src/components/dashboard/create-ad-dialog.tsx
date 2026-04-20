@@ -31,14 +31,14 @@ interface AdImage {
 }
 
 export function CreateAdDialog({
-  workspaceId,
+  organizationId,
   accountId,
   adSets,
   creatives,
   pages,
   images,
 }: {
-  workspaceId: string;
+  organizationId: string;
   accountId: string;
   adSets: { id: string; name: string }[];
   creatives: { id: string; name: string; thumbnail_url?: string }[];
@@ -93,7 +93,7 @@ export function CreateAdDialog({
       formData.append("account_id", accountId);
       formData.append("name", file.name);
 
-      const res = await fetch(`/api/workspaces/${workspaceId}/meta/images`, {
+      const res = await fetch(`/api/organizations/${organizationId}/meta/images`, {
         method: "POST",
         body: formData,
       });
@@ -145,7 +145,7 @@ export function CreateAdDialog({
         adBody.call_to_action_type = ctaType;
       }
 
-      const res = await fetch(`/api/workspaces/${workspaceId}/meta/ads`, {
+      const res = await fetch(`/api/organizations/${organizationId}/meta/ads`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(adBody),

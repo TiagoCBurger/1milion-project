@@ -18,13 +18,13 @@ interface AdImage {
 }
 
 export function CreativesClient({
-  workspaceId,
+  organizationId,
   accountId,
   pages,
   initialImages,
   canWrite = false,
 }: {
-  workspaceId: string;
+  organizationId: string;
   accountId: string;
   pages: { id: string; name: string }[];
   initialImages: AdImage[];
@@ -49,7 +49,7 @@ export function CreativesClient({
       formData.append("account_id", accountId);
       formData.append("name", file.name);
 
-      const res = await fetch(`/api/workspaces/${workspaceId}/meta/images`, {
+      const res = await fetch(`/api/organizations/${organizationId}/meta/images`, {
         method: "POST",
         body: formData,
       });
@@ -114,7 +114,7 @@ export function CreativesClient({
 
           {pages.length > 0 && (
             <CreateCreativeDialog
-              workspaceId={workspaceId}
+              organizationId={organizationId}
               accountId={accountId}
               pages={pages}
               images={images}

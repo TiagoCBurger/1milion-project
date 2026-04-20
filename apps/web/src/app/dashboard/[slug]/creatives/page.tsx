@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getDecryptedToken, fetchPages } from "@/lib/meta-api";
-import { getEnabledAdAccounts } from "@/lib/workspace-data";
+import { getEnabledAdAccounts } from "@/lib/organization-data";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
@@ -26,7 +26,7 @@ export default async function CreativesPage({
   if (!user) redirect("/login");
 
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id, enable_meta_mutations")
     .eq("slug", slug)
     .single();
@@ -39,7 +39,7 @@ export default async function CreativesPage({
     return (
       <>
         <PageHeader breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Criativos" },
         ]} />
@@ -73,7 +73,7 @@ export default async function CreativesPage({
   const { data: images } = await admin
     .from("ad_images")
     .select("*")
-    .eq("workspace_id", workspace.id)
+    .eq("organization_id", workspace.id)
     .eq("account_id", selectedAccount)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -81,7 +81,7 @@ export default async function CreativesPage({
   return (
     <>
       <PageHeader breadcrumbs={[
-        { label: "Espaços de trabalho", href: "/dashboard" },
+        { label: "Organizações", href: "/dashboard" },
         { label: slug, href: `/dashboard/${slug}` },
         { label: "Criativos" },
       ]} />
@@ -98,7 +98,7 @@ export default async function CreativesPage({
         </div>
 
         <CreativesClient
-          workspaceId={workspace.id}
+          organizationId={workspace.id}
           accountId={selectedAccount}
           pages={pageOptions}
           initialImages={images ?? []}

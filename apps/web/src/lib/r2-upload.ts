@@ -25,7 +25,7 @@ export interface R2UploadResult {
 
 export async function uploadToR2(
   buffer: Buffer | Uint8Array,
-  workspaceId: string,
+  organizationId: string,
   type: "images" | "videos",
   fileName: string,
   contentType: string
@@ -34,7 +34,7 @@ export async function uploadToR2(
   const safeName = fileName.replace(/[^a-zA-Z0-9_.-]/g, "_").slice(0, 64);
   const ext = safeName.split(".").pop() || "bin";
   const baseName = safeName.replace(/\.[^.]+$/, "");
-  const key = `${workspaceId}/${type}/${timestamp}_${baseName}.${ext}`;
+  const key = `${organizationId}/${type}/${timestamp}_${baseName}.${ext}`;
 
   await getS3Client().send(
     new PutObjectCommand({

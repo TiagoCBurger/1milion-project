@@ -32,12 +32,12 @@ interface AdImage {
 }
 
 export function CreateCreativeDialog({
-  workspaceId,
+  organizationId,
   accountId,
   pages,
   images,
 }: {
-  workspaceId: string;
+  organizationId: string;
   accountId: string;
   pages: { id: string; name: string }[];
   images?: AdImage[];
@@ -67,7 +67,7 @@ export function CreateCreativeDialog({
     setSuccess(null);
 
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/meta/creatives`, {
+      const res = await fetch(`/api/organizations/${organizationId}/meta/creatives`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
