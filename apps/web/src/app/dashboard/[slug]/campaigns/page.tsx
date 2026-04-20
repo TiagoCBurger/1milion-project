@@ -76,7 +76,7 @@ export default async function CampaignsPage({
             description={
               !token
                 ? "Conecte sua conta Meta para ver campanhas."
-                : "Ative pelo menos uma conta de anúncios no painel do espaço."
+                : "Ative pelo menos uma conta de anúncios no painel da organização."
             }
           >
             <Button asChild>

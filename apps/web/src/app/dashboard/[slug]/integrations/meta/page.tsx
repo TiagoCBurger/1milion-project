@@ -124,7 +124,7 @@ export default function MetaIntegrationPage() {
     if (!organizationId || !canManageMeta) return;
     if (
       !window.confirm(
-        "Desconectar a conta Facebook deste espaço? Será necessário conectar de novo para usar dados de anúncios."
+        "Desconectar a conta Facebook desta organização? Será necessário conectar de novo para usar dados de anúncios."
       )
     ) {
       return;
@@ -228,14 +228,14 @@ export default function MetaIntegrationPage() {
                   </code>
                 </div>
                 <Button onClick={() => router.push(`/dashboard/${slug}`)} className="mt-4 w-full">
-                  Ir para o espaço
+                  Ir para a organização
                 </Button>
               </CardContent>
             )}
             {!successData.api_key && (
               <CardContent>
                 <Button onClick={() => router.push(`/dashboard/${slug}`)} className="w-full">
-                  Ir para o espaço
+                  Ir para a organização
                 </Button>
               </CardContent>
             )}
@@ -274,7 +274,7 @@ export default function MetaIntegrationPage() {
         <div className="mx-auto max-w-xl p-6">
           <h1 className="mb-1 text-2xl font-semibold tracking-tight">Conta Facebook conectada</h1>
           <p className="mb-6 text-muted-foreground">
-            Este espaço está vinculado à Meta. Você pode desconectar para revogar o acesso neste
+            Esta organização está vinculado à Meta. Você pode desconectar para revogar o acesso neste
             produto ou trocar de conta.
           </p>
           {(oauthError || error) && (

@@ -118,7 +118,7 @@ export default async function WorkspacePage({
       key: "meta",
       title: "Conectar o Facebook (Meta)",
       description:
-        "Autorize sua conta Meta para gerenciar contas de anúncios, campanhas e criativos neste espaço.",
+        "Autorize sua conta Meta para gerenciar contas de anúncios, campanhas e criativos nesta organização.",
       href: `/dashboard/${slug}/integrations/meta`,
       cta: "Conectar Meta",
       icon: Link2,
@@ -198,7 +198,7 @@ export default async function WorkspacePage({
               <CardTitle className="text-xl">Configuração</CardTitle>
               <CardDescription>
                 Conclua os itens abaixo para usar anúncios e ferramentas MCP
-                neste espaço.
+                nesta organização.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -241,7 +241,7 @@ export default async function WorkspacePage({
           <EmptyState
             icon={Building2}
             title="Nenhuma conta de anúncios ativa"
-            description="Habilite pelo menos uma conta de anúncios no Business Manager sincronizado com este espaço."
+            description="Habilite pelo menos uma conta de anúncios no Business Manager sincronizado com esta organização."
           >
             <Button asChild>
               <Link href={`/dashboard/${slug}/integrations/meta`}>
@@ -282,7 +282,7 @@ export default async function WorkspacePage({
               <StatCard
                 title="Contas de anúncio"
                 value={accounts.length}
-                subtitle="ativas neste espaço"
+                subtitle="ativas nesta organização"
                 icon={Building2}
               />
               <StatCard

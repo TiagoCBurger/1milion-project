@@ -84,7 +84,7 @@ export default async function AdSetDetailPage({
             description={
               !token
                 ? "Conecte a Meta para ver anúncios deste conjunto."
-                : "Ative pelo menos uma conta de anúncios no painel do espaço."
+                : "Ative pelo menos uma conta de anúncios no painel da organização."
             }
           >
             <Button asChild>

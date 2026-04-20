@@ -82,7 +82,7 @@ export function MetaWorkspaceAdAccounts({
     return (
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="text-base">Contas de anúncio neste espaço</CardTitle>
+          <CardTitle className="text-base">Contas de anúncio nesta organização</CardTitle>
           <CardDescription>Carregando…</CardDescription>
         </CardHeader>
       </Card>
@@ -96,7 +96,7 @@ export function MetaWorkspaceAdAccounts({
   return (
     <Card className="mt-6">
       <CardHeader>
-        <CardTitle className="text-base">Contas de anúncio neste espaço</CardTitle>
+        <CardTitle className="text-base">Contas de anúncio nesta organização</CardTitle>
         <CardDescription>
           O dashboard, as estatísticas e o MCP usam apenas as contas{" "}
           <strong className="font-semibold text-foreground">ativas</strong> abaixo. Limite do plano:{" "}

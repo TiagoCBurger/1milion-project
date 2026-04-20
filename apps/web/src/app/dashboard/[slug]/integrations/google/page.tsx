@@ -43,7 +43,7 @@ export default async function GoogleIntegrationPage({
         <EmptyState
           icon={LineChart}
           title="Integração Google em breve"
-          description="A conexão com Google Ads e ecossistema Google está em desenvolvimento. Avisaremos quando estiver disponível neste espaço."
+          description="A conexão com Google Ads e ecossistema Google está em desenvolvimento. Avisaremos quando estiver disponível nesta organização."
         >
           <Button asChild variant="outline">
             <Link href={`/dashboard/${slug}/integrations`}>Voltar às integrações</Link>
