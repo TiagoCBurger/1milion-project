@@ -41,13 +41,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 GRANT EXECUTE ON FUNCTION public.is_organization_member(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_organization_owner(UUID) TO authenticated;
 
--- Drop the legacy helpers so stale policies referencing them fail at
--- CREATE time instead of silently evaluating false at query time.
-DROP FUNCTION IF EXISTS public.is_workspace_member(UUID);
-DROP FUNCTION IF EXISTS public.is_workspace_owner(UUID);
-
 -- ───────────────────────────────────────────────────────────
 -- Drop every known variant of each policy (old + new names).
+-- Policies must be dropped before the legacy helpers they depend on.
 -- ───────────────────────────────────────────────────────────
 
 -- memberships
@@ -114,6 +110,13 @@ DROP POLICY IF EXISTS "goals_read_members" ON analytics.goals;
 DROP POLICY IF EXISTS "goals_write_admins" ON analytics.goals;
 DROP POLICY IF EXISTS "funnels_read_members" ON analytics.funnels;
 DROP POLICY IF EXISTS "funnels_write_admins" ON analytics.funnels;
+
+-- ───────────────────────────────────────────────────────────
+-- Now that no policy references them, drop the legacy helpers.
+-- ───────────────────────────────────────────────────────────
+
+DROP FUNCTION IF EXISTS public.is_workspace_member(UUID);
+DROP FUNCTION IF EXISTS public.is_workspace_owner(UUID);
 
 -- ───────────────────────────────────────────────────────────
 -- Recreate with the organization-aware helpers.
