@@ -6,12 +6,11 @@ const TOKEN_ENCRYPTION_KEY = Deno.env.get("TOKEN_ENCRYPTION_KEY")!;
 const WORKER_SECRET = Deno.env.get("WORKER_SECRET");
 
 Deno.serve(async (req) => {
-  // Only accept POST
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  // Verify caller auth (accepts service_role JWT, sb_secret key, or worker secret)
+  // Verify caller auth (service_role JWT or worker secret)
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
   const validTokens = [SUPABASE_SERVICE_ROLE_KEY, WORKER_SECRET].filter(Boolean);
@@ -19,15 +18,24 @@ Deno.serve(async (req) => {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const { workspaceId } = await req.json();
-  if (!workspaceId) {
-    return Response.json({ error: "workspaceId required" }, { status: 400 });
+  // Accept both `organizationId` (new) and `workspaceId` (legacy caller
+  // body) so the mcp-worker deploys in any order.
+  const body = (await req.json()) as {
+    organizationId?: string;
+    workspaceId?: string;
+  };
+  const organizationId = body.organizationId ?? body.workspaceId;
+  if (!organizationId) {
+    return Response.json(
+      { error: "organizationId required" },
+      { status: 400 }
+    );
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   const { data, error } = await supabase.rpc("decrypt_meta_token", {
-    p_workspace_id: workspaceId,
+    p_organization_id: organizationId,
     p_encryption_key: TOKEN_ENCRYPTION_KEY,
   });
 
@@ -38,7 +46,7 @@ Deno.serve(async (req) => {
 
   if (!data) {
     return Response.json(
-      { error: "No valid token found for workspace" },
+      { error: "No valid token found for organization" },
       { status: 404 }
     );
   }
