@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { validateAndInspectToken } from "@/lib/meta-oauth";
 
 const TOKEN_ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY!;
@@ -41,12 +42,14 @@ export async function POST(
     return Response.json({ error: "Invalid token" }, { status: 400 });
   }
 
+  const admin = createAdminClient();
+
   try {
     // Validate and inspect the token
     const inspection = await validateAndInspectToken(token);
 
-    // Encrypt and store token
-    const { error: encryptError } = await supabase.rpc("encrypt_meta_token", {
+    // Encrypt and store token (service-role only RPC)
+    const { error: encryptError } = await admin.rpc("encrypt_meta_token", {
       p_organization_id: organizationId,
       p_token: token,
       p_encryption_key: TOKEN_ENCRYPTION_KEY,
@@ -83,7 +86,8 @@ export async function POST(
       .limit(1);
 
     if (!existingKeys?.length) {
-      const { data: keyData } = await supabase.rpc("generate_api_key", {
+      // service-role only RPC
+      const { data: keyData } = await admin.rpc("generate_api_key", {
         p_organization_id: organizationId,
         p_created_by: user.id,
         p_name: "Auto-generated",

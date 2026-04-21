@@ -5,6 +5,15 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const TOKEN_ENCRYPTION_KEY = Deno.env.get("TOKEN_ENCRYPTION_KEY")!;
 const WORKER_SECRET = Deno.env.get("WORKER_SECRET");
 
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
@@ -13,8 +22,10 @@ Deno.serve(async (req) => {
   // Verify caller auth (service_role JWT or worker secret)
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
-  const validTokens = [SUPABASE_SERVICE_ROLE_KEY, WORKER_SECRET].filter(Boolean);
-  if (!token || !validTokens.includes(token)) {
+  const validTokens = [SUPABASE_SERVICE_ROLE_KEY, WORKER_SECRET].filter(
+    (t): t is string => Boolean(t)
+  );
+  if (!token || !validTokens.some((expected) => timingSafeEqual(token, expected))) {
     return new Response("Unauthorized", { status: 401 });
   }
 

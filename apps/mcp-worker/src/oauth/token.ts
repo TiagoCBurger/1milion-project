@@ -9,6 +9,7 @@ import { getClient } from "./clients";
 import {
   generateToken,
   sha256Hex,
+  timingSafeEqual,
   verifyPkce,
   jsonResponse,
   oauthError,
@@ -309,8 +310,9 @@ async function authenticateClient(
   const client = await getClient(clientId, env.OAUTH_KV);
   if (!client) return null;
 
-  // Verify secret
-  if (client.client_secret !== clientSecret) return null;
+  // Verify secret (constant-time to avoid timing oracle on client_secret)
+  if (clientSecret === null) return null;
+  if (!timingSafeEqual(client.client_secret, clientSecret)) return null;
 
   // Check if secret expired
   const now = Math.floor(Date.now() / 1000);

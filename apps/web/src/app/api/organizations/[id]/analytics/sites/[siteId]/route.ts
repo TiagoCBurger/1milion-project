@@ -38,6 +38,19 @@ export async function PATCH(
   if (!body) return Response.json({ error: "Invalid body" }, { status: 400 });
 
   const analytics = createAnalyticsAdminClient();
+
+  // Confirm `siteId` really belongs to `id` before any write. The RPC
+  // below is SECURITY DEFINER and filters only on `id = p_site_id`, so
+  // an admin of Org A could otherwise overwrite Org B's CAPI token.
+  const { data: owning, error: ownErr } = await analytics
+    .from("sites")
+    .select("id")
+    .eq("id", siteId)
+    .eq("organization_id", id)
+    .maybeSingle();
+  if (ownErr) return Response.json({ error: ownErr.message }, { status: 500 });
+  if (!owning) return Response.json({ error: "Site not found" }, { status: 404 });
+
   const update: Record<string, unknown> = {};
   if (body.pixel_id !== undefined) update.pixel_id = body.pixel_id || null;
   if (body.is_active !== undefined) update.is_active = Boolean(body.is_active);

@@ -1,17 +1,51 @@
 // ============================================================
 // Public Unsubscribe Endpoint
 // GET /api/email/unsubscribe?email=x&t=token
+//
+// `t` must be a valid HMAC over `email` produced with
+// EMAIL_UNSUBSCRIBE_SECRET. Without it, the request is rejected
+// so an attacker cannot mass-unsubscribe arbitrary addresses.
 // ============================================================
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getResendClient } from "@vibefly/email";
+import { verifyUnsubscribeToken } from "@/lib/unsubscribe-token";
+
+function errorPage(message: string, status: number): Response {
+  return new Response(
+    `<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Link inválido — VibeFly</title></head>
+<body style="font-family:Inter,sans-serif;text-align:center;padding:80px 20px;color:#334155">
+  <h1 style="color:#7C3AED">Link inválido ou expirado</h1>
+  <p>${message}</p>
+  <p><a href="https://app.vibefly.app" style="color:#7C3AED">Voltar ao VibeFly</a></p>
+</body>
+</html>`,
+    {
+      status,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    },
+  );
+}
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const email = url.searchParams.get("email");
+  const token = url.searchParams.get("t");
 
-  if (!email) {
-    return new Response("Email não informado.", { status: 400 });
+  if (!email || !token) {
+    return errorPage(
+      "Faltam parâmetros no link. Use o botão de descadastro direto do email recebido.",
+      400,
+    );
+  }
+
+  if (!verifyUnsubscribeToken(email, token)) {
+    return errorPage(
+      "Não conseguimos validar esse link. Se o problema continuar, entre em contato com o suporte.",
+      403,
+    );
   }
 
   const admin = createAdminClient();

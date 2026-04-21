@@ -1,6 +1,6 @@
 // ============================================================
 // User Created Hook — sends welcome email
-// Called by a Supabase Database Webhook on INSERT to profiles
+// Called by a Supabase Database Webhook on INSERT to profiles.
 //
 // Setup in Supabase Dashboard > Database > Webhooks:
 //   Table: public.profiles
@@ -9,8 +9,14 @@
 //   HTTP Method: POST
 //   Headers:
 //     Authorization: Bearer <SUPABASE_WEBHOOK_SECRET>
+//
+// The secret MUST be set. When it is missing the route fails
+// closed (503) rather than accepting arbitrary callers — this
+// endpoint drives outbound email from the platform's verified
+// Resend domain and an unauth path is a phishing primitive.
 // ============================================================
 
+import { timingSafeEqual } from "node:crypto";
 import {
   sendTransactionalEmail,
   syncUserToAudience,
@@ -33,11 +39,23 @@ interface ProfileInsertPayload {
 function verifyHookSecret(request: Request): boolean {
   const auth = request.headers.get("authorization");
   const secret = process.env.SUPABASE_WEBHOOK_SECRET;
-  if (!secret) return true; // Skip verification if not configured
-  return auth === `Bearer ${secret}`;
+  if (!secret || !auth) return false;
+  const expected = `Bearer ${secret}`;
+  if (auth.length !== expected.length) return false;
+  return timingSafeEqual(
+    Buffer.from(auth, "utf8"),
+    Buffer.from(expected, "utf8"),
+  );
 }
 
 export async function POST(request: Request) {
+  if (!process.env.SUPABASE_WEBHOOK_SECRET) {
+    return Response.json(
+      { error: "Webhook not configured" },
+      { status: 503 },
+    );
+  }
+
   if (!verifyHookSecret(request)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }

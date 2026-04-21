@@ -9,6 +9,16 @@ export function generateToken(bytes = 32): string {
   return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** Constant-time string comparison to avoid timing oracles on secret checks. */
+export function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
 /** SHA-256 hash a string and return hex. */
 export async function sha256Hex(input: string): Promise<string> {
   const data = new TextEncoder().encode(input);

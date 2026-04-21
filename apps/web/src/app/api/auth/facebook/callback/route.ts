@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   exchangeCodeForToken,
   exchangeForLongLivedToken,
@@ -61,6 +62,24 @@ export async function GET(request: NextRequest) {
     return redirectError(slug, "unauthorized");
   }
 
+  // Verify the authenticated user is still an owner/admin of the
+  // organization carried in the signed state cookie. This prevents
+  // a revoked admin (or a state cookie replayed under a different
+  // session) from driving the privileged service-role RPCs below.
+  const { data: membership } = await supabase
+    .from("memberships")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("organization_id", organizationId)
+    .in("role", ["owner", "admin"])
+    .maybeSingle();
+
+  if (!membership) {
+    return redirectError(slug, "forbidden");
+  }
+
+  const admin = createAdminClient();
+
   try {
     // 1. Exchange code for short-lived token
     const redirectUri = `${origin}/api/auth/facebook/callback`;
@@ -83,8 +102,8 @@ export async function GET(request: NextRequest) {
     // 3. Validate and inspect the long-lived token
     const inspection = await validateAndInspectToken(longLivedToken);
 
-    // 4. Encrypt and store token
-    const { error: encryptError } = await supabase.rpc("encrypt_meta_token", {
+    // 4. Encrypt and store token (service-role only RPC)
+    const { error: encryptError } = await admin.rpc("encrypt_meta_token", {
       p_organization_id: organizationId,
       p_token: longLivedToken,
       p_encryption_key: TOKEN_ENCRYPTION_KEY,
@@ -111,9 +130,9 @@ export async function GET(request: NextRequest) {
         .eq("id", organizationId);
     }
 
-    // 6. Sync all BMs and their ad accounts
+    // 6. Sync all BMs and their ad accounts (service-role only RPC)
     if (inspection.businessManagers.length > 0) {
-      const { error: syncError } = await supabase.rpc(
+      const { error: syncError } = await admin.rpc(
         "sync_business_managers",
         {
           p_organization_id: organizationId,
@@ -135,7 +154,8 @@ export async function GET(request: NextRequest) {
 
     let apiKeyParam = "";
     if (!existingKeys?.length) {
-      const { data: keyData } = await supabase.rpc("generate_api_key", {
+      // service-role only RPC
+      const { data: keyData } = await admin.rpc("generate_api_key", {
         p_organization_id: organizationId,
         p_created_by: user.id,
         p_name: "Auto-generated",

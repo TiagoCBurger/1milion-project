@@ -1,21 +1,20 @@
 // ============================================================
-// Contacts API
+// Contacts API — platform-admin only.
 // GET    /api/email/audiences/[id]/contacts  — list contacts
 // POST   /api/email/audiences/[id]/contacts  — add contact
 // DELETE /api/email/audiences/[id]/contacts  — remove contact
 // ============================================================
 
-import { createClient } from "@/lib/supabase/server";
+import { requirePlatformAdmin } from "@/lib/platform-admin";
 import { listContacts, addContact, removeContact } from "@vibefly/email";
 
 interface Params {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(request: Request, { params }: Params) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(_request: Request, { params }: Params) {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate.response;
 
   const { id: audienceId } = await params;
   const contacts = await listContacts(audienceId);
@@ -23,9 +22,8 @@ export async function GET(request: Request, { params }: Params) {
 }
 
 export async function POST(request: Request, { params }: Params) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate.response;
 
   const { id: audienceId } = await params;
   const body = await request.json() as { email: string; firstName?: string };
@@ -39,9 +37,8 @@ export async function POST(request: Request, { params }: Params) {
 }
 
 export async function DELETE(request: Request, { params }: Params) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate.response;
 
   const { id: audienceId } = await params;
   const body = await request.json() as { contactId: string };
