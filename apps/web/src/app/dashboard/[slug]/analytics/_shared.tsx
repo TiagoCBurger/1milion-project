@@ -53,11 +53,13 @@ export function AnalyticsToolbar({
   sites,
   site,
   range,
+  initialLive,
 }: {
   slug: string;
   sites: SiteRow[];
   site: SiteRow | null;
   range: string;
+  initialLive?: number;
 }) {
   if (sites.length === 0 || !site) return null;
   return (
@@ -67,7 +69,7 @@ export function AnalyticsToolbar({
         <TimeRangePicker current={range} />
       </div>
       <div className="flex items-center gap-3">
-        <LiveCounter siteId={site.id} />
+        <LiveCounter siteId={site.id} initial={initialLive} />
         <Button variant="outline" size="sm" asChild>
           <Link href={`/dashboard/${slug}/analytics/settings`}>Configurar</Link>
         </Button>

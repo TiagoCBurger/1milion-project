@@ -202,17 +202,32 @@ export async function POST(
     );
   }
 
-  const results: ItemResult[] = [];
-  let okCount = 0;
+  // Pin narrowed values so the closure below sees them as non-nullable.
+  const leaseId: string = lease.id;
+  const leaseAccountId: string = lease.account_id as string;
+  const authUserId = auth.userId;
+  const authSource = auth.source;
+  const metaToken: string = token;
 
-  for (const item of targets) {
-    const baseAudit = {
+  type BaseAudit = {
+    organization_id: string;
+    lease_id: string;
+    account_id: string;
+    r2_key: string;
+    mime_declared: AllowedImageMime;
+    actor_user_id: string | null;
+  };
+
+  async function processItem(
+    item: LeaseItemMeta,
+  ): Promise<{ ok: boolean; result: ItemResult }> {
+    const baseAudit: BaseAudit = {
       organization_id: organizationId,
-      lease_id: lease.id,
-      account_id: lease.account_id as string,
+      lease_id: leaseId,
+      account_id: leaseAccountId,
       r2_key: item.key,
       mime_declared: item.declared_mime,
-      actor_user_id: auth.userId,
+      actor_user_id: authUserId,
     };
 
     try {
@@ -223,8 +238,7 @@ export async function POST(
           action: "reject",
           reason: "R2 object not found (client never uploaded)",
         });
-        results.push({ key: item.key, ok: false, reason: "Object not uploaded" });
-        continue;
+        return { ok: false, result: { key: item.key, ok: false, reason: "Object not uploaded" } };
       }
 
       if (buf.byteLength !== item.expected_size) {
@@ -235,8 +249,7 @@ export async function POST(
           reason: `size mismatch: expected ${item.expected_size}, got ${buf.byteLength}`,
         });
         await deleteR2Object(item.key).catch(() => {});
-        results.push({ key: item.key, ok: false, reason: "Size mismatch" });
-        continue;
+        return { ok: false, result: { key: item.key, ok: false, reason: "Size mismatch" } };
       }
 
       const actualSha = await sha256Hex(buf);
@@ -252,8 +265,7 @@ export async function POST(
           reason: "sha256 mismatch (post-presign byte swap?)",
         });
         await deleteR2Object(item.key).catch(() => {});
-        results.push({ key: item.key, ok: false, reason: "Hash mismatch" });
-        continue;
+        return { ok: false, result: { key: item.key, ok: false, reason: "Hash mismatch" } };
       }
 
       const mimeCheck = validateMime(buf, {
@@ -270,12 +282,12 @@ export async function POST(
           reason: `mime: ${mimeCheck.reason}`,
         });
         await deleteR2Object(item.key).catch(() => {});
-        results.push({ key: item.key, ok: false, reason: mimeCheck.reason });
-        continue;
+        return { ok: false, result: { key: item.key, ok: false, reason: mimeCheck.reason } };
       }
 
       const sanitized = await reEncodeImage(buf, mimeCheck.actual as AllowedImageMime);
       const sanitizedSha = await sha256Hex(sanitized.buf);
+      const originalSize = buf.byteLength;
 
       await putR2Object(item.key, sanitized.buf, sanitized.mime);
 
@@ -285,13 +297,13 @@ export async function POST(
         size_bytes: sanitized.buf.byteLength,
         mime_actual: sanitized.mime,
         action: "sanitize",
-        reason: `original=${buf.byteLength} sanitized=${sanitized.buf.byteLength} ${sanitized.width}x${sanitized.height}`,
+        reason: `original=${originalSize} sanitized=${sanitized.buf.byteLength} ${sanitized.width}x${sanitized.height}`,
       });
 
       const adName = adNameByKey.get(item.key) ?? item.file_name;
       const metaResult = await metaApiUploadImage(
-        lease.account_id as string,
-        token,
+        leaseAccountId,
+        metaToken,
         sanitized.buf,
         item.file_name,
         sanitized.mime,
@@ -308,8 +320,7 @@ export async function POST(
           action: "reject",
           reason: `meta: ${errMsg}`,
         });
-        results.push({ key: item.key, ok: false, reason: errMsg });
-        continue;
+        return { ok: false, result: { key: item.key, ok: false, reason: errMsg } };
       }
 
       const imageHash = firstUploadedImageHash(metaResult);
@@ -321,8 +332,10 @@ export async function POST(
           action: "reject",
           reason: "Meta returned no image hash",
         });
-        results.push({ key: item.key, ok: false, reason: "No image hash from Meta" });
-        continue;
+        return {
+          ok: false,
+          result: { key: item.key, ok: false, reason: "No image hash from Meta" },
+        };
       }
 
       const r2Url = publicR2Url(item.key);
@@ -332,7 +345,7 @@ export async function POST(
         .upsert(
           {
             organization_id: organizationId,
-            account_id: lease.account_id as string,
+            account_id: leaseAccountId,
             image_hash: imageHash,
             r2_key: item.key,
             r2_url: r2Url,
@@ -340,13 +353,13 @@ export async function POST(
             file_size: sanitized.buf.byteLength,
             content_type: sanitized.mime,
             sha256: sanitizedSha,
-            lease_id: lease.id,
+            lease_id: leaseId,
             status: "ready",
             sanitized: true,
-            original_size: buf.byteLength,
+            original_size: originalSize,
             sanitized_size: sanitized.buf.byteLength,
-            uploaded_via: auth.source === "mcp" ? "mcp" : "web",
-            created_by: auth.userId,
+            uploaded_via: authSource === "mcp" ? "mcp" : "web",
+            created_by: authUserId,
           },
           { onConflict: "organization_id,account_id,image_hash" },
         )
@@ -366,16 +379,18 @@ export async function POST(
         reason: `meta_hash=${imageHash}`,
       });
 
-      okCount++;
-      results.push({
-        key: item.key,
+      return {
         ok: true,
-        image_hash: imageHash,
-        ad_image_id: saved?.id,
-        r2_url: r2Url,
-        width: sanitized.width,
-        height: sanitized.height,
-      });
+        result: {
+          key: item.key,
+          ok: true,
+          image_hash: imageHash,
+          ad_image_id: saved?.id,
+          r2_url: r2Url,
+          width: sanitized.width,
+          height: sanitized.height,
+        },
+      };
     } catch (err) {
       const reason = err instanceof Error ? err.message : "Unknown error";
       console.error("[finalize-upload] item failed:", item.key, err);
@@ -385,9 +400,32 @@ export async function POST(
         reason: `exception: ${reason.slice(0, 200)}`,
       });
       await deleteR2Object(item.key).catch(() => {});
-      results.push({ key: item.key, ok: false, reason });
+      return { ok: false, result: { key: item.key, ok: false, reason } };
     }
   }
+
+  // Bounded concurrency — each in-flight item can hold two copies of its
+  // bytes in memory at once (raw + sanitized). At 30MB/image that's up to
+  // 180MB just for buffers before we cap. CONCURRENCY=3 keeps the peak
+  // under ~200MB even on the Max-tier batch limit (100 files).
+  const CONCURRENCY = 3;
+  const results: ItemResult[] = new Array(targets.length);
+  let okCount = 0;
+  let next = 0;
+
+  async function worker() {
+    while (true) {
+      const idx = next++;
+      if (idx >= targets.length) return;
+      const { ok, result } = await processItem(targets[idx]);
+      results[idx] = result;
+      if (ok) okCount++;
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, targets.length) }, () => worker()),
+  );
 
   const newFinalizedCount = lease.finalized_count + okCount;
   const isComplete = newFinalizedCount >= lease.expected_count;

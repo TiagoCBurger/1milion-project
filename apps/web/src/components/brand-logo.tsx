@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 type BrandLogoProps = {
@@ -17,11 +18,12 @@ export function BrandLogo({
   className,
 }: BrandLogoProps) {
   const img = (
-    <img
+    <Image
       src="/logo.svg"
       alt="VibeFly"
       width={240}
       height={55}
+      priority
       className={cn(
         "w-auto",
         variant === "onDarkPage" ? "h-6 sm:h-7" : "h-8 sm:h-9",

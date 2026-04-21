@@ -315,9 +315,12 @@ describe("Token endpoint — connection recording", () => {
         };
       }
       if (u.includes("/oauth_connections?")) {
+        // HEAD request with `Prefer: count=exact` — the count comes back in
+        // the `content-range` header, not the body.
         return {
           ok: true,
-          json: async () => [{ id: "other-conn" }],
+          headers: new Headers({ "content-range": "0-0/1" }),
+          json: async () => [],
         };
       }
       return { ok: true, json: async () => ({}) };

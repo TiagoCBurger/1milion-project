@@ -1,8 +1,8 @@
 import { redirect, notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getDecryptedToken, fetchPages } from "@/lib/meta-api";
 import { getEnabledAdAccounts } from "@/lib/organization-data";
+import { getAuthedUser, getSupabase } from "@/lib/auth-context";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
@@ -21,10 +21,10 @@ export default async function CreativesPage({
 }) {
   const { slug } = await params;
   const { account_id } = await searchParams;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthedUser();
   if (!user) redirect("/login");
 
+  const supabase = await getSupabase();
   const { data: workspace } = await supabase
     .from("organizations")
     .select("id, enable_meta_mutations")
@@ -32,8 +32,10 @@ export default async function CreativesPage({
     .single();
   if (!workspace) notFound();
 
-  const token = await getDecryptedToken(workspace.id);
-  const accounts = await getEnabledAdAccounts(workspace.id);
+  const [token, accounts] = await Promise.all([
+    getDecryptedToken(workspace.id),
+    getEnabledAdAccounts(workspace.id),
+  ]);
 
   if (!token || accounts.length === 0) {
     return (
@@ -62,21 +64,25 @@ export default async function CreativesPage({
   }
 
   const selectedAccount = account_id ?? accounts[0].meta_account_id;
-  const { data: pages } = await fetchPages(token);
+
+  const admin = createAdminClient();
+  const [{ data: pages }, imagesRes] = await Promise.all([
+    fetchPages(token),
+    admin
+      .from("ad_images")
+      .select(
+        "id, image_hash, r2_url, file_name, file_size, created_at, account_id, organization_id",
+      )
+      .eq("organization_id", workspace.id)
+      .eq("account_id", selectedAccount)
+      .order("created_at", { ascending: false })
+      .limit(50),
+  ]);
+  const images = imagesRes.data;
   const pageOptions = pages.map((p) => ({
     id: String(p["id"] ?? ""),
     name: String(p["name"] ?? ""),
   }));
-
-  // Fetch persisted images
-  const admin = createAdminClient();
-  const { data: images } = await admin
-    .from("ad_images")
-    .select("*")
-    .eq("organization_id", workspace.id)
-    .eq("account_id", selectedAccount)
-    .order("created_at", { ascending: false })
-    .limit(50);
 
   return (
     <>

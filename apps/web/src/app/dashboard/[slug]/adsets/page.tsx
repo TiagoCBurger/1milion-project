@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { getDecryptedToken, fetchAdSets, fetchCampaigns } from "@/lib/meta-api";
 import { getEnabledAdAccounts } from "@/lib/organization-data";
+import { getAuthedUser, getSupabase } from "@/lib/auth-context";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
@@ -33,10 +33,10 @@ export default async function AdSetsPage({
 }) {
   const { slug } = await params;
   const { account_id } = await searchParams;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthedUser();
   if (!user) redirect("/login");
 
+  const supabase = await getSupabase();
   const { data: workspace } = await supabase
     .from("organizations")
     .select("id, enable_meta_mutations")
@@ -44,8 +44,10 @@ export default async function AdSetsPage({
     .single();
   if (!workspace) notFound();
 
-  const token = await getDecryptedToken(workspace.id);
-  const accounts = await getEnabledAdAccounts(workspace.id);
+  const [token, accounts] = await Promise.all([
+    getDecryptedToken(workspace.id),
+    getEnabledAdAccounts(workspace.id),
+  ]);
 
   if (!token || accounts.length === 0) {
     return (
@@ -74,8 +76,10 @@ export default async function AdSetsPage({
   }
 
   const selectedAccount = account_id ?? accounts[0].meta_account_id;
-  const { data: adsets, error } = await fetchAdSets(token, selectedAccount);
-  const { data: campaigns } = await fetchCampaigns(token, selectedAccount);
+  const [{ data: adsets, error }, { data: campaigns }] = await Promise.all([
+    fetchAdSets(token, selectedAccount),
+    fetchCampaigns(token, selectedAccount),
+  ]);
   const campaignOptions = campaigns.map((c) => ({
     id: String(c["id"] ?? ""),
     name: String(c["name"] ?? ""),

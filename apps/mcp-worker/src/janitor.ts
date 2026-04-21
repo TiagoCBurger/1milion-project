@@ -38,6 +38,7 @@ export interface JanitorResult {
   expiredCount: number;
   sweptLeases: number;
   deletedKeys: number;
+  refreshedTokens: number;
   errors: string[];
 }
 
@@ -74,7 +75,8 @@ async function fetchOrphanLeases(env: Env, limit = 50): Promise<ExpiredLease[]> 
   if (!res.ok) {
     throw new Error(`fetchOrphanLeases failed: ${res.status} ${await res.text()}`);
   }
-  return (await res.json()) as ExpiredLease[];
+  const body = (await res.json()) as unknown;
+  return Array.isArray(body) ? (body as ExpiredLease[]) : [];
 }
 
 async function markCancelled(env: Env, leaseId: string): Promise<void> {
@@ -113,11 +115,71 @@ async function logCancel(
   }).catch((err) => console.error("[janitor] audit insert failed:", err));
 }
 
+async function fetchExpiringOrgIds(env: Env): Promise<string[]> {
+  // Tokens within the next 7 days (but not already expired) — long-lived
+  // tokens still have juice to exchange. Anything already past due requires
+  // a fresh user OAuth flow; we don't try to refresh those.
+  const now = new Date().toISOString();
+  const in7d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const url =
+    `${env.SUPABASE_URL}/rest/v1/meta_tokens` +
+    `?is_valid=eq.true` +
+    `&expires_at=gte.${encodeURIComponent(now)}` +
+    `&expires_at=lte.${encodeURIComponent(in7d)}` +
+    `&select=organization_id` +
+    `&limit=100`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+  });
+  if (!res.ok) {
+    throw new Error(
+      `fetchExpiringOrgIds failed: ${res.status} ${await res.text()}`,
+    );
+  }
+  const body = (await res.json()) as unknown;
+  if (!Array.isArray(body)) return [];
+  return (body as Array<{ organization_id?: unknown }>)
+    .map((r) => (typeof r.organization_id === "string" ? r.organization_id : null))
+    .filter((v): v is string => v !== null);
+}
+
+async function refreshTokensViaWeb(
+  env: Env,
+  organizationIds: string[],
+): Promise<number> {
+  if (organizationIds.length === 0) return 0;
+  const webBase = env.WEB_APP_URL?.replace(/\/$/, "");
+  const serviceToken = env.MCP_SERVICE_TOKEN;
+  if (!webBase || !serviceToken) {
+    throw new Error("WEB_APP_URL or MCP_SERVICE_TOKEN not configured");
+  }
+
+  const res = await fetch(`${webBase}/api/internal/meta-token/refresh`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-mcp-service-token": serviceToken,
+    },
+    body: JSON.stringify({ organization_ids: organizationIds }),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `refresh endpoint failed: ${res.status} ${await res.text()}`,
+    );
+  }
+  const body = (await res.json()) as { successes?: number };
+  return Number(body.successes ?? 0);
+}
+
 export async function runJanitor(env: Env): Promise<JanitorResult> {
   const result: JanitorResult = {
     expiredCount: 0,
     sweptLeases: 0,
     deletedKeys: 0,
+    refreshedTokens: 0,
     errors: [],
   };
 
@@ -125,15 +187,13 @@ export async function runJanitor(env: Env): Promise<JanitorResult> {
     result.expiredCount = await expireStaleLeases(env);
   } catch (err) {
     result.errors.push((err as Error).message);
-    return result;
   }
 
-  let leases: ExpiredLease[];
+  let leases: ExpiredLease[] = [];
   try {
     leases = await fetchOrphanLeases(env);
   } catch (err) {
     result.errors.push((err as Error).message);
-    return result;
   }
 
   for (const lease of leases) {
@@ -165,6 +225,13 @@ export async function runJanitor(env: Env): Promise<JanitorResult> {
     } catch (err) {
       result.errors.push((err as Error).message);
     }
+  }
+
+  try {
+    const expiringOrgs = await fetchExpiringOrgIds(env);
+    result.refreshedTokens = await refreshTokensViaWeb(env, expiringOrgs);
+  } catch (err) {
+    result.errors.push(`token-refresh: ${(err as Error).message}`);
   }
 
   return result;

@@ -1,8 +1,8 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getDecryptedToken, fetchInsights } from "@/lib/meta-api";
 import { getEnabledAdAccounts } from "@/lib/organization-data";
+import { getAuthedUser, getSupabase, getOrganizationBySlug } from "@/lib/auth-context";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -64,45 +64,39 @@ export default async function WorkspacePage({
   const { slug } = await params;
   const { account_id, time_range } = await searchParams;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthedUser();
   if (!user) redirect("/login");
 
-  const { data: workspace } = await supabase
-    .from("organizations")
-    .select("id, name, slug")
-    .eq("slug", slug)
-    .single();
-
+  const workspace = await getOrganizationBySlug(slug);
   if (!workspace) notFound();
 
-  const { data: metaToken } = await supabase
-    .from("meta_tokens")
-    .select("is_valid")
-    .eq("organization_id", workspace.id)
-    .maybeSingle();
+  const supabase = await getSupabase();
 
-  const metaConnected = metaToken?.is_valid === true;
+  // Fan out the four independent status lookups in parallel. Each is a small
+  // count-style query; serializing them was adding ~250-400ms of idle wait.
+  const [metaTokenRes, apiKeysRes, oauthRes] = await Promise.all([
+    supabase
+      .from("meta_tokens")
+      .select("is_valid")
+      .eq("organization_id", workspace.id)
+      .maybeSingle(),
+    supabase
+      .from("api_keys")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", workspace.id)
+      .eq("is_active", true),
+    supabase
+      .from("oauth_connections")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", workspace.id)
+      .eq("is_active", true),
+  ]);
 
-  const { data: activeApiKeys } = await supabase
-    .from("api_keys")
-    .select("id")
-    .eq("organization_id", workspace.id)
-    .eq("is_active", true);
-
-  const { data: activeOAuth } = await supabase
-    .from("oauth_connections")
-    .select("id")
-    .eq("organization_id", workspace.id)
-    .eq("is_active", true);
-
-  const mcpConfigured =
-    (activeApiKeys?.length ?? 0) > 0 || (activeOAuth?.length ?? 0) > 0;
-
-  const mcpCount =
-    (activeApiKeys?.length ?? 0) + (activeOAuth?.length ?? 0);
+  const metaConnected = metaTokenRes.data?.is_valid === true;
+  const activeApiKeyCount = apiKeysRes.count ?? 0;
+  const activeOAuthCount = oauthRes.count ?? 0;
+  const mcpConfigured = activeApiKeyCount > 0 || activeOAuthCount > 0;
+  const mcpCount = activeApiKeyCount + activeOAuthCount;
 
   const checklistItems: Array<{
     key: string;
@@ -139,9 +133,14 @@ export default async function WorkspacePage({
 
   const showChecklist = checklistItems.length > 0;
 
-  const token = metaConnected ? await getDecryptedToken(workspace.id) : null;
-  const accounts =
-    metaConnected && token ? await getEnabledAdAccounts(workspace.id) : [];
+  // Token + enabled accounts are independent after the above status checks —
+  // kick both off together so the longer of the two defines the wait.
+  const [token, accounts] = metaConnected
+    ? await Promise.all([
+        getDecryptedToken(workspace.id),
+        getEnabledAdAccounts(workspace.id),
+      ])
+    : [null, [] as Awaited<ReturnType<typeof getEnabledAdAccounts>>];
 
   const showMainDashboard = Boolean(token && accounts.length > 0);
 

@@ -2,6 +2,15 @@ import { createClient } from "@/lib/supabase/server";
 import { assertOrganizationCanWrite } from "@/lib/organization-write-guard";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getDecryptedToken, metaApiUploadImage, metaUserFacingError } from "@/lib/meta-api";
+import { reEncodeImage } from "@/lib/image-sanitize";
+import { uploadToR2 } from "@/lib/r2-upload";
+import {
+  ALLOWED_IMAGE_MIMES,
+  UPLOAD_LIMITS,
+  type AllowedImageMime,
+  type SubscriptionTier,
+} from "@vibefly/shared";
+import { sha256Hex, validateMime } from "@vibefly/sanitizer";
 
 function firstUploadedImageHash(metaResult: Record<string, unknown>): string | null {
   const raw = metaResult.images;
@@ -12,7 +21,23 @@ function firstUploadedImageHash(metaResult: Record<string, unknown>): string | n
   const h = (first as Record<string, unknown>).hash;
   return typeof h === "string" ? h : null;
 }
-import { uploadToR2 } from "@/lib/r2-upload";
+
+function isAllowedImageMime(m: unknown): m is AllowedImageMime {
+  return typeof m === "string" && (ALLOWED_IMAGE_MIMES as readonly string[]).includes(m);
+}
+
+async function resolveTier(
+  admin: ReturnType<typeof createAdminClient>,
+  organizationId: string,
+): Promise<SubscriptionTier> {
+  const { data } = await admin
+    .from("subscriptions")
+    .select("tier")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .maybeSingle();
+  return (data?.tier ?? "free") as SubscriptionTier;
+}
 
 async function authorize(organizationId: string) {
   const supabase = await createClient();
@@ -97,23 +122,62 @@ export async function POST(
     return Response.json({ error: "file and account_id are required" }, { status: 400 });
   }
 
-  const MAX_SIZE = 30 * 1024 * 1024;
-  if (file.size > MAX_SIZE) {
+  // System-wide ceiling — defense-in-depth before tier lookup runs, so an
+  // infra hiccup resolving tier can't turn into an unbounded upload.
+  const SYSTEM_MAX_BYTES = UPLOAD_LIMITS.max.max_image_bytes; // 30MB
+  if (file.size > SYSTEM_MAX_BYTES) {
     return Response.json({ error: "Image exceeds 30MB limit" }, { status: 400 });
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+  if (!isAllowedImageMime(file.type)) {
+    return Response.json(
+      {
+        error: `content_type "${file.type || "unknown"}" is not supported. Allowed: ${ALLOWED_IMAGE_MIMES.join(", ")}`,
+      },
+      { status: 400 },
+    );
+  }
 
-  // Upload to R2
+  const admin = createAdminClient();
+  const tier = await resolveTier(admin, organizationId);
+  const limits = UPLOAD_LIMITS[tier];
+
+  if (file.size > limits.max_image_bytes) {
+    return Response.json(
+      { error: `Image exceeds the ${limits.max_image_bytes}-byte limit for your plan` },
+      { status: 400 },
+    );
+  }
+
+  const rawBuffer = new Uint8Array(await file.arrayBuffer());
+
+  // Magic-byte + declared MIME validation — the header from the browser is
+  // trivially spoofable, so we must check the first bytes against the
+  // declared type before forwarding anywhere.
+  const mimeCheck = validateMime(rawBuffer, {
+    declaredMime: file.type,
+    kind: "image",
+  });
+  if (!mimeCheck.ok) {
+    return Response.json({ error: mimeCheck.reason }, { status: 400 });
+  }
+
+  // Re-encode to strip EXIF/XMP/ICC and neutralize any polyglot payload
+  // embedded in a valid-looking image file. We use the actual detected MIME
+  // (not the declared one) so the output format is always what sharp saw.
+  const sanitized = await reEncodeImage(rawBuffer, mimeCheck.actual as AllowedImageMime);
+  const sanitizedSha = await sha256Hex(sanitized.buf);
+
+  // Upload sanitized bytes to R2
   let r2Key: string | null = null;
   let r2Url: string | null = null;
   try {
     const r2Result = await uploadToR2(
-      buffer,
+      Buffer.from(sanitized.buf),
       organizationId,
       "images",
       file.name,
-      file.type || "image/jpeg"
+      sanitized.mime,
     );
     r2Key = r2Result.key;
     r2Url = r2Result.publicUrl;
@@ -121,14 +185,14 @@ export async function POST(
     console.warn("[images] R2 upload failed (non-critical):", err);
   }
 
-  // Upload to Meta
+  // Upload sanitized bytes to Meta
   const metaResult = await metaApiUploadImage(
     accountId,
     token,
-    buffer,
+    sanitized.buf,
     file.name,
-    file.type || "image/jpeg",
-    name
+    sanitized.mime,
+    name,
   );
 
   const errMsg = metaUserFacingError(metaResult);
@@ -142,8 +206,6 @@ export async function POST(
     return Response.json({ error: "Failed to get image hash from Meta" }, { status: 500 });
   }
 
-  // Persist metadata in Supabase
-  const admin = createAdminClient();
   const { data: saved, error: dbError } = await admin
     .from("ad_images")
     .upsert(
@@ -154,11 +216,17 @@ export async function POST(
         r2_key: r2Key,
         r2_url: r2Url,
         file_name: file.name,
-        file_size: file.size,
-        content_type: file.type || "image/jpeg",
+        file_size: sanitized.buf.byteLength,
+        content_type: sanitized.mime,
+        sha256: sanitizedSha,
+        sanitized: true,
+        original_size: rawBuffer.byteLength,
+        sanitized_size: sanitized.buf.byteLength,
+        uploaded_via: "web",
+        status: "ready",
         created_by: user.id,
       },
-      { onConflict: "organization_id,account_id,image_hash" }
+      { onConflict: "organization_id,account_id,image_hash" },
     )
     .select()
     .single();

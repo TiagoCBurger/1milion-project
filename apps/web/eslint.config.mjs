@@ -27,6 +27,14 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    // Force everyone onto next/image — raw <img> loses lazy loading,
+    // responsive sizes, and Cloudflare-served optimisations. Exceptions
+    // (e.g. the Meta pixel noscript) must opt-out explicitly.
+    rules: {
+      "@next/next/no-img-element": "error",
+    },
+  },
 ]);
 
 export default eslintConfig;

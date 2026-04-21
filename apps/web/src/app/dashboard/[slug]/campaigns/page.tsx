@@ -1,8 +1,8 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getDecryptedToken, fetchCampaigns, fetchInsights } from "@/lib/meta-api";
 import { getEnabledAdAccounts } from "@/lib/organization-data";
+import { getAuthedUser, getSupabase } from "@/lib/auth-context";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
@@ -83,12 +83,10 @@ export default async function CampaignsPage({
 }) {
   const { slug } = await params;
   const { account_id, time_range } = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthedUser();
   if (!user) redirect("/login");
 
+  const supabase = await getSupabase();
   const { data: workspace } = await supabase
     .from("organizations")
     .select("id, enable_meta_mutations")
@@ -96,8 +94,11 @@ export default async function CampaignsPage({
     .single();
   if (!workspace) notFound();
 
-  const token = await getDecryptedToken(workspace.id);
-  const accounts = await getEnabledAdAccounts(workspace.id);
+  // Token + enabled accounts are independent; resolve together.
+  const [token, accounts] = await Promise.all([
+    getDecryptedToken(workspace.id),
+    getEnabledAdAccounts(workspace.id),
+  ]);
 
   if (!token || accounts.length === 0) {
     return (

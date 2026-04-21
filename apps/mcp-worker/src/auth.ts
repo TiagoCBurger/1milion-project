@@ -17,21 +17,26 @@ export async function validateApiKey(
   apiKey: string,
   env: Env
 ): Promise<AuthResult> {
-  // Check KV cache first
-  const cacheKey = `v2:apikey:${hashForCache(apiKey)}`;
-  const cached = await env.CACHE_KV.get(cacheKey, "json");
+  // Cache key is derived from a full SHA-256 of the API key (truncated for
+  // brevity). A collision-resistant hash is required here: the old 32-bit
+  // polynomial hash hit birthday collisions at ~65k keys, which would have
+  // let cache lookups cross-contaminate organizations.
+  const cacheKey = `v2:apikey:${(await sha256Hex(apiKey)).slice(0, 32)}`;
+  // Bundle projects inside the cached value so cache hits resolve in one KV
+  // read instead of two. Both entries share the same 5-minute TTL anyway.
+  type CachedApiKeyContext = Omit<
+    OrganizationContext,
+    "availableProjects" | "allowedProjectIds"
+  > & { projects: ProjectSummary[] };
+
+  const cached = await env.CACHE_KV.get<CachedApiKeyContext>(cacheKey, "json");
   if (cached) {
-    const ctxBase = cached as Omit<
-      OrganizationContext,
-      "availableProjects" | "allowedProjectIds"
-    >;
-    const projects = await fetchOrganizationProjects(ctxBase.organizationId, env);
     return {
       ok: true,
       workspace: {
-        ...ctxBase,
-        availableProjects: projects,
-        allowedProjectIds: projects.map((p) => p.id),
+        ...cached,
+        availableProjects: cached.projects,
+        allowedProjectIds: cached.projects.map((p) => p.id),
       },
     };
   }
@@ -84,11 +89,14 @@ export async function validateApiKey(
     enableMetaMutations: row.enable_meta_mutations === true,
   };
 
-  await env.CACHE_KV.put(cacheKey, JSON.stringify(ctxBase), {
-    expirationTtl: API_KEY_CACHE_TTL,
-  });
-
   const projects = await fetchOrganizationProjects(row.organization_id, env);
+
+  await env.CACHE_KV.put(
+    cacheKey,
+    JSON.stringify({ ...ctxBase, projects }),
+    { expirationTtl: API_KEY_CACHE_TTL },
+  );
+
   return {
     ok: true,
     workspace: {
@@ -158,24 +166,31 @@ async function mcpConnectionLimitExceededMessage(
 ): Promise<string | null> {
   if (maxMcpConnections === -1) return null;
 
-  const connCacheKey = `v2:mcp_conn:${organizationId}:${hashForCache(oauthClientId)}`;
+  const connCacheKey = `v2:mcp_conn:${organizationId}:${(await sha256Hex(oauthClientId)).slice(0, 32)}`;
   let connCount: number | null = null;
   const cachedCount = await env.CACHE_KV.get(connCacheKey);
   if (cachedCount !== null) {
     connCount = parseInt(cachedCount, 10);
   } else {
+    // HEAD + count=exact returns only a Content-Range header — we skip
+    // downloading the whole row set just to call `.length` on it.
     const countResp = await fetch(
       `${env.SUPABASE_URL}/rest/v1/oauth_connections?organization_id=eq.${organizationId}&is_active=eq.true&client_id=neq.${encodeURIComponent(oauthClientId)}&select=id`,
       {
+        method: "HEAD",
         headers: {
           apikey: env.SUPABASE_SERVICE_ROLE_KEY,
           Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          Prefer: "count=exact",
         },
       }
     );
     if (countResp.ok) {
-      const connRows = (await countResp.json()) as unknown[];
-      connCount = connRows.length;
+      const range = countResp.headers.get("content-range");
+      // Format: "0-0/42" — the number after the slash is the exact count.
+      const total = range?.split("/")[1];
+      connCount = total ? Number.parseInt(total, 10) : 0;
+      if (!Number.isFinite(connCount)) connCount = 0;
       await env.CACHE_KV.put(connCacheKey, String(connCount), {
         expirationTtl: MCP_CONN_COUNT_CACHE_TTL,
       });
@@ -312,19 +327,30 @@ export async function verifyOAuthAccessToken(
 
   console.log("[oauth] token OK, organization:", organizationId, "client:", stored.client_id);
 
-  // Resolve organization context from Supabase
-  const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/rpc/get_organization_context`,
-    {
+  const supabaseHeaders = {
+    "Content-Type": "application/json",
+    apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+  } as const;
+
+  // Three independent Supabase lookups. Serializing them added 100-300ms of
+  // idle wait to every /mcp call; they share no data so fan them out.
+  const [response, connResponse, projects] = await Promise.all([
+    fetch(`${env.SUPABASE_URL}/rest/v1/rpc/get_organization_context`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      },
+      headers: supabaseHeaders,
       body: JSON.stringify({ p_organization_id: organizationId }),
-    }
-  );
+    }),
+    fetch(`${env.SUPABASE_URL}/rest/v1/rpc/get_oauth_connection`, {
+      method: "POST",
+      headers: supabaseHeaders,
+      body: JSON.stringify({
+        p_organization_id: organizationId,
+        p_client_id: stored.client_id,
+      }),
+    }),
+    fetchOrganizationProjects(organizationId, env),
+  ]);
 
   if (!response.ok) {
     console.error("[oauth] get_organization_context error:", response.status, await response.text());
@@ -350,8 +376,6 @@ export async function verifyOAuthAccessToken(
     return { ok: false, error: "Internal error loading organization. Please try again." };
   }
 
-  console.log("[oauth] get_organization_context rows:", rows.length, rows[0] ? JSON.stringify(rows[0]) : "empty");
-
   if (!rows || rows.length === 0) {
     return { ok: false, error: "Organization not found or inactive." };
   }
@@ -366,27 +390,8 @@ export async function verifyOAuthAccessToken(
     env
   );
   if (limitMsg) {
-    console.log("[oauth] connection limit exceeded");
     return { ok: false, error: limitMsg };
   }
-
-  // Pull allowed_projects from DB (source of truth); fall back to KV copy
-  // and, for legacy tokens, derive projects from the stored allowed_accounts.
-  const connResponse = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/rpc/get_oauth_connection`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-      body: JSON.stringify({
-        p_organization_id: organizationId,
-        p_client_id: stored.client_id,
-      }),
-    }
-  );
 
   let allowedProjects: string[] = stored.allowed_projects ?? [];
 
@@ -405,17 +410,10 @@ export async function verifyOAuthAccessToken(
       console.error("[oauth] get_oauth_connection JSON parse error:", e);
     }
 
-    console.log(
-      "[oauth] get_oauth_connection rows:",
-      connRows.length,
-      connRows[0] ? JSON.stringify(connRows[0]) : "empty"
-    );
-
     if (connRows && connRows.length > 0) {
       const conn = connRows[0];
 
       if (!conn.is_active) {
-        console.log("[oauth] connection is_active=false, revoked");
         return {
           ok: false,
           error: "MCP connection was revoked. Re-authorize at vibefly.app/dashboard.",
@@ -430,9 +428,7 @@ export async function verifyOAuthAccessToken(
         {
           method: "PATCH",
           headers: {
-            "Content-Type": "application/json",
-            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+            ...supabaseHeaders,
             Prefer: "return=minimal",
           },
           body: JSON.stringify({ last_used_at: new Date().toISOString() }),
@@ -446,11 +442,7 @@ export async function verifyOAuthAccessToken(
       );
       fetch(`${env.SUPABASE_URL}/rest/v1/rpc/upsert_oauth_connection`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        },
+        headers: supabaseHeaders,
         body: JSON.stringify({
           p_organization_id: organizationId,
           p_client_id: stored.client_id,
@@ -461,8 +453,6 @@ export async function verifyOAuthAccessToken(
       }).catch((err) => console.error("[oauth] Auto-register connection failed:", err));
     }
   }
-
-  const projects = await fetchOrganizationProjects(organizationId, env);
 
   // If no allowed_projects on the token or connection, infer from legacy
   // allowed_accounts (tokens minted before 029). Fall back to all projects
@@ -530,18 +520,6 @@ async function resolveProjectsFromLegacyAccounts(
   return [...new Set(rows.map((r) => r.project_id))];
 }
 
-/**
- * Simple hash for cache key (not security-critical, just for KV key).
- */
-function hashForCache(input: string): string {
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    const char = input.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
-  }
-  return hash.toString(36);
-}
 
 // Re-export the projects helper so callers that previously imported from
 // workspace-ad-accounts find it here.

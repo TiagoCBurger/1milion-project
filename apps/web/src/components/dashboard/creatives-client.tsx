@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Upload, ImageIcon, Check, Loader2, Trash2 } from "lucide-react";
+import Image from "next/image";
+import { Upload, ImageIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +30,6 @@ export function CreativesClient({
   initialImages: AdImage[];
   canWrite?: boolean;
 }) {
-  const router = useRouter();
   const [images, setImages] = useState<AdImage[]>(initialImages);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -146,11 +145,16 @@ export function CreativesClient({
                   className="group relative rounded-lg border bg-muted/30 overflow-hidden"
                 >
                   {img.r2_url ? (
-                    <img
-                      src={img.r2_url}
-                      alt={img.file_name}
-                      className="aspect-square w-full object-cover"
-                    />
+                    <div className="relative aspect-square w-full">
+                      <Image
+                        src={img.r2_url}
+                        alt={img.file_name}
+                        fill
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                        className="object-cover"
+                        loading="lazy"
+                      />
+                    </div>
                   ) : (
                     <div className="aspect-square w-full flex items-center justify-center bg-muted">
                       <ImageIcon className="h-8 w-8 text-muted-foreground/40" />

@@ -1,43 +1,13 @@
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { TimeseriesPoint } from "@/lib/analytics/types";
 
 interface Props {
-  siteId: string;
-  range: string;
+  points: TimeseriesPoint[];
+  bucket: "hour" | "day";
 }
 
-export function TimeseriesChart({ siteId, range }: Props) {
-  const [points, setPoints] = useState<TimeseriesPoint[] | null>(null);
-  const [bucket, setBucket] = useState<"hour" | "day">("day");
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setPoints(null);
-    setErr(null);
-    (async () => {
-      try {
-        const res = await fetch(`/api/analytics/${siteId}/timeseries?range=${range}`, {
-          cache: "no-store",
-        });
-        const body = await res.json();
-        if (cancelled) return;
-        if (!res.ok) setErr(body?.error ?? "Erro");
-        else {
-          setPoints(body.points as TimeseriesPoint[]);
-          setBucket(body.bucket);
-        }
-      } catch (e) {
-        if (!cancelled) setErr((e as Error).message);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [siteId, range]);
-
-  const geometry = useMemo(() => buildGeometry(points ?? []), [points]);
+export function TimeseriesChart({ points, bucket }: Props) {
+  const geometry = buildGeometry(points);
 
   return (
     <Card>
@@ -45,12 +15,9 @@ export function TimeseriesChart({ siteId, range }: Props) {
         <CardTitle>Sessões ao longo do tempo</CardTitle>
       </CardHeader>
       <CardContent>
-        {err && <p className="text-sm text-red-600">{err}</p>}
-        {!err && points === null && <div className="h-48 animate-pulse rounded bg-muted" />}
-        {!err && points && points.length === 0 && (
+        {points.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sem dados no período selecionado.</p>
-        )}
-        {!err && points && points.length > 0 && (
+        ) : (
           <div className="space-y-3">
             <svg viewBox="0 0 800 200" className="h-56 w-full" preserveAspectRatio="none">
               <path d={geometry.areaPath} fill="currentColor" className="text-vf-lime/40" />

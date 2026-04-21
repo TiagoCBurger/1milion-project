@@ -1,6 +1,17 @@
 import { META_GRAPH_BASE_URL, META_API_VERSION } from "@vibefly/shared";
 
 const BASE_URL = `${META_GRAPH_BASE_URL}/${META_API_VERSION}`;
+const META_REQUEST_TIMEOUT_MS = 15_000;
+
+function errorFromException(err: unknown): Record<string, unknown> {
+  const message =
+    err instanceof Error && err.name === "AbortError"
+      ? "Meta API request timed out"
+      : err instanceof Error
+        ? err.message
+        : String(err);
+  return { error: { message, type: "NetworkError", code: 0 } };
+}
 
 /**
  * Make an authenticated GET request to Meta Graph API.
@@ -19,11 +30,15 @@ export async function metaApiGet(
       typeof value === "string" ? value : JSON.stringify(value)
     );
   }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), META_REQUEST_TIMEOUT_MS);
   try {
-    const res = await fetch(url.toString());
+    const res = await fetch(url.toString(), { signal: controller.signal });
     return (await res.json()) as Record<string, unknown>;
   } catch (err) {
-    return { error: { message: String(err), type: "NetworkError", code: 0 } };
+    return errorFromException(err);
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -46,15 +61,20 @@ export async function metaApiPost(
       typeof value === "string" ? value : JSON.stringify(value)
     );
   }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), META_REQUEST_TIMEOUT_MS);
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
+      signal: controller.signal,
     });
     return (await res.json()) as Record<string, unknown>;
   } catch (err) {
-    return { error: { message: String(err), type: "NetworkError", code: 0 } };
+    return errorFromException(err);
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

@@ -1,4 +1,5 @@
 import type { Env, ProjectSummary } from "./types";
+import { sha256Hex } from "./oauth/utils";
 
 const PROJECTS_CACHE_TTL = 300;        // 5 min
 const PROJECT_ACCOUNTS_CACHE_TTL = 300; // 5 min
@@ -78,7 +79,9 @@ export async function fetchProjectEnabledMetaAccountIds(
   if (sorted.length === 0) {
     return new Map();
   }
-  const cacheKey = `v2:project_accounts:${sorted.join(",")}`;
+  // Hash the joined UUIDs — Cloudflare KV rejects keys >512 bytes, and a
+  // raw join of ~14+ UUIDs crosses that limit, silently disabling the cache.
+  const cacheKey = `v2:project_accounts:${(await sha256Hex(sorted.join(","))).slice(0, 32)}`;
   const cached = await env.CACHE_KV.get<Record<string, string[]>>(cacheKey, "json");
   if (cached) {
     return new Map(Object.entries(cached));
