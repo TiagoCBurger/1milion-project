@@ -167,7 +167,7 @@ describe("PRICING", () => {
   });
 
   it("values are in centavos (positive integers)", () => {
-    expect(PRICING.pro.monthly).toBe(2_700);
+    expect(PRICING.pro.monthly).toBe(4_700);
     expect(PRICING.max.monthly).toBe(9_700);
   });
 

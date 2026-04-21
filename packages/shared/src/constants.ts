@@ -147,7 +147,7 @@ export const SHA256_REQUIRED = true;
 // ============================================================
 
 export const PRICING = {
-  pro: { monthly: 2_700, label: "Pro" },
+  pro: { monthly: 4_700, label: "Pro" },
   max: { monthly: 9_700, label: "Max" },
 } as const;
 
