@@ -6,6 +6,7 @@ import { registerCampaignsTools } from "./campaigns";
 import { registerAdsetTools } from "./adsets";
 import { registerAdTools } from "./ads";
 import { registerCreativeTools } from "./creatives";
+import { registerCreativeUploadTools } from "./creative-upload";
 import { registerInsightTools } from "./insights";
 import { registerTargetingTools } from "./targeting";
 import { registerLibraryTools } from "./library";
@@ -237,6 +238,7 @@ export function registerAllTools(ctx: ToolContext): void {
   registerAdsetTools(ctx);
   registerAdTools(ctx);
   registerCreativeTools(ctx);
+  registerCreativeUploadTools(ctx);
   registerInsightTools(ctx);
   registerTargetingTools(ctx);
   registerLibraryTools(ctx);

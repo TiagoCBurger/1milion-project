@@ -228,10 +228,13 @@ export function registerCreativeTools(ctx: ToolContext): void {
 
   if (!ctx.enableMetaMutations) return;
 
-  // ── upload_ad_image (PRO+ TIER ONLY) ──────────────────────────────
+  // ── upload_ad_image (LEGACY — prefer request_creative_upload) ─────
+  // Slated for removal 60 days after request_creative_upload ships.
+  // Kept for backwards-compat with hosts that can't compute sha256
+  // client-side. Bytes still pass through the LLM context here.
   server.tool(
     "upload_ad_image",
-    "Upload an image to a Meta ad account from a URL or base64 data. Returns the image hash for use in creatives. Requires Pro tier.",
+    "[LEGACY — use request_creative_upload + finalize_creative_upload for local files] Upload an image to a Meta ad account from a public URL or base64. Pollutes the LLM context with bytes. Requires Pro tier.",
     {
       project_id: z
         .string()

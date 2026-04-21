@@ -6,6 +6,7 @@ import { checkRateLimit } from "./rate-limit";
 import { logUsage } from "./usage";
 import { registerAllTools } from "./tools";
 import { routeOAuth } from "./oauth/router";
+import { runJanitor } from "./janitor";
 import type { Env, OrganizationContext } from "./types";
 
 export { RateLimitDO } from "./rate-limit-do";
@@ -36,6 +37,19 @@ export default {
         }
       );
     }
+  },
+
+  async scheduled(
+    _controller: ScheduledController,
+    env: Env,
+    ctx: ExecutionContext
+  ): Promise<void> {
+    ctx.waitUntil(
+      (async () => {
+        const result = await runJanitor(env);
+        console.log("[janitor]", JSON.stringify(result));
+      })(),
+    );
   },
 };
 

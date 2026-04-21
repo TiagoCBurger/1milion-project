@@ -15,6 +15,8 @@ export interface Env {
   SUPABASE_SERVICE_ROLE_KEY: string;
   R2_PUBLIC_URL: string;
   OAUTH_SIGNING_SECRET: string;
+  /** Shared secret with the web app for MCP-originated upload calls. */
+  MCP_SERVICE_TOKEN?: string;
 
   // Config vars
   MCP_SERVER_URL: string;

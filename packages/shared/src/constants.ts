@@ -60,6 +60,11 @@ export const UPLOAD_LIMITS: Record<
     videos_per_day: number;
     max_image_bytes: number;
     max_video_bytes: number;
+    batch_max_files: number;
+    batch_max_total_bytes: number;
+    concurrent_leases: number;
+    downloads_per_day: number;
+    downloads_per_minute: number;
   }
 > = {
   free: {
@@ -67,26 +72,75 @@ export const UPLOAD_LIMITS: Record<
     videos_per_day: 0,
     max_image_bytes: 0,
     max_video_bytes: 0,
+    batch_max_files: 0,
+    batch_max_total_bytes: 0,
+    concurrent_leases: 0,
+    downloads_per_day: 0,
+    downloads_per_minute: 0,
   },
   pro: {
     images_per_day: 50,
     videos_per_day: 10,
     max_image_bytes: 30 * 1024 * 1024,
     max_video_bytes: 500 * 1024 * 1024,
+    batch_max_files: 20,
+    batch_max_total_bytes: 200 * 1024 * 1024,
+    concurrent_leases: 5,
+    downloads_per_day: 500,
+    downloads_per_minute: 30,
   },
   max: {
     images_per_day: 200,
     videos_per_day: 50,
     max_image_bytes: 30 * 1024 * 1024,
     max_video_bytes: 1024 * 1024 * 1024,
+    batch_max_files: 100,
+    batch_max_total_bytes: 1024 * 1024 * 1024,
+    concurrent_leases: 20,
+    downloads_per_day: 5_000,
+    downloads_per_minute: 60,
   },
   enterprise: {
     images_per_day: 0, // custom per contract
     videos_per_day: 0,
     max_image_bytes: 30 * 1024 * 1024,
     max_video_bytes: 2 * 1024 * 1024 * 1024,
+    batch_max_files: 200,
+    batch_max_total_bytes: 5 * 1024 * 1024 * 1024,
+    concurrent_leases: 50,
+    downloads_per_day: 0, // custom per contract
+    downloads_per_minute: 120,
   },
 };
+
+// ============================================================
+// Allow-listed MIME types for ad creatives
+// Magic-byte detection at upload time must match one of these.
+// SVG is intentionally excluded (script execution risk).
+// ============================================================
+
+export const ALLOWED_IMAGE_MIMES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+
+export const ALLOWED_VIDEO_MIMES = [
+  "video/mp4",
+  "video/quicktime",
+] as const;
+
+export type AllowedImageMime = (typeof ALLOWED_IMAGE_MIMES)[number];
+export type AllowedVideoMime = (typeof ALLOWED_VIDEO_MIMES)[number];
+
+// ============================================================
+// Upload lease config
+// ============================================================
+
+export const UPLOAD_LEASE_TTL_SECONDS = 600; // 10 min — covers slow uploads
+export const PRESIGNED_URL_TTL_SECONDS = 300; // 5 min per slot
+export const DOWNLOAD_URL_TTL_SECONDS = 600;
+export const SHA256_REQUIRED = true;
 
 // ============================================================
 // Pricing (amounts in centavos BRL)

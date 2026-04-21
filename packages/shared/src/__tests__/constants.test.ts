@@ -7,6 +7,12 @@ import {
   API_KEY_PREFIX,
   PRICING,
   UPLOAD_LIMITS,
+  ALLOWED_IMAGE_MIMES,
+  ALLOWED_VIDEO_MIMES,
+  UPLOAD_LEASE_TTL_SECONDS,
+  PRESIGNED_URL_TTL_SECONDS,
+  DOWNLOAD_URL_TTL_SECONDS,
+  SHA256_REQUIRED,
 } from "../constants";
 
 describe("META_API_VERSION", () => {
@@ -101,6 +107,56 @@ describe("UPLOAD_LIMITS", () => {
   it("max tier has higher limits than pro", () => {
     expect(UPLOAD_LIMITS.max.images_per_day).toBeGreaterThan(UPLOAD_LIMITS.pro.images_per_day);
     expect(UPLOAD_LIMITS.max.videos_per_day).toBeGreaterThan(UPLOAD_LIMITS.pro.videos_per_day);
+  });
+
+  it("all tiers expose batch + concurrency + download fields", () => {
+    for (const tier of ["free", "pro", "max", "enterprise"] as const) {
+      const t = UPLOAD_LIMITS[tier];
+      expect(t).toHaveProperty("batch_max_files");
+      expect(t).toHaveProperty("batch_max_total_bytes");
+      expect(t).toHaveProperty("concurrent_leases");
+      expect(t).toHaveProperty("downloads_per_day");
+      expect(t).toHaveProperty("downloads_per_minute");
+    }
+  });
+
+  it("paid tiers allow batch operations; free does not", () => {
+    expect(UPLOAD_LIMITS.free.batch_max_files).toBe(0);
+    expect(UPLOAD_LIMITS.pro.batch_max_files).toBeGreaterThan(0);
+    expect(UPLOAD_LIMITS.max.batch_max_files).toBeGreaterThan(UPLOAD_LIMITS.pro.batch_max_files);
+  });
+
+  it("concurrent_leases scales with tier", () => {
+    expect(UPLOAD_LIMITS.free.concurrent_leases).toBe(0);
+    expect(UPLOAD_LIMITS.max.concurrent_leases).toBeGreaterThan(UPLOAD_LIMITS.pro.concurrent_leases);
+  });
+});
+
+describe("Allowed creative MIME types", () => {
+  it("image allow-list includes only safe raster formats", () => {
+    expect(ALLOWED_IMAGE_MIMES).toEqual(["image/jpeg", "image/png", "image/webp"]);
+    expect(ALLOWED_IMAGE_MIMES).not.toContain("image/svg+xml");
+    expect(ALLOWED_IMAGE_MIMES).not.toContain("image/gif");
+  });
+
+  it("video allow-list includes only common containers", () => {
+    expect(ALLOWED_VIDEO_MIMES).toContain("video/mp4");
+    expect(ALLOWED_VIDEO_MIMES).toContain("video/quicktime");
+  });
+});
+
+describe("Upload lease constants", () => {
+  it("presigned URL expires before lease (so URL never outlives the slot)", () => {
+    expect(PRESIGNED_URL_TTL_SECONDS).toBeLessThanOrEqual(UPLOAD_LEASE_TTL_SECONDS);
+  });
+
+  it("download URL has bounded lifetime", () => {
+    expect(DOWNLOAD_URL_TTL_SECONDS).toBeGreaterThan(0);
+    expect(DOWNLOAD_URL_TTL_SECONDS).toBeLessThanOrEqual(3600);
+  });
+
+  it("SHA256 is required by default", () => {
+    expect(SHA256_REQUIRED).toBe(true);
   });
 });
 
