@@ -62,12 +62,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: organizationId } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await authorize(organizationId);
   if (!user) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+    return Response.json({ error: "Not authorized" }, { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);
