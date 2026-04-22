@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { Switch } from "@/components/ui/switch";
 
 interface Props {
-  workspaceId: string;
+  organizationId: string;
   accountId: string;
   enabled: boolean;
   onApplied?: (isEnabled: boolean) => void;
 }
 
-export function AdAccountToggle({ workspaceId, accountId, enabled, onApplied }: Props) {
+export function AdAccountToggle({ organizationId, accountId, enabled, onApplied }: Props) {
   const [isEnabled, setIsEnabled] = useState(enabled);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -25,7 +25,7 @@ export function AdAccountToggle({ workspaceId, accountId, enabled, onApplied }: 
     const next = !isEnabled;
     try {
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/ad-accounts/${accountId}/toggle`,
+        `/api/organizations/${organizationId}/ad-accounts/${accountId}/toggle`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },

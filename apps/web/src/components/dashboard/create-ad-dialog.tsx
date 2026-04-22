@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Plus, ImageIcon, Check, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,14 +32,14 @@ interface AdImage {
 }
 
 export function CreateAdDialog({
-  workspaceId,
+  organizationId,
   accountId,
   adSets,
   creatives,
   pages,
   images,
 }: {
-  workspaceId: string;
+  organizationId: string;
   accountId: string;
   adSets: { id: string; name: string }[];
   creatives: { id: string; name: string; thumbnail_url?: string }[];
@@ -93,7 +94,7 @@ export function CreateAdDialog({
       formData.append("account_id", accountId);
       formData.append("name", file.name);
 
-      const res = await fetch(`/api/workspaces/${workspaceId}/meta/images`, {
+      const res = await fetch(`/api/organizations/${organizationId}/meta/images`, {
         method: "POST",
         body: formData,
       });
@@ -145,7 +146,7 @@ export function CreateAdDialog({
         adBody.call_to_action_type = ctaType;
       }
 
-      const res = await fetch(`/api/workspaces/${workspaceId}/meta/ads`, {
+      const res = await fetch(`/api/organizations/${organizationId}/meta/ads`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(adBody),
@@ -278,7 +279,15 @@ export function CreateAdDialog({
                   {/* Selected image preview */}
                   {imagePreview && (
                     <div className="flex items-center gap-3 rounded-md border bg-muted/30 p-2">
-                      <img src={imagePreview} alt="Selected" className="h-16 w-16 rounded-md object-cover" />
+                      {/* Next/Image requires a width/height or fill parent; this is a fixed-size preview that already constrains itself via Tailwind. Using the sanitizer-served R2 URL so eager load is cheap. */}
+                      <Image
+                        src={imagePreview}
+                        alt="Selected"
+                        width={64}
+                        height={64}
+                        className="h-16 w-16 rounded-md object-cover"
+                        unoptimized
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium truncate">Image selected</p>
                         <p className="text-[10px] text-muted-foreground font-mono">{imageHash.slice(0, 16)}...</p>
@@ -313,7 +322,15 @@ export function CreateAdDialog({
                               title={img.file_name}
                             >
                               {img.r2_url ? (
-                                <img src={img.r2_url} alt={img.file_name} className="aspect-square w-full object-cover" />
+                                <div className="relative aspect-square w-full">
+                                  <Image
+                                    src={img.r2_url}
+                                    alt={img.file_name}
+                                    fill
+                                    sizes="64px"
+                                    className="object-cover"
+                                  />
+                                </div>
                               ) : (
                                 <div className="aspect-square w-full flex items-center justify-center bg-muted">
                                   <ImageIcon className="h-4 w-4 text-muted-foreground/40" />

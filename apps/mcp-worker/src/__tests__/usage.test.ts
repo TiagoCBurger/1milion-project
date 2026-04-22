@@ -21,7 +21,7 @@ describe("logUsage", () => {
 
     await logUsage(
       {
-        workspaceId: "ws-1",
+        organizationId: "org-1",
         apiKeyId: "key-1",
         toolName: "get_campaigns",
         method: "POST",
@@ -41,7 +41,7 @@ describe("logUsage", () => {
     expect(opts.headers.Prefer).toBe("return=minimal");
 
     const body = JSON.parse(opts.body);
-    expect(body.workspace_id).toBe("ws-1");
+    expect(body.organization_id).toBe("org-1");
     expect(body.api_key_id).toBe("key-1");
     expect(body.tool_name).toBe("get_campaigns");
     expect(body.response_time_ms).toBe(150);
@@ -54,7 +54,7 @@ describe("logUsage", () => {
 
     await logUsage(
       {
-        workspaceId: "ws-1",
+        organizationId: "org-1",
         apiKeyId: "key-1",
         toolName: "create_campaign",
         method: "POST",
@@ -74,11 +74,10 @@ describe("logUsage", () => {
   it("does not throw on fetch failure (fire-and-forget)", async () => {
     (globalThis.fetch as any).mockRejectedValue(new Error("Network error"));
 
-    // Should not throw
     await expect(
       logUsage(
         {
-          workspaceId: "ws-1",
+          organizationId: "org-1",
           apiKeyId: "key-1",
           toolName: "test",
           method: "POST",
@@ -97,7 +96,7 @@ describe("logUsage", () => {
     await expect(
       logUsage(
         {
-          workspaceId: "ws-1",
+          organizationId: "org-1",
           apiKeyId: "key-1",
           toolName: "test",
           method: "POST",

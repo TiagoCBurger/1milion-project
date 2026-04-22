@@ -193,12 +193,18 @@ describe("buildServer", () => {
       token: "test_token",
       tier: "pro",
       env: createMockEnv(),
-      workspaceId: "test-workspace",
+      organizationId: "test-organization",
       enableMetaMutations: true,
+      availableProjects: [
+        { id: "proj-default", slug: "default", name: "Default", isDefault: true },
+      ],
+      allowedProjectIds: ["proj-default"],
     });
 
-    // Should have all 35 tools registered
+    // Should have all tools registered (including new list_projects / get_project)
     expect(toolNames.length).toBeGreaterThanOrEqual(30);
+    expect(toolNames).toContain("list_projects");
+    expect(toolNames).toContain("get_project");
     expect(toolNames).toContain("get_ad_accounts");
     expect(toolNames).toContain("get_campaigns");
     expect(toolNames).toContain("create_campaign");

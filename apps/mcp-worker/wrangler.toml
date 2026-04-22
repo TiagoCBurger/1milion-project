@@ -13,7 +13,10 @@ invocation_logs = true
 # Secrets (set via `wrangler secret bulk` — NOT in this file):
 # SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, FACEBOOK_APP_ID,
 # FACEBOOK_APP_SECRET, OAUTH_SIGNING_SECRET, R2_ACCESS_KEY_ID,
-# R2_SECRET_ACCESS_KEY, R2_ACCOUNT_ID, R2_BUCKET_NAME
+# R2_SECRET_ACCESS_KEY, R2_ACCOUNT_ID, R2_BUCKET_NAME,
+# MCP_SERVICE_TOKEN (shared with the web app for upload forwards;
+# generate with `openssl rand -hex 32` and set the SAME value on
+# both the web app's env and the worker's secrets).
 
 [vars]
 MCP_SERVER_URL = "https://mcp-worker.ticburger.workers.dev"
@@ -42,3 +45,8 @@ new_sqlite_classes = ["RateLimitDO"]
 [[r2_buckets]]
 binding = "CREATIVES_R2"
 bucket_name = "vibefly-creatives"
+
+# Cron triggers
+# Janitor sweeps stale upload leases + orphan R2 keys every 10 minutes.
+[triggers]
+crons = ["*/10 * * * *"]

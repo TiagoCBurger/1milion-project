@@ -27,15 +27,15 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { workspace_id, tier, cycle } = body as {
-    workspace_id?: string;
+  const { organization_id, tier, cycle } = body as {
+    organization_id?: string;
     tier?: string;
     cycle?: string;
   };
 
-  if (!workspace_id || !tier) {
+  if (!organization_id || !tier) {
     return Response.json(
-      { error: "Missing required fields: workspace_id, tier" },
+      { error: "Missing required fields: organization_id, tier" },
       { status: 400 }
     );
   }
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     .from("memberships")
     .select("role")
     .eq("user_id", user.id)
-    .eq("workspace_id", workspace_id)
+    .eq("organization_id", organization_id)
     .in("role", ["owner", "admin"])
     .single();
 
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
   const { data: subscription } = await admin
     .from("subscriptions")
     .select("id, tier, billing_cycle, status")
-    .eq("workspace_id", workspace_id)
+    .eq("organization_id", organization_id)
     .single();
 
   if (!subscription) {
@@ -131,17 +131,17 @@ export async function DELETE(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const workspaceId = searchParams.get("workspace_id");
+  const organizationId = searchParams.get("organization_id");
 
-  if (!workspaceId) {
-    return Response.json({ error: "Missing workspace_id" }, { status: 400 });
+  if (!organizationId) {
+    return Response.json({ error: "Missing organization_id" }, { status: 400 });
   }
 
   const { data: membership } = await supabase
     .from("memberships")
     .select("role")
     .eq("user_id", user.id)
-    .eq("workspace_id", workspaceId)
+    .eq("organization_id", organizationId)
     .in("role", ["owner", "admin"])
     .single();
 
@@ -158,7 +158,7 @@ export async function DELETE(request: Request) {
       pending_billing_cycle: null,
       updated_at: new Date().toISOString(),
     })
-    .eq("workspace_id", workspaceId);
+    .eq("organization_id", organizationId);
 
   return Response.json({ success: true });
 }

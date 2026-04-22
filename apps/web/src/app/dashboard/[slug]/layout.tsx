@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
-import { fetchSidebarWorkspaces } from "@/lib/dashboard-workspaces";
+import { fetchSidebarOrganizations } from "@/lib/organizations";
+import { getAuthedUser, getSupabase } from "@/lib/auth-context";
 
 export default async function WorkspaceLayout({
   children,
@@ -11,12 +11,11 @@ export default async function WorkspaceLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
+  const user = await getAuthedUser();
   if (!user) redirect("/login");
 
-  const workspaces = await fetchSidebarWorkspaces(supabase, user.id);
+  const supabase = await getSupabase();
+  const workspaces = await fetchSidebarOrganizations(supabase, user.id);
 
   const currentWorkspace = workspaces.find((ws) => ws.slug === slug);
   if (!currentWorkspace) notFound();

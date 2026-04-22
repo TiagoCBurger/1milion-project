@@ -23,13 +23,41 @@ export async function handleAuthorize(
   const state = url.searchParams.get("state");
   const scope = url.searchParams.get("scope");
 
-  // Validate required params
-  if (!clientId || !redirectUri || !codeChallenge) {
+  // RFC 6749 §3.1.2.4: the authorization server MUST NOT redirect to an
+  // unvalidated redirect_uri. Resolve + verify the client and redirect_uri
+  // up front, then every error that follows can safely use errorRedirect.
+  if (!clientId || !redirectUri) {
+    return new Response(
+      JSON.stringify({
+        error: "invalid_request",
+        error_description: "Missing required parameters: client_id, redirect_uri",
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  const client = await getClient(clientId, env.OAUTH_KV);
+  if (!client) {
+    return new Response(
+      JSON.stringify({
+        error: "invalid_request",
+        error_description: "Unknown client_id",
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  if (!client.redirect_uris.includes(redirectUri)) {
+    return new Response("Invalid redirect_uri", { status: 400 });
+  }
+
+  // From here on, redirectUri is known-good — safe to redirect error responses.
+  if (!codeChallenge) {
     return errorRedirect(
       redirectUri,
       state,
       "invalid_request",
-      "Missing required parameters: client_id, redirect_uri, code_challenge"
+      "Missing required parameter: code_challenge",
     );
   }
 
@@ -49,23 +77,6 @@ export async function handleAuthorize(
       "invalid_request",
       "Only code_challenge_method=S256 is supported"
     );
-  }
-
-  // Validate client
-  const client = await getClient(clientId, env.OAUTH_KV);
-  if (!client) {
-    return errorRedirect(
-      redirectUri,
-      state,
-      "invalid_request",
-      "Unknown client_id"
-    );
-  }
-
-  // Validate redirect_uri matches registered URIs
-  if (!client.redirect_uris.includes(redirectUri)) {
-    // Don't redirect to an unregistered URI — return error directly
-    return new Response("Invalid redirect_uri", { status: 400 });
   }
 
   // Store auth request in KV
@@ -168,11 +179,12 @@ export async function handleOAuthCallback(
 
   const storedCode: StoredAuthCode = {
     client_id: authRequest.client_id,
-    workspace_id: payload.workspace_id,
+    organization_id: payload.organization_id,
     user_id: payload.user_id,
     code_challenge: authRequest.code_challenge,
     redirect_uri: authRequest.redirect_uri,
     scope: authRequest.scope,
+    allowed_projects: payload.allowed_projects,
     allowed_accounts: payload.allowed_accounts,
     created_at: Math.floor(Date.now() / 1000),
   };

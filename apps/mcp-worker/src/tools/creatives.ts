@@ -4,7 +4,12 @@ import { uploadToR2, estimateBase64Size } from "../r2";
 import { checkUploadLimit } from "../rate-limit";
 import { UPLOAD_LIMITS } from "@vibefly/shared";
 import type { ToolContext } from "./index";
-import { isAccountAllowed, accountBlockedResult } from "./index";
+import {
+  isAccountAllowed,
+  accountBlockedResult,
+  getProjectAllowedAccounts,
+  scopeCheckByMetaId,
+} from "./index";
 import type { SubscriptionTier } from "@vibefly/shared";
 
 const CREATIVE_LIST_FIELDS =
@@ -17,18 +22,25 @@ const VIDEO_FIELDS =
   "source,title,description,length,picture,thumbnails,created_time";
 
 export function registerCreativeTools(ctx: ToolContext): void {
-  const { server, token, tier, env, workspaceId, allowedAccounts } = ctx;
+  const { server, token, tier, env, organizationId } = ctx;
 
   // ── get_ad_creatives ────────────────────────────────────────────────
   server.tool(
     "get_ad_creatives",
     "List all creatives associated with a Meta ad account or ad.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       ad_id: z
         .string()
         .describe("The ad ID to retrieve creatives for."),
     },
     async (args) => {
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.ad_id);
+      if (!check.ok) return check.result;
+
       const data = await metaApiGet(`${args.ad_id}/adcreatives`, token, {
         fields: CREATIVE_LIST_FIELDS,
       });
@@ -46,11 +58,18 @@ export function registerCreativeTools(ctx: ToolContext): void {
     "get_creative_details",
     "Get detailed information about a specific ad creative including asset feed spec and object story spec.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       creative_id: z
         .string()
         .describe("The creative ID to retrieve details for."),
     },
     async (args) => {
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.creative_id);
+      if (!check.ok) return check.result;
+
       const data = await metaApiGet(args.creative_id, token, {
         fields: CREATIVE_DETAIL_FIELDS,
       });
@@ -68,11 +87,18 @@ export function registerCreativeTools(ctx: ToolContext): void {
     "get_ad_image",
     "Get image info and URLs for a Meta ad. Returns thumbnail and image URLs.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       ad_id: z
         .string()
         .describe("The ad ID to retrieve image information for."),
     },
     async (args) => {
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.ad_id);
+      if (!check.ok) return check.result;
+
       const data = await metaApiGet(args.ad_id, token, {
         fields: "creative{id,thumbnail_url,image_url,image_hash},account_id",
       });
@@ -119,6 +145,10 @@ export function registerCreativeTools(ctx: ToolContext): void {
     "get_ad_video",
     "Get video info, source URL, and thumbnail for a Meta ad video. Provide either ad_id or video_id.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       ad_id: z
         .string()
         .optional()
@@ -137,6 +167,12 @@ export function registerCreativeTools(ctx: ToolContext): void {
           true,
         );
       }
+
+      // Scope-check the supplied id — for video_id Meta's /video endpoint
+      // exposes account_id only on advideos, so fall back to checking the ad.
+      const scopeTargetId = args.ad_id ?? args.video_id!;
+      const check = await scopeCheckByMetaId(ctx, args.project_id, scopeTargetId);
+      if (!check.ok) return check.result;
 
       if (!resolvedVideoId && args.ad_id) {
         const creativeData = await metaApiGet(
@@ -224,11 +260,18 @@ export function registerCreativeTools(ctx: ToolContext): void {
 
   if (!ctx.enableMetaMutations) return;
 
-  // ── upload_ad_image (PRO+ TIER ONLY) ──────────────────────────────
+  // ── upload_ad_image (LEGACY — prefer request_creative_upload) ─────
+  // Slated for removal 60 days after request_creative_upload ships.
+  // Kept for backwards-compat with hosts that can't compute sha256
+  // client-side. Bytes still pass through the LLM context here.
   server.tool(
     "upload_ad_image",
-    "Upload an image to a Meta ad account from a URL or base64 data. Returns the image hash for use in creatives. Requires Pro tier.",
+    "[LEGACY — use request_creative_upload + finalize_creative_upload for local files] Upload an image to a Meta ad account from a public URL or base64. Pollutes the LLM context with bytes. Requires Pro tier.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe("The ad account ID (with or without act_ prefix)."),
@@ -247,6 +290,9 @@ export function registerCreativeTools(ctx: ToolContext): void {
         .describe("Optional name for the uploaded image."),
     },
     async (args) => {
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(args.account_id, allowedAccounts)) {
         return accountBlockedResult(args.account_id);
       }
@@ -266,7 +312,7 @@ export function registerCreativeTools(ctx: ToolContext): void {
       }
 
       const limits = UPLOAD_LIMITS[tier as SubscriptionTier];
-      const uploadCheck = await checkUploadLimit(workspaceId, "images", limits.images_per_day, env);
+      const uploadCheck = await checkUploadLimit(organizationId, "images", limits.images_per_day, env);
       if (!uploadCheck.allowed) {
         return textResult(
           { error: `Daily image upload limit reached (${limits.images_per_day}/day). Upgrade your plan for more uploads.` },
@@ -290,7 +336,7 @@ export function registerCreativeTools(ctx: ToolContext): void {
 
         const r2Result = await uploadToR2(
           env,
-          workspaceId,
+          organizationId,
           "images",
           args.name ?? "upload",
           args.image_base64,
@@ -333,6 +379,10 @@ export function registerCreativeTools(ctx: ToolContext): void {
     "upload_ad_video",
     "Upload a video to a Meta ad account from a public URL. Returns video_id (processing is async on Meta's side — use get_video_status to poll). Requires Pro tier.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe("The ad account ID (with or without act_ prefix)."),
@@ -350,6 +400,9 @@ export function registerCreativeTools(ctx: ToolContext): void {
         .describe("Description for the video."),
     },
     async (args) => {
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(args.account_id, allowedAccounts)) {
         return accountBlockedResult(args.account_id);
       }
@@ -362,7 +415,7 @@ export function registerCreativeTools(ctx: ToolContext): void {
       }
 
       const limits = UPLOAD_LIMITS[tier as SubscriptionTier];
-      const uploadCheck = await checkUploadLimit(workspaceId, "videos", limits.videos_per_day, env);
+      const uploadCheck = await checkUploadLimit(organizationId, "videos", limits.videos_per_day, env);
       if (!uploadCheck.allowed) {
         return textResult(
           { error: `Daily video upload limit reached (${limits.videos_per_day}/day). Upgrade your plan for more uploads.` },
@@ -394,6 +447,10 @@ export function registerCreativeTools(ctx: ToolContext): void {
     "create_ad_creative",
     "Create a new ad creative with image or video. Requires Pro tier.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe("The ad account ID (with or without act_ prefix)."),
@@ -442,6 +499,9 @@ export function registerCreativeTools(ctx: ToolContext): void {
         .describe("Instagram account ID for Instagram ad placement."),
     },
     async (args) => {
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(args.account_id, allowedAccounts)) {
         return accountBlockedResult(args.account_id);
       }
@@ -533,6 +593,10 @@ export function registerCreativeTools(ctx: ToolContext): void {
     "update_ad_creative",
     "Update an ad creative. Note: Meta API only reliably allows updating the name. To change content, create a new creative.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       creative_id: z
         .string()
         .describe("The creative ID to update."),
@@ -548,6 +612,9 @@ export function registerCreativeTools(ctx: ToolContext): void {
           true,
         );
       }
+
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.creative_id);
+      if (!check.ok) return check.result;
 
       const params: Record<string, unknown> = {};
       if (args.name) params.name = args.name;

@@ -20,7 +20,7 @@ export default function BillingSuccessPage() {
 
     async function poll() {
       const { data: workspace } = await supabase
-        .from("workspaces")
+        .from("organizations")
         .select("id")
         .eq("slug", slug)
         .single();
@@ -30,7 +30,7 @@ export default function BillingSuccessPage() {
         return;
       }
 
-      const res = await fetch(`/api/billing/status?workspace_id=${workspace.id}`);
+      const res = await fetch(`/api/billing/status?organization_id=${workspace.id}`);
       if (res.ok) {
         const data = await res.json();
         if (data.subscription?.status === "active" && data.subscription?.tier !== "free") {

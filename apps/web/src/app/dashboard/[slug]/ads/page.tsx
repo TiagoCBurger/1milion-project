@@ -1,8 +1,8 @@
 import { redirect, notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getDecryptedToken, fetchAds, fetchAdSets, fetchCreatives, fetchPages } from "@/lib/meta-api";
-import { getEnabledAdAccounts } from "@/lib/workspace-data";
+import { getEnabledAdAccounts } from "@/lib/organization-data";
+import { getAuthedUser, getSupabase } from "@/lib/auth-context";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
@@ -34,25 +34,27 @@ export default async function AdsPage({
 }) {
   const { slug } = await params;
   const { account_id } = await searchParams;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthedUser();
   if (!user) redirect("/login");
 
+  const supabase = await getSupabase();
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id, enable_meta_mutations")
     .eq("slug", slug)
     .single();
   if (!workspace) notFound();
 
-  const token = await getDecryptedToken(workspace.id);
-  const accounts = await getEnabledAdAccounts(workspace.id);
+  const [token, accounts] = await Promise.all([
+    getDecryptedToken(workspace.id),
+    getEnabledAdAccounts(workspace.id),
+  ]);
 
   if (!token || accounts.length === 0) {
     return (
       <>
         <PageHeader breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Anúncios" },
         ]} />
@@ -75,10 +77,32 @@ export default async function AdsPage({
   }
 
   const selectedAccount = account_id ?? accounts[0].meta_account_id;
-  const { data: ads, error } = await fetchAds(token, selectedAccount);
-  const { data: adsets } = await fetchAdSets(token, selectedAccount);
-  const { data: creatives } = await fetchCreatives(token, selectedAccount);
-  const { data: pages } = await fetchPages(token);
+
+  // All five lookups (4 Meta Graph + 1 Supabase ad_images) are independent,
+  // so fan them out. Previously the page serialized them, turning every
+  // navigation into a ~2-4s wait even on warm caches.
+  const admin = createAdminClient();
+  const [
+    { data: ads, error },
+    { data: adsets },
+    { data: creatives },
+    { data: pages },
+    imagesResult,
+  ] = await Promise.all([
+    fetchAds(token, selectedAccount),
+    fetchAdSets(token, selectedAccount),
+    fetchCreatives(token, selectedAccount),
+    fetchPages(token),
+    admin
+      .from("ad_images")
+      .select("id, image_hash, r2_url, file_name")
+      .eq("organization_id", workspace.id)
+      .eq("account_id", selectedAccount)
+      .order("created_at", { ascending: false })
+      .limit(50),
+  ]);
+  const images = imagesResult.data;
+
   const adsetOptions = adsets.map((a) => ({
     id: String(a["id"] ?? ""),
     name: String(a["name"] ?? ""),
@@ -94,20 +118,10 @@ export default async function AdsPage({
     name: String(p["name"] ?? ""),
   }));
 
-  // Fetch persisted images
-  const admin = createAdminClient();
-  const { data: images } = await admin
-    .from("ad_images")
-    .select("id, image_hash, r2_url, file_name")
-    .eq("workspace_id", workspace.id)
-    .eq("account_id", selectedAccount)
-    .order("created_at", { ascending: false })
-    .limit(50);
-
   return (
     <>
       <PageHeader breadcrumbs={[
-        { label: "Espaços de trabalho", href: "/dashboard" },
+        { label: "Organizações", href: "/dashboard" },
         { label: slug, href: `/dashboard/${slug}` },
         { label: "Anúncios" },
       ]} />
@@ -122,7 +136,7 @@ export default async function AdsPage({
           </div>
           <div className="flex items-center gap-2">
             {workspace.enable_meta_mutations && (
-              <CreateAdDialog workspaceId={workspace.id} accountId={selectedAccount} adSets={adsetOptions} creatives={creativeOptions} pages={pageOptions} images={images ?? []} />
+              <CreateAdDialog organizationId={workspace.id} accountId={selectedAccount} adSets={adsetOptions} creatives={creativeOptions} pages={pageOptions} images={images ?? []} />
             )}
             <AccountSelector accounts={accounts} current={selectedAccount} />
           </div>

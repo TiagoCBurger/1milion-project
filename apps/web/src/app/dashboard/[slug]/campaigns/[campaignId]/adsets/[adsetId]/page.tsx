@@ -1,13 +1,13 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import {
   getDecryptedToken,
   fetchAds,
   metaApiGet,
   metaUserFacingError,
 } from "@/lib/meta-api";
-import { getEnabledAdAccounts } from "@/lib/workspace-data";
+import { getEnabledAdAccounts } from "@/lib/organization-data";
+import { getAuthedUser, getSupabase } from "@/lib/auth-context";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
@@ -48,28 +48,28 @@ export default async function AdSetDetailPage({
 }) {
   const { slug, campaignId, adsetId } = await params;
   const { account_id } = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthedUser();
   if (!user) redirect("/login");
 
+  const supabase = await getSupabase();
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id")
     .eq("slug", slug)
     .single();
   if (!workspace) notFound();
 
-  const token = await getDecryptedToken(workspace.id);
-  const accounts = await getEnabledAdAccounts(workspace.id);
+  const [token, accounts] = await Promise.all([
+    getDecryptedToken(workspace.id),
+    getEnabledAdAccounts(workspace.id),
+  ]);
 
   if (!token || accounts.length === 0) {
     return (
       <>
         <PageHeader
           breadcrumbs={[
-            { label: "Espaços de trabalho", href: "/dashboard" },
+            { label: "Organizações", href: "/dashboard" },
             { label: slug, href: `/dashboard/${slug}` },
             { label: "Campanhas", href: `/dashboard/${slug}/campaigns` },
             { label: campaignId, href: `/dashboard/${slug}/campaigns/${campaignId}` },
@@ -84,7 +84,7 @@ export default async function AdSetDetailPage({
             description={
               !token
                 ? "Conecte a Meta para ver anúncios deste conjunto."
-                : "Ative pelo menos uma conta de anúncios no painel do espaço."
+                : "Ative pelo menos uma conta de anúncios no painel da organização."
             }
           >
             <Button asChild>
@@ -101,6 +101,9 @@ export default async function AdSetDetailPage({
   const selectedAccount = account_id ?? accounts[0].meta_account_id;
   const q = `account_id=${encodeURIComponent(selectedAccount)}`;
 
+  // Adset detail + its campaign parent + ad list are independent. First we
+  // must resolve the adset to learn the campaign ID, so the adset fetch stays
+  // sequential; the other two run in parallel once that's known.
   const adsetJson = await metaApiGet(adsetId, token, { fields: adsetFields });
   const adsetErr = metaUserFacingError(adsetJson);
   if (adsetErr || adsetJson["id"] == null) {
@@ -108,7 +111,10 @@ export default async function AdSetDetailPage({
   }
 
   const graphCampaignId = String(adsetJson["campaign_id"] ?? campaignId);
-  const campaignJson = await metaApiGet(graphCampaignId, token, { fields: campaignFields });
+  const [campaignJson, adsRes] = await Promise.all([
+    metaApiGet(graphCampaignId, token, { fields: campaignFields }),
+    fetchAds(token, selectedAccount, { adsetId, limit: 100 }),
+  ]);
   const campaignErr = metaUserFacingError(campaignJson);
   const campaignName =
     !campaignErr && campaignJson["id"] != null
@@ -117,17 +123,13 @@ export default async function AdSetDetailPage({
 
   const adsetName = String(adsetJson["name"] ?? adsetId);
   const adsetStatus = String(adsetJson["status"] ?? "—");
-
-  const { data: ads, error } = await fetchAds(token, selectedAccount, {
-    adsetId,
-    limit: 100,
-  });
+  const { data: ads, error } = adsRes;
 
   return (
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Campanhas", href: `/dashboard/${slug}/campaigns` },
           {

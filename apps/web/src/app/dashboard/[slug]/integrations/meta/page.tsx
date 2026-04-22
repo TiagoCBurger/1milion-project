@@ -17,7 +17,7 @@ export default function MetaIntegrationPage() {
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [organizationId, setWorkspaceId] = useState<string | null>(null);
   const [metaConnected, setMetaConnected] = useState(false);
   const [canManageMeta, setCanManageMeta] = useState(false);
   const [connectionLoaded, setConnectionLoaded] = useState(false);
@@ -46,7 +46,7 @@ export default function MetaIntegrationPage() {
         data: { user },
       } = await supabase.auth.getUser();
       const { data: ws } = await supabase
-        .from("workspaces")
+        .from("organizations")
         .select("id")
         .eq("slug", slug)
         .maybeSingle();
@@ -63,7 +63,7 @@ export default function MetaIntegrationPage() {
           .from("memberships")
           .select("role")
           .eq("user_id", user.id)
-          .eq("workspace_id", ws.id)
+          .eq("organization_id", ws.id)
           .maybeSingle();
         setCanManageMeta(membership?.role === "owner" || membership?.role === "admin");
       } else {
@@ -72,7 +72,7 @@ export default function MetaIntegrationPage() {
       const { data: metaTok } = await supabase
         .from("meta_tokens")
         .select("is_valid")
-        .eq("workspace_id", ws.id)
+        .eq("organization_id", ws.id)
         .maybeSingle();
       setMetaConnected(metaTok?.is_valid === true);
       setConnectionLoaded(true);
@@ -90,13 +90,13 @@ export default function MetaIntegrationPage() {
 
   async function handleManualConnect(e: React.FormEvent) {
     e.preventDefault();
-    if (!workspaceId) return;
+    if (!organizationId) return;
     setLoading(true);
     setError("");
     setManualSuccess(null);
 
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/connect`, {
+      const res = await fetch(`/api/organizations/${organizationId}/connect`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
@@ -116,15 +116,15 @@ export default function MetaIntegrationPage() {
   }
 
   function handleFacebookConnect() {
-    if (!workspaceId) return;
-    window.location.href = `/api/auth/facebook?workspace_id=${workspaceId}&slug=${slug}`;
+    if (!organizationId) return;
+    window.location.href = `/api/auth/facebook?organization_id=${organizationId}&slug=${slug}`;
   }
 
   async function handleDisconnect() {
-    if (!workspaceId || !canManageMeta) return;
+    if (!organizationId || !canManageMeta) return;
     if (
       !window.confirm(
-        "Desconectar a conta Facebook deste espaço? Será necessário conectar de novo para usar dados de anúncios."
+        "Desconectar a conta Facebook desta organização? Será necessário conectar de novo para usar dados de anúncios."
       )
     ) {
       return;
@@ -132,7 +132,7 @@ export default function MetaIntegrationPage() {
     setDisconnecting(true);
     setError("");
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/disconnect`, { method: "POST" });
+      const res = await fetch(`/api/organizations/${organizationId}/disconnect`, { method: "POST" });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         setError(data.error || "Não foi possível desconectar");
@@ -165,7 +165,7 @@ export default function MetaIntegrationPage() {
       <>
         <PageHeader
           breadcrumbs={[
-            { label: "Espaços de trabalho", href: "/dashboard" },
+            { label: "Organizações", href: "/dashboard" },
             { label: slug, href: `/dashboard/${slug}` },
             { label: "Integrações", href: `/dashboard/${slug}/integrations` },
             { label: "Meta Ads" },
@@ -184,7 +184,7 @@ export default function MetaIntegrationPage() {
       <>
         <PageHeader
           breadcrumbs={[
-            { label: "Espaços de trabalho", href: "/dashboard" },
+            { label: "Organizações", href: "/dashboard" },
             { label: slug, href: `/dashboard/${slug}` },
             { label: "Integrações", href: `/dashboard/${slug}/integrations` },
             { label: "Meta Ads" },
@@ -228,14 +228,14 @@ export default function MetaIntegrationPage() {
                   </code>
                 </div>
                 <Button onClick={() => router.push(`/dashboard/${slug}`)} className="mt-4 w-full">
-                  Ir para o espaço
+                  Ir para a organização
                 </Button>
               </CardContent>
             )}
             {!successData.api_key && (
               <CardContent>
                 <Button onClick={() => router.push(`/dashboard/${slug}`)} className="w-full">
-                  Ir para o espaço
+                  Ir para a organização
                 </Button>
               </CardContent>
             )}
@@ -264,7 +264,7 @@ export default function MetaIntegrationPage() {
       <>
         <PageHeader
           breadcrumbs={[
-            { label: "Espaços de trabalho", href: "/dashboard" },
+            { label: "Organizações", href: "/dashboard" },
             { label: slug, href: `/dashboard/${slug}` },
             { label: "Integrações", href: `/dashboard/${slug}/integrations` },
             { label: "Meta Ads" },
@@ -274,7 +274,7 @@ export default function MetaIntegrationPage() {
         <div className="mx-auto max-w-xl p-6">
           <h1 className="mb-1 text-2xl font-semibold tracking-tight">Conta Facebook conectada</h1>
           <p className="mb-6 text-muted-foreground">
-            Este espaço está vinculado à Meta. Você pode desconectar para revogar o acesso neste
+            Esta organização está vinculado à Meta. Você pode desconectar para revogar o acesso neste
             produto ou trocar de conta.
           </p>
           {(oauthError || error) && (
@@ -314,9 +314,9 @@ export default function MetaIntegrationPage() {
               )}
             </CardContent>
           </Card>
-          {workspaceId ? (
+          {organizationId ? (
             <MetaWorkspaceAdAccounts
-              workspaceId={workspaceId}
+              organizationId={organizationId}
               slug={slug}
               canManage={canManageMeta}
             />
@@ -330,7 +330,7 @@ export default function MetaIntegrationPage() {
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Integrações", href: `/dashboard/${slug}/integrations` },
           { label: "Meta Ads" },
@@ -351,7 +351,7 @@ export default function MetaIntegrationPage() {
 
         <Button
           onClick={handleFacebookConnect}
-          disabled={!workspaceId}
+          disabled={!organizationId}
           size="lg"
           className="h-12 w-full text-base"
           style={{ backgroundColor: "#1877F2" }}
@@ -404,7 +404,7 @@ export default function MetaIntegrationPage() {
                     placeholder="EAAxxxxxxx..."
                   />
                 </div>
-                <Button type="submit" disabled={loading || !workspaceId} variant="secondary" className="w-full">
+                <Button type="submit" disabled={loading || !organizationId} variant="secondary" className="w-full">
                   {loading ? "Validando…" : "Conectar token"}
                 </Button>
               </form>

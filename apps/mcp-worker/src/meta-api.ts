@@ -1,6 +1,17 @@
 import { META_GRAPH_BASE_URL, META_API_VERSION } from "@vibefly/shared";
 
 const BASE_URL = `${META_GRAPH_BASE_URL}/${META_API_VERSION}`;
+const META_REQUEST_TIMEOUT_MS = 15_000;
+
+function errorFromException(err: unknown): Record<string, unknown> {
+  const message =
+    err instanceof Error && err.name === "AbortError"
+      ? "Meta API request timed out"
+      : err instanceof Error
+        ? err.message
+        : String(err);
+  return { error: { message, type: "NetworkError", code: 0 } };
+}
 
 /**
  * Make an authenticated GET request to Meta Graph API.
@@ -11,7 +22,6 @@ export async function metaApiGet(
   params: Record<string, unknown> = {}
 ): Promise<Record<string, unknown>> {
   const url = new URL(`${BASE_URL}/${endpoint}`);
-  url.searchParams.set("access_token", token);
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue;
     url.searchParams.set(
@@ -19,11 +29,21 @@ export async function metaApiGet(
       typeof value === "string" ? value : JSON.stringify(value)
     );
   }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), META_REQUEST_TIMEOUT_MS);
   try {
-    const res = await fetch(url.toString());
+    // Pass the token in the Authorization header. Meta accepts both
+    // query-string and header, but query-string tokens can leak into
+    // CDN outbound access logs — use the header and keep the URL clean.
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
     return (await res.json()) as Record<string, unknown>;
   } catch (err) {
-    return { error: { message: String(err), type: "NetworkError", code: 0 } };
+    return errorFromException(err);
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -38,7 +58,6 @@ export async function metaApiPost(
 ): Promise<Record<string, unknown>> {
   const url = `${BASE_URL}/${endpoint}`;
   const body = new URLSearchParams();
-  body.set("access_token", token);
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue;
     body.set(
@@ -46,15 +65,23 @@ export async function metaApiPost(
       typeof value === "string" ? value : JSON.stringify(value)
     );
   }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), META_REQUEST_TIMEOUT_MS);
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Bearer ${token}`,
+      },
       body: body.toString(),
+      signal: controller.signal,
     });
     return (await res.json()) as Record<string, unknown>;
   } catch (err) {
-    return { error: { message: String(err), type: "NetworkError", code: 0 } };
+    return errorFromException(err);
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

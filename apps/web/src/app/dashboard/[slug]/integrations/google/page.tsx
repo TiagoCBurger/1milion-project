@@ -21,7 +21,7 @@ export default async function GoogleIntegrationPage({
   if (!user) redirect("/login");
 
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id")
     .eq("slug", slug)
     .single();
@@ -31,7 +31,7 @@ export default async function GoogleIntegrationPage({
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Integrações", href: `/dashboard/${slug}/integrations` },
           { label: "Google" },
@@ -43,7 +43,7 @@ export default async function GoogleIntegrationPage({
         <EmptyState
           icon={LineChart}
           title="Integração Google em breve"
-          description="A conexão com Google Ads e ecossistema Google está em desenvolvimento. Avisaremos quando estiver disponível neste espaço."
+          description="A conexão com Google Ads e ecossistema Google está em desenvolvimento. Avisaremos quando estiver disponível nesta organização."
         >
           <Button asChild variant="outline">
             <Link href={`/dashboard/${slug}/integrations`}>Voltar às integrações</Link>

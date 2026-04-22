@@ -25,8 +25,9 @@ function oauthSigningSecret(): string | null {
 
 /**
  * POST /api/oauth/approve
- * Called by the consent form after user selects a workspace.
- * Signs a JWT and returns the MCP worker callback URL.
+ * Called by the consent form after user selects the organization and the
+ * subset of projects this MCP client may access. Signs a JWT and returns
+ * the MCP worker callback URL.
  */
 export async function POST(request: NextRequest) {
   const secret = oauthSigningSecret();
@@ -54,43 +55,65 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json()) as {
     request_id: string;
-    workspace_id: string;
+    organization_id: string;
     user_id: string;
     oauth_client_id?: string;
-    allowed_accounts?: string[];
+    allowed_projects?: string[];
   };
 
-  if (!body.request_id || !body.workspace_id) {
+  if (!body.request_id || !body.organization_id) {
     return NextResponse.json(
-      { error: "Missing request_id or workspace_id" },
+      { error: "Missing request_id or organization_id" },
       { status: 400 }
     );
   }
 
-  // Verify the user_id matches the authenticated user
   if (body.user_id !== user.id) {
     return NextResponse.json({ error: "User mismatch" }, { status: 403 });
   }
 
-  // Verify user has access to the workspace
   const { data: membership } = await supabase
     .from("memberships")
     .select("role")
     .eq("user_id", user.id)
-    .eq("workspace_id", body.workspace_id)
+    .eq("organization_id", body.organization_id)
     .single();
 
   if (!membership) {
     return NextResponse.json(
-      { error: "No access to this workspace" },
+      { error: "No access to this organization" },
       { status: 403 }
+    );
+  }
+
+  // Validate allowed_projects belong to this organization.
+  const allowedProjects = body.allowed_projects ?? [];
+  if (allowedProjects.length === 0) {
+    return NextResponse.json(
+      { error: "Select at least one project for this connection." },
+      { status: 400 }
+    );
+  }
+  const { data: validProjects, error: projErr } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("organization_id", body.organization_id)
+    .in("id", allowedProjects);
+  if (projErr) {
+    return NextResponse.json({ error: projErr.message }, { status: 500 });
+  }
+  const validIds = new Set((validProjects ?? []).map((p) => p.id));
+  if (validIds.size !== allowedProjects.length) {
+    return NextResponse.json(
+      { error: "One or more selected projects do not belong to this organization." },
+      { status: 400 }
     );
   }
 
   const { data: subRow } = await supabase
     .from("subscriptions")
     .select("tier, max_mcp_connections")
-    .eq("workspace_id", body.workspace_id)
+    .eq("organization_id", body.organization_id)
     .eq("status", "active")
     .maybeSingle();
 
@@ -104,7 +127,7 @@ export async function POST(request: NextRequest) {
     let connQuery = supabase
       .from("oauth_connections")
       .select("id", { count: "exact", head: true })
-      .eq("workspace_id", body.workspace_id)
+      .eq("organization_id", body.organization_id)
       .eq("is_active", true);
 
     if (body.oauth_client_id) {
@@ -137,15 +160,11 @@ export async function POST(request: NextRequest) {
   const payload: Record<string, unknown> = {
     request_id: body.request_id,
     user_id: user.id,
-    workspace_id: body.workspace_id,
+    organization_id: body.organization_id,
+    allowed_projects: allowedProjects,
     iat: now,
     exp: now + 30, // 30 seconds
   };
-
-  // Include allowed ad accounts if specified
-  if (body.allowed_accounts && body.allowed_accounts.length > 0) {
-    payload.allowed_accounts = body.allowed_accounts;
-  }
 
   const mcpBase = mcpWorkerBaseUrl();
   if (

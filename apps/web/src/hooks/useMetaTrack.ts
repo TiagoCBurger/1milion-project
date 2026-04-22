@@ -2,6 +2,12 @@
 
 import { useCallback } from "react";
 
+declare global {
+  interface Window {
+    fbq?: (...args: unknown[]) => void;
+  }
+}
+
 const TRACK_WORKER_URL =
   process.env.NEXT_PUBLIC_TRACK_WORKER_URL ?? "https://track-worker.ticburger.workers.dev";
 
@@ -67,7 +73,7 @@ interface TrackOptions {
 
 // ── Hook ────────────────────────────────────────────────────
 
-export function useMetaTrack(workspaceId: string) {
+export function useMetaTrack(organizationId: string) {
   const track = useCallback(
     async (eventName: string, options?: TrackOptions) => {
       const eventId = crypto.randomUUID();
@@ -84,7 +90,7 @@ export function useMetaTrack(workspaceId: string) {
       const fbp = getFbp();
 
       const payload = {
-        workspace_id: workspaceId,
+        organization_id: organizationId,
         event_name: eventName,
         event_id: eventId,
         event_time: Math.floor(Date.now() / 1000),
@@ -109,7 +115,7 @@ export function useMetaTrack(workspaceId: string) {
         console.error("[useMetaTrack] CAPI request failed:", err);
       }
     },
-    [workspaceId]
+    [organizationId]
   );
 
   return { track };

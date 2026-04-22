@@ -51,12 +51,16 @@ function mockApproveFromSuccess() {
     if (table === "memberships") {
       return mockQueryChain({ data: { role: "owner" }, error: null });
     }
+    if (table === "projects") {
+      // Validate allowed_projects belong to this organization.
+      return mockQueryChain({ data: [{ id: "proj-1" }], error: null });
+    }
     if (table === "subscriptions") {
       const chain: any = {};
       chain.select = vi.fn().mockReturnValue(chain);
       chain.eq = vi.fn().mockReturnValue(chain);
       chain.maybeSingle = vi.fn().mockResolvedValue({
-        data: { max_mcp_connections: 5 },
+        data: { tier: "pro", max_mcp_connections: 5 },
         error: null,
       });
       return chain;
@@ -76,21 +80,21 @@ function setupAuth(user: ReturnType<typeof mockUser> | null) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// API Route: POST /api/workspaces/[id]/disconnect
+// API Route: POST /api/organizations/[id]/disconnect
 // ══════════════════════════════════════════════════════════════
 
-describe("POST /api/workspaces/[id]/disconnect", () => {
+describe("POST /api/organizations/[id]/disconnect", () => {
   let handler: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    handler = await import("@/app/api/workspaces/[id]/disconnect/route");
+    handler = await import("@/app/api/organizations/[id]/disconnect/route");
   });
 
   it("returns 401 when not authenticated", async () => {
     setupAuth(null);
     const res = await handler.POST(
-      new Request("http://localhost/api/workspaces/ws-1/disconnect", { method: "POST" }),
+      new Request("http://localhost/api/organizations/ws-1/disconnect", { method: "POST" }),
       { params: Promise.resolve({ id: "ws-1" }) }
     );
     const { status, body } = await parseJsonResponse(res);
@@ -105,7 +109,7 @@ describe("POST /api/workspaces/[id]/disconnect", () => {
     mockFrom.mockReturnValue(chain);
 
     const res = await handler.POST(
-      new Request("http://localhost/api/workspaces/ws-1/disconnect", { method: "POST" }),
+      new Request("http://localhost/api/organizations/ws-1/disconnect", { method: "POST" }),
       { params: Promise.resolve({ id: "ws-1" }) }
     );
     const { status, body } = await parseJsonResponse(res);
@@ -128,7 +132,7 @@ describe("POST /api/workspaces/[id]/disconnect", () => {
     });
 
     const res = await handler.POST(
-      new Request("http://localhost/api/workspaces/ws-1/disconnect", { method: "POST" }),
+      new Request("http://localhost/api/organizations/ws-1/disconnect", { method: "POST" }),
       { params: Promise.resolve({ id: "ws-1" }) }
     );
     const { status, body } = await parseJsonResponse(res);
@@ -140,20 +144,20 @@ describe("POST /api/workspaces/[id]/disconnect", () => {
     expect(tables).toContain("memberships");
     expect(tables).toContain("meta_tokens");
     expect(tables).toContain("business_managers");
-    expect(tables).toContain("workspaces");
+    expect(tables).toContain("organizations");
   });
 });
 
 // ══════════════════════════════════════════════════════════════
-// API Route: PATCH /api/workspaces/[id]/ad-accounts/[accountId]/toggle
+// API Route: PATCH /api/organizations/[id]/ad-accounts/[accountId]/toggle
 // ══════════════════════════════════════════════════════════════
 
-describe("PATCH /api/workspaces/[id]/ad-accounts/[accountId]/toggle", () => {
+describe("PATCH /api/organizations/[id]/ad-accounts/[accountId]/toggle", () => {
   let handler: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    handler = await import("@/app/api/workspaces/[id]/ad-accounts/[accountId]/toggle/route");
+    handler = await import("@/app/api/organizations/[id]/ad-accounts/[accountId]/toggle/route");
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -208,15 +212,15 @@ describe("PATCH /api/workspaces/[id]/ad-accounts/[accountId]/toggle", () => {
 });
 
 // ══════════════════════════════════════════════════════════════
-// API Route: POST /api/workspaces/[id]/connect
+// API Route: POST /api/organizations/[id]/connect
 // ══════════════════════════════════════════════════════════════
 
-describe("POST /api/workspaces/[id]/connect", () => {
+describe("POST /api/organizations/[id]/connect", () => {
   let handler: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    handler = await import("@/app/api/workspaces/[id]/connect/route");
+    handler = await import("@/app/api/organizations/[id]/connect/route");
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -279,15 +283,15 @@ describe("POST /api/workspaces/[id]/connect", () => {
 });
 
 // ══════════════════════════════════════════════════════════════
-// API Route: GET /api/workspaces/[id]/oauth-connections
+// API Route: GET /api/organizations/[id]/oauth-connections
 // ══════════════════════════════════════════════════════════════
 
-describe("GET /api/workspaces/[id]/oauth-connections", () => {
+describe("GET /api/organizations/[id]/oauth-connections", () => {
   let handler: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    handler = await import("@/app/api/workspaces/[id]/oauth-connections/route");
+    handler = await import("@/app/api/organizations/[id]/oauth-connections/route");
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -312,15 +316,15 @@ describe("GET /api/workspaces/[id]/oauth-connections", () => {
 });
 
 // ══════════════════════════════════════════════════════════════
-// API Route: PATCH & DELETE /api/workspaces/[id]/oauth-connections/[connectionId]
+// API Route: PATCH & DELETE /api/organizations/[id]/oauth-connections/[connectionId]
 // ══════════════════════════════════════════════════════════════
 
-describe("PATCH /api/workspaces/[id]/oauth-connections/[connectionId]", () => {
+describe("PATCH /api/organizations/[id]/oauth-connections/[connectionId]", () => {
   let handler: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    handler = await import("@/app/api/workspaces/[id]/oauth-connections/[connectionId]/route");
+    handler = await import("@/app/api/organizations/[id]/oauth-connections/[connectionId]/route");
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -387,7 +391,7 @@ describe("POST /api/oauth/approve", () => {
       new Request("http://localhost/api/oauth/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request_id: "req-1", workspace_id: "ws-1", user_id: "user-123" }),
+        body: JSON.stringify({ request_id: "req-1", organization_id: "ws-1", user_id: "user-123" }),
       })
     );
     expect(res.status).toBe(401);
@@ -399,7 +403,7 @@ describe("POST /api/oauth/approve", () => {
       new Request("http://localhost/api/oauth/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace_id: "ws-1", user_id: "user-123" }),
+        body: JSON.stringify({ organization_id: "ws-1", user_id: "user-123" }),
       })
     );
     expect(res.status).toBe(400);
@@ -411,7 +415,7 @@ describe("POST /api/oauth/approve", () => {
       new Request("http://localhost/api/oauth/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request_id: "req-1", workspace_id: "ws-1", user_id: "user-DIFFERENT" }),
+        body: JSON.stringify({ request_id: "req-1", organization_id: "ws-1", user_id: "user-DIFFERENT" }),
       })
     );
     expect(res.status).toBe(403);
@@ -427,7 +431,7 @@ describe("POST /api/oauth/approve", () => {
       new Request("http://localhost/api/oauth/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request_id: "req-1", workspace_id: "ws-1", user_id: "user-123" }),
+        body: JSON.stringify({ request_id: "req-1", organization_id: "ws-1", user_id: "user-123" }),
       })
     );
     expect(res.status).toBe(403);
@@ -441,7 +445,12 @@ describe("POST /api/oauth/approve", () => {
       new Request("http://localhost/api/oauth/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request_id: "req-1", workspace_id: "ws-1", user_id: "user-123" }),
+        body: JSON.stringify({
+          request_id: "req-1",
+          organization_id: "ws-1",
+          user_id: "user-123",
+          allowed_projects: ["proj-1"],
+        }),
       })
     );
     expect(res.status).toBe(200);
@@ -456,7 +465,7 @@ describe("POST /api/oauth/approve", () => {
     // Verify payload
     const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
     expect(payload.request_id).toBe("req-1");
-    expect(payload.workspace_id).toBe("ws-1");
+    expect(payload.organization_id).toBe("ws-1");
     expect(payload.user_id).toBe("user-123");
     expect(payload.exp).toBeGreaterThan(payload.iat);
     expect(payload.exp - payload.iat).toBe(30); // 30 seconds TTL
@@ -468,12 +477,15 @@ describe("POST /api/oauth/approve", () => {
       if (table === "memberships") {
         return mockQueryChain({ data: { role: "owner" }, error: null });
       }
+      if (table === "projects") {
+        return mockQueryChain({ data: [{ id: "proj-1" }], error: null });
+      }
       if (table === "subscriptions") {
         const chain: any = {};
         chain.select = vi.fn().mockReturnValue(chain);
         chain.eq = vi.fn().mockReturnValue(chain);
         chain.maybeSingle = vi.fn().mockResolvedValue({
-          data: { max_mcp_connections: 1 },
+          data: { tier: "pro", max_mcp_connections: 1 },
           error: null,
         });
         return chain;
@@ -490,9 +502,10 @@ describe("POST /api/oauth/approve", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           request_id: "req-1",
-          workspace_id: "ws-1",
+          organization_id: "ws-1",
           user_id: "user-123",
           oauth_client_id: "client_new",
+          allowed_projects: ["proj-1"],
         }),
       })
     );

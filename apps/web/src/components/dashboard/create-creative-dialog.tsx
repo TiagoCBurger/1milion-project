@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Plus, Check, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,12 +33,12 @@ interface AdImage {
 }
 
 export function CreateCreativeDialog({
-  workspaceId,
+  organizationId,
   accountId,
   pages,
   images,
 }: {
-  workspaceId: string;
+  organizationId: string;
   accountId: string;
   pages: { id: string; name: string }[];
   images?: AdImage[];
@@ -67,7 +68,7 @@ export function CreateCreativeDialog({
     setSuccess(null);
 
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/meta/creatives`, {
+      const res = await fetch(`/api/organizations/${organizationId}/meta/creatives`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -150,11 +151,15 @@ export function CreateCreativeDialog({
                     }`}
                   >
                     {img.r2_url ? (
-                      <img
-                        src={img.r2_url}
-                        alt={img.file_name}
-                        className="aspect-square w-full object-cover"
-                      />
+                      <div className="relative aspect-square w-full">
+                        <Image
+                          src={img.r2_url}
+                          alt={img.file_name}
+                          fill
+                          sizes="120px"
+                          className="object-cover"
+                        />
+                      </div>
                     ) : (
                       <div className="aspect-square w-full flex items-center justify-center bg-muted">
                         <ImageIcon className="h-5 w-5 text-muted-foreground/40" />

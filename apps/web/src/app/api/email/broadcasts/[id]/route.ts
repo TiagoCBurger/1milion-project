@@ -1,30 +1,28 @@
 // ============================================================
-// Broadcast Detail + Send
+// Broadcast Detail + Send — platform-admin only.
 // GET  /api/email/broadcasts/[id]  — get broadcast details
 // POST /api/email/broadcasts/[id]  — send the broadcast
 // ============================================================
 
-import { createClient } from "@/lib/supabase/server";
+import { requirePlatformAdmin } from "@/lib/platform-admin";
 import { getBroadcast, sendBroadcastById } from "@vibefly/email";
 
 interface Params {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(request: Request, { params }: Params) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(_request: Request, { params }: Params) {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate.response;
 
   const { id } = await params;
   const broadcast = await getBroadcast(id);
   return Response.json({ broadcast });
 }
 
-export async function POST(request: Request, { params }: Params) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+export async function POST(_request: Request, { params }: Params) {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate.response;
 
   const { id } = await params;
   const result = await sendBroadcastById(id);

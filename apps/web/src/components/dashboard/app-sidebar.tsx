@@ -10,12 +10,13 @@ import {
   Cable,
   CreditCard,
   LogOut,
-  ChevronsUpDown,
   Building2,
+  Check,
   Moon,
   Sun,
-  ShoppingCart,
-  Radar,
+  Plus,
+  Settings,
+  SlidersHorizontal,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -25,14 +26,18 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { defaultWorkspaceSlug } from "@/lib/dashboard-workspaces"
+import { defaultOrganizationSlug } from "@/lib/organizations"
+import { ProjectSwitcher } from "./project-switcher"
 
-interface Workspace {
+interface Organization {
   id: string
   name: string
   slug: string
@@ -41,8 +46,9 @@ interface Workspace {
 }
 
 interface AppSidebarProps {
-  workspaces: Workspace[]
-  currentWorkspace?: Workspace | null
+  workspaces: Organization[]
+  currentWorkspace?: Organization | null
+  currentProjectSlug?: string
   user: { email: string; name?: string }
 }
 
@@ -69,12 +75,18 @@ function isNavActive(pathname: string, item: NavItem): boolean {
   return pathname === item.url
 }
 
-export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarProps) {
+export function AppSidebar({ workspaces, currentWorkspace, currentProjectSlug, user }: AppSidebarProps) {
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
   const slug = currentWorkspace?.slug
-  const fallbackSlug = defaultWorkspaceSlug(workspaces)
+  const fallbackSlug = defaultOrganizationSlug(workspaces)
   const effectiveSlug = slug ?? fallbackSlug
+  // Parse project slug from the URL when the route has the nested shape
+  // /dashboard/[orgSlug]/[projectSlug]/... — fall back to the prop.
+  const pathParts = pathname.split("/")
+  const urlProjectSlug =
+    pathParts[1] === "dashboard" && pathParts[2] === slug ? pathParts[3] : undefined
+  const resolvedProjectSlug = currentProjectSlug ?? urlProjectSlug
   const homeDashboardHref = effectiveSlug
     ? `/dashboard/${effectiveSlug}`
     : "/dashboard/new"
@@ -106,19 +118,6 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
             `/dashboard/${slug}/insights`,
             `/dashboard/${slug}/pages`,
           ],
-        },
-        {
-          title: "Vendas",
-          url: `/dashboard/${slug}/vendas`,
-          icon: ShoppingCart,
-          comingSoon: true,
-        },
-        {
-          title: "Rastreamento Avançado",
-          url: `/dashboard/${slug}/rastreamento-avancado`,
-          icon: Radar,
-          activePathPrefix: `/dashboard/${slug}/rastreamento-avancado`,
-          comingSoon: true,
         },
       ]
     : []
@@ -152,47 +151,11 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
         <BrandLogo href={homeDashboardHref} sidebar />
       </div>
 
-      <div className="px-3 pb-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-sidebar-accent transition-colors">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-vf-lime/20 text-vf-ink">
-                <Building2 className="h-4 w-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">
-                  {currentWorkspace?.name ??
-                    (workspaces.length === 0 ? "Criar espaço" : "Selecionar espaço")}
-                </p>
-                {currentWorkspace?.meta_business_name && (
-                  <p className="text-xs text-muted-foreground truncate">
-                    {currentWorkspace.meta_business_name}
-                  </p>
-                )}
-              </div>
-              <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="start">
-            <DropdownMenuLabel>Espaços de trabalho</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {workspaces.map((ws) => (
-              <DropdownMenuItem key={ws.id} asChild>
-                <Link href={`/dashboard/${ws.slug}`}>
-                  <Building2 className="mr-2 h-4 w-4" />
-                  {ws.name}
-                </Link>
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/dashboard/new" className="text-muted-foreground">
-                + Novo espaço
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      {slug ? (
+        <div className="px-3 pb-2">
+          <ProjectSwitcher orgSlug={slug} currentProjectSlug={resolvedProjectSlug} />
+        </div>
+      ) : null}
 
       <div className="mx-3 h-px bg-border" />
 
@@ -217,22 +180,84 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
               </Avatar>
               <div className="flex-1 min-w-0 text-left">
                 <p className="text-sm font-medium truncate">{user.name ?? user.email.split("@")[0]}</p>
-                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {currentWorkspace?.name ?? user.email}
+                </p>
               </div>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" className="w-56">
-            {slug ? (
-              <>
+          <DropdownMenuContent side="top" align="start" className="w-60">
+            <DropdownMenuLabel className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium truncate">
+                {user.name ?? user.email.split("@")[0]}
+              </span>
+              <span className="text-xs text-muted-foreground truncate font-normal">
+                {user.email}
+              </span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Building2 className="mr-2 h-4 w-4" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate">Organização</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {currentWorkspace?.name ?? "Selecionar"}
+                  </p>
+                </div>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-56">
+                <DropdownMenuLabel>Organizações</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {workspaces.map((org) => (
+                  <DropdownMenuItem key={org.id} asChild>
+                    <Link href={`/dashboard/${org.slug}`}>
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          currentWorkspace?.id === org.id ? "opacity-100" : "opacity-0",
+                        )}
+                      />
+                      <span className="truncate">{org.name}</span>
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+                {workspaces.length > 0 && <DropdownMenuSeparator />}
                 <DropdownMenuItem asChild>
-                  <Link href={`/dashboard/${slug}/billing`}>
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Assinatura
+                  <Link href="/dashboard/new" className="text-muted-foreground">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nova organização
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            {slug ? (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Configurações
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-56">
+                  <DropdownMenuItem asChild>
+                    <Link href={`/dashboard/${slug}/billing`}>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Assinatura
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/dashboard/${slug}/settings`}>
+                      <SlidersHorizontal className="mr-2 h-4 w-4" />
+                      Configurações da organização
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
             ) : null}
+
+            <DropdownMenuSeparator />
+
             <DropdownMenuItem
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             >
@@ -251,7 +276,7 @@ export function AppSidebar({ workspaces, currentWorkspace, user }: AppSidebarPro
                 void handleSignOut()
               }}
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-4 w-4 mr-2" />
               Sair
             </DropdownMenuItem>
           </DropdownMenuContent>

@@ -54,12 +54,15 @@ function mockApproveFromSuccess() {
     if (table === "memberships") {
       return mockQueryChain({ data: { role: "owner" }, error: null });
     }
+    if (table === "projects") {
+      return mockQueryChain({ data: [{ id: "proj-1" }], error: null });
+    }
     if (table === "subscriptions") {
       const chain: any = {};
       chain.select = vi.fn().mockReturnValue(chain);
       chain.eq = vi.fn().mockReturnValue(chain);
       chain.maybeSingle = vi.fn().mockResolvedValue({
-        data: { max_mcp_connections: 5 },
+        data: { tier: "pro", max_mcp_connections: 5 },
         error: null,
       });
       return chain;
@@ -82,12 +85,12 @@ describe("Security: Authentication enforcement", () => {
   });
 
   const routes = [
-    { name: "disconnect", path: "@/app/api/workspaces/[id]/disconnect/route", method: "POST", params: { id: "ws-1" } },
-    { name: "connect", path: "@/app/api/workspaces/[id]/connect/route", method: "POST", params: { id: "ws-1" } },
-    { name: "ad-account-toggle", path: "@/app/api/workspaces/[id]/ad-accounts/[accountId]/toggle/route", method: "PATCH", params: { id: "ws-1", accountId: "acc-1" } },
-    { name: "oauth-connections-list", path: "@/app/api/workspaces/[id]/oauth-connections/route", method: "GET", params: { id: "ws-1" } },
-    { name: "oauth-connection-update", path: "@/app/api/workspaces/[id]/oauth-connections/[connectionId]/route", method: "PATCH", params: { id: "ws-1", connectionId: "conn-1" } },
-    { name: "oauth-connection-delete", path: "@/app/api/workspaces/[id]/oauth-connections/[connectionId]/route", method: "DELETE", params: { id: "ws-1", connectionId: "conn-1" } },
+    { name: "disconnect", path: "@/app/api/organizations/[id]/disconnect/route", method: "POST", params: { id: "ws-1" } },
+    { name: "connect", path: "@/app/api/organizations/[id]/connect/route", method: "POST", params: { id: "ws-1" } },
+    { name: "ad-account-toggle", path: "@/app/api/organizations/[id]/ad-accounts/[accountId]/toggle/route", method: "PATCH", params: { id: "ws-1", accountId: "acc-1" } },
+    { name: "oauth-connections-list", path: "@/app/api/organizations/[id]/oauth-connections/route", method: "GET", params: { id: "ws-1" } },
+    { name: "oauth-connection-update", path: "@/app/api/organizations/[id]/oauth-connections/[connectionId]/route", method: "PATCH", params: { id: "ws-1", connectionId: "conn-1" } },
+    { name: "oauth-connection-delete", path: "@/app/api/organizations/[id]/oauth-connections/[connectionId]/route", method: "DELETE", params: { id: "ws-1", connectionId: "conn-1" } },
     { name: "oauth-approve", path: "@/app/api/oauth/approve/route", method: "POST", params: {} },
   ];
 
@@ -101,7 +104,7 @@ describe("Security: Authentication enforcement", () => {
         ? JSON.stringify(route.name === "connect"
           ? { token: "EAA123456789" }
           : route.name === "oauth-approve"
-          ? { request_id: "r", workspace_id: "w", user_id: "u" }
+          ? { request_id: "r", organization_id: "w", user_id: "u" }
           : { is_enabled: true })
         : undefined;
 
@@ -129,7 +132,7 @@ describe("Security: Authorization (RBAC)", () => {
   it("member role cannot disconnect workspace", async () => {
     // member (not owner/admin) → 403
     mockFrom.mockReturnValue(mockQueryChain({ data: null, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/disconnect/route");
+    const handler = await import("@/app/api/organizations/[id]/disconnect/route");
 
     const res = await handler.POST(
       new Request("http://localhost/test", { method: "POST" }),
@@ -140,7 +143,7 @@ describe("Security: Authorization (RBAC)", () => {
 
   it("member role cannot toggle ad accounts", async () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: null, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/ad-accounts/[accountId]/toggle/route");
+    const handler = await import("@/app/api/organizations/[id]/ad-accounts/[accountId]/toggle/route");
 
     const res = await handler.PATCH(
       jsonRequest({ is_enabled: true }, "PATCH"),
@@ -151,7 +154,7 @@ describe("Security: Authorization (RBAC)", () => {
 
   it("member role cannot update OAuth connections", async () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: null, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/oauth-connections/[connectionId]/route");
+    const handler = await import("@/app/api/organizations/[id]/oauth-connections/[connectionId]/route");
 
     const res = await handler.PATCH(
       jsonRequest({ allowed_accounts: ["act_123"] }, "PATCH"),
@@ -162,7 +165,7 @@ describe("Security: Authorization (RBAC)", () => {
 
   it("member role cannot revoke OAuth connections", async () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: null, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/oauth-connections/[connectionId]/route");
+    const handler = await import("@/app/api/organizations/[id]/oauth-connections/[connectionId]/route");
 
     const res = await handler.DELETE(
       new Request("http://localhost/test", { method: "DELETE" }),
@@ -182,7 +185,7 @@ describe("Security: Authorization (RBAC)", () => {
       return chain;
     });
 
-    const handler = await import("@/app/api/workspaces/[id]/oauth-connections/route");
+    const handler = await import("@/app/api/organizations/[id]/oauth-connections/route");
     const res = await handler.GET(
       new Request("http://localhost/test"),
       { params: Promise.resolve({ id: "ws-1" }) }
@@ -200,7 +203,7 @@ describe("Security: Input validation", () => {
 
   it("connect route rejects empty token", async () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: { role: "owner" }, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/connect/route");
+    const handler = await import("@/app/api/organizations/[id]/connect/route");
 
     const res = await handler.POST(
       jsonRequest({ token: "" }),
@@ -211,7 +214,7 @@ describe("Security: Input validation", () => {
 
   it("connect route rejects numeric token", async () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: { role: "owner" }, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/connect/route");
+    const handler = await import("@/app/api/organizations/[id]/connect/route");
 
     const res = await handler.POST(
       jsonRequest({ token: 123456789012345 }),
@@ -222,7 +225,7 @@ describe("Security: Input validation", () => {
 
   it("connect route rejects array token", async () => {
     mockFrom.mockReturnValue(mockQueryChain({ data: { role: "owner" }, error: null }));
-    const handler = await import("@/app/api/workspaces/[id]/connect/route");
+    const handler = await import("@/app/api/organizations/[id]/connect/route");
 
     const res = await handler.POST(
       jsonRequest({ token: ["EAA", "123"] }),
@@ -241,7 +244,7 @@ describe("Security: Input validation", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           request_id: "req-1",
-          workspace_id: "ws-1",
+          organization_id: "ws-1",
           user_id: "attacker-user-id",
         }),
       })
@@ -259,7 +262,7 @@ describe("Security: Input validation", () => {
       return mockQueryChain({ data: null, error: null });
     });
 
-    const handler = await import("@/app/api/workspaces/[id]/oauth-connections/[connectionId]/route");
+    const handler = await import("@/app/api/organizations/[id]/oauth-connections/[connectionId]/route");
     const res = await handler.PATCH(
       jsonRequest({}, "PATCH"),
       { params: Promise.resolve({ id: "ws-1", connectionId: "conn-1" }) }
@@ -314,7 +317,12 @@ describe("Security: JWT token generation", () => {
       new NextRequest("http://localhost/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request_id: "req-1", workspace_id: "ws-1", user_id: "user-123" }),
+        body: JSON.stringify({
+          request_id: "req-1",
+          organization_id: "ws-1",
+          user_id: "user-123",
+          allowed_projects: ["proj-1"],
+        }),
       })
     );
 
@@ -336,9 +344,9 @@ describe("Security: JWT token generation", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           request_id: "req-1",
-          workspace_id: "ws-1",
+          organization_id: "ws-1",
           user_id: "user-123",
-          allowed_accounts: ["act_111", "act_222"],
+          allowed_projects: ["proj-1"],
         }),
       })
     );
@@ -348,9 +356,9 @@ describe("Security: JWT token generation", () => {
     const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
 
     expect(payload.request_id).toBe("req-1");
-    expect(payload.workspace_id).toBe("ws-1");
+    expect(payload.organization_id).toBe("ws-1");
     expect(payload.user_id).toBe("user-123");
-    expect(payload.allowed_accounts).toEqual(["act_111", "act_222"]);
+    expect(payload.allowed_projects).toEqual(["proj-1"]);
     expect(payload.iat).toBeDefined();
     expect(payload.exp).toBeDefined();
   });

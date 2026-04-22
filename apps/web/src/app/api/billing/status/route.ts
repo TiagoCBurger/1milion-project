@@ -11,10 +11,10 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const workspaceId = searchParams.get("workspace_id");
+  const organizationId = searchParams.get("organization_id");
 
-  if (!workspaceId) {
-    return Response.json({ error: "Missing workspace_id" }, { status: 400 });
+  if (!organizationId) {
+    return Response.json({ error: "Missing organization_id" }, { status: 400 });
   }
 
   // Verify membership
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     .from("memberships")
     .select("role")
     .eq("user_id", user.id)
-    .eq("workspace_id", workspaceId)
+    .eq("organization_id", organizationId)
     .single();
 
   if (!membership) {
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     .select(
       "id, tier, status, billing_cycle, current_period_end, requests_per_hour, requests_per_day, max_mcp_connections, max_ad_accounts, pending_tier, pending_billing_cycle, created_at"
     )
-    .eq("workspace_id", workspaceId)
+    .eq("organization_id", organizationId)
     .single();
 
   if (error || !subscription) {

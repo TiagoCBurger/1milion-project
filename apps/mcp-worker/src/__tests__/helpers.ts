@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Env, WorkspaceContext } from "../types";
+import type { Env, OrganizationContext } from "../types";
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<{
   content: Array<{ type: string; text: string }>;
@@ -149,13 +149,13 @@ export function createMockEnv(overrides?: Partial<Env>): Env {
 }
 
 /**
- * Create a mock WorkspaceContext.
+ * Create a mock OrganizationContext.
  */
 export function createMockWorkspace(
-  overrides?: Partial<WorkspaceContext>,
-): WorkspaceContext {
+  overrides?: Partial<OrganizationContext>,
+): OrganizationContext {
   return {
-    workspaceId: "ws-123",
+    organizationId: "org-123",
     apiKeyId: "key-456",
     tier: "pro",
     requestsPerMinute: 30,
@@ -164,6 +164,10 @@ export function createMockWorkspace(
     maxMcpConnections: 1,
     maxAdAccounts: 1,
     enableMetaMutations: true,
+    availableProjects: [
+      { id: "proj-default", slug: "default", name: "Default", isDefault: true },
+    ],
+    allowedProjectIds: ["proj-default"],
     ...overrides,
   };
 }

@@ -27,12 +27,11 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  // Get all valid tokens not validated in the last 6 hours
   const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
 
   const { data: tokens, error } = await supabase
     .from("meta_tokens")
-    .select("id, workspace_id, token_type, expires_at")
+    .select("id, organization_id, token_type, expires_at")
     .eq("is_valid", true)
     .or(`last_validated_at.is.null,last_validated_at.lt.${sixHoursAgo}`);
 
@@ -42,7 +41,7 @@ Deno.serve(async (req) => {
   }
 
   const results: Array<{
-    workspace_id: string;
+    organization_id: string;
     valid: boolean;
     refreshed?: boolean;
     error?: string;
@@ -50,28 +49,25 @@ Deno.serve(async (req) => {
 
   for (const token of tokens ?? []) {
     try {
-      // Decrypt token
       const { data: decrypted } = await supabase.rpc("decrypt_meta_token", {
-        p_workspace_id: token.workspace_id,
+        p_organization_id: token.organization_id,
         p_encryption_key: TOKEN_ENCRYPTION_KEY,
       });
 
       if (!decrypted) {
         results.push({
-          workspace_id: token.workspace_id,
+          organization_id: token.organization_id,
           valid: false,
           error: "decrypt_failed",
         });
         continue;
       }
 
-      // Validate with Meta Graph API
       const meResponse = await fetch(
         `${META_GRAPH_URL}/me?access_token=${decrypted}`
       );
 
       if (!meResponse.ok) {
-        // Token is invalid - mark as invalid
         await supabase
           .from("meta_tokens")
           .update({
@@ -81,14 +77,13 @@ Deno.serve(async (req) => {
           .eq("id", token.id);
 
         results.push({
-          workspace_id: token.workspace_id,
+          organization_id: token.organization_id,
           valid: false,
           error: "meta_api_rejected",
         });
         continue;
       }
 
-      // Token is valid - check if it needs refresh
       let refreshed = false;
       if (
         token.token_type === "long_lived" &&
@@ -100,7 +95,6 @@ Deno.serve(async (req) => {
         const daysLeft = (expiresAt - Date.now()) / (1000 * 60 * 60 * 24);
 
         if (daysLeft < REFRESH_THRESHOLD_DAYS && daysLeft > 0) {
-          // Attempt to refresh the long-lived token
           try {
             const refreshUrl = new URL(`${META_GRAPH_URL}/oauth/access_token`);
             refreshUrl.searchParams.set("grant_type", "fb_exchange_token");
@@ -113,29 +107,28 @@ Deno.serve(async (req) => {
             if (refreshRes.ok) {
               const refreshData = await refreshRes.json();
               const newToken = refreshData.access_token;
-              const newExpiresIn = refreshData.expires_in || 5184000; // default 60 days
+              const newExpiresIn = refreshData.expires_in || 5184000;
               const newExpiresAt = new Date(
                 Date.now() + newExpiresIn * 1000
               ).toISOString();
 
-              // Re-encrypt and store the new token
               await supabase.rpc("encrypt_meta_token", {
-                p_workspace_id: token.workspace_id,
+                p_organization_id: token.organization_id,
                 p_token: newToken,
                 p_encryption_key: TOKEN_ENCRYPTION_KEY,
                 p_token_type: "long_lived",
-                p_meta_user_id: null, // preserve existing
-                p_scopes: null, // preserve existing
+                p_meta_user_id: null,
+                p_scopes: null,
                 p_expires_at: newExpiresAt,
               });
 
               refreshed = true;
               console.log(
-                `Refreshed token for workspace ${token.workspace_id}, new expiry: ${newExpiresAt}`
+                `Refreshed token for organization ${token.organization_id}, new expiry: ${newExpiresAt}`
               );
             } else {
               console.warn(
-                `Failed to refresh token for workspace ${token.workspace_id}`
+                `Failed to refresh token for organization ${token.organization_id}`
               );
             }
           } catch (refreshErr) {
@@ -144,16 +137,19 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Update last_validated_at
       await supabase
         .from("meta_tokens")
         .update({ last_validated_at: new Date().toISOString() })
         .eq("id", token.id);
 
-      results.push({ workspace_id: token.workspace_id, valid: true, refreshed });
+      results.push({
+        organization_id: token.organization_id,
+        valid: true,
+        refreshed,
+      });
     } catch (err) {
       results.push({
-        workspace_id: token.workspace_id,
+        organization_id: token.organization_id,
         valid: false,
         error: String(err),
       });

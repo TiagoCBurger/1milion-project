@@ -130,7 +130,7 @@ export function SuggestIntegrationButton({ slug }: { slug: string }) {
           <DialogHeader>
             <DialogTitle>Sugerir uma ferramenta</DialogTitle>
             <DialogDescription>
-              Diga qual integração você quer ver neste espaço. Avaliamos cada sugestão.
+              Diga qual integração você quer ver nesta organização. Avaliamos cada sugestão.
             </DialogDescription>
           </DialogHeader>
           {open ? (
@@ -161,7 +161,7 @@ export function IntegrationRequestCard({ slug }: { slug: string }) {
             <CardTitle className="text-lg">Pedir nova integração</CardTitle>
             <CardDescription>
               Não encontrou o que precisa? Descreva qual ferramenta ou plataforma você quer conectar a
-              este espaço. Avaliamos cada pedido.
+              esta organização. Avaliamos cada pedido.
             </CardDescription>
           </div>
         </CardHeader>

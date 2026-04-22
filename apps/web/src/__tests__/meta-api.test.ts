@@ -41,7 +41,7 @@ describe("Meta API Layer", () => {
       const token = await getDecryptedToken("ws-123");
       expect(token).toBe("EAABx123...");
       expect(mockRpc).toHaveBeenCalledWith("decrypt_meta_token", {
-        p_workspace_id: "ws-123",
+        p_organization_id: "ws-123",
         p_encryption_key: process.env.TOKEN_ENCRYPTION_KEY,
       });
     });
@@ -85,9 +85,10 @@ describe("Meta API Layer", () => {
       const result = await fetchCampaigns("token123", "1234567890");
 
       expect(global.fetch).toHaveBeenCalledTimes(1);
-      const calledUrl = (global.fetch as any).mock.calls[0][0] as string;
+      const [calledUrl, calledOpts] = (global.fetch as any).mock.calls[0];
       expect(calledUrl).toContain("act_1234567890/campaigns");
-      expect(calledUrl).toContain("access_token=token123");
+      expect(calledUrl).not.toContain("access_token=");
+      expect(calledOpts.headers.Authorization).toBe("Bearer token123");
       expect(calledUrl).toContain("fields=");
       expect(result.data).toHaveLength(2);
       expect(result.error).toBeUndefined();
@@ -309,7 +310,7 @@ describe("Meta API Layer", () => {
   // ── Security: token never leaked ──────────────────────────
 
   describe("security", () => {
-    it("passes token as query param, not in headers or body", async () => {
+    it("passes token in Authorization header, never in the URL", async () => {
       global.fetch = vi.fn().mockResolvedValue({
         json: async () => ({ data: [] }),
       });
@@ -317,10 +318,10 @@ describe("Meta API Layer", () => {
       await fetchCampaigns("secret-token-123", "123");
 
       const [url, options] = (global.fetch as any).mock.calls[0];
-      // Token is in URL query params
-      expect(url).toContain("access_token=secret-token-123");
-      // No Authorization header (Meta API uses query param auth)
-      expect(options?.headers).toBeUndefined();
+      // URLs hit access logs; the token must not appear there.
+      expect(url).not.toContain("secret-token-123");
+      expect(url).not.toContain("access_token=");
+      expect(options.headers.Authorization).toBe("Bearer secret-token-123");
     });
 
     it("never exposes token encryption key in API calls", async () => {

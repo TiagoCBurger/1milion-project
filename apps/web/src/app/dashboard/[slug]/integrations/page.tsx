@@ -28,7 +28,7 @@ export default async function IntegrationsHubPage({
   if (!user) redirect("/login");
 
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id")
     .eq("slug", slug)
     .single();
@@ -37,7 +37,7 @@ export default async function IntegrationsHubPage({
   const { data: metaTok } = await supabase
     .from("meta_tokens")
     .select("id")
-    .eq("workspace_id", workspace.id)
+    .eq("organization_id", workspace.id)
     .eq("is_valid", true)
     .maybeSingle();
 
@@ -47,7 +47,7 @@ export default async function IntegrationsHubPage({
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Integrações" },
         ]}
@@ -59,7 +59,7 @@ export default async function IntegrationsHubPage({
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight">Integrações</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Conecte contas externas para sincronizar dados com este espaço. Cada integração tem
+              Conecte contas externas para sincronizar dados com esta organização. Cada integração tem
               credenciais e regras de sincronização próprias.
             </p>
           </div>
@@ -80,7 +80,7 @@ export default async function IntegrationsHubPage({
               <CardTitle className="text-lg">Meta Ads</CardTitle>
               <CardDescription>
                 Vincule sua conta Facebook / Meta Business para gerenciar campanhas, conjuntos,
-                criativos e insights a partir deste espaço.
+                criativos e insights a partir desta organização.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -117,7 +117,7 @@ export default async function IntegrationsHubPage({
               <CardTitle className="text-lg">Google</CardTitle>
               <CardDescription>
                 Em breve: conexão com Google Ads e ferramentas do ecossistema Google para campanhas,
-                métricas e relatórios neste espaço.
+                métricas e relatórios nesta organização.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
@@ -146,7 +146,7 @@ export default async function IntegrationsHubPage({
               <CardTitle className="text-lg">Ferramentas de IA</CardTitle>
               <CardDescription>
                 Conecte Claude, Cursor, ChatGPT e outros clientes via Model Context Protocol (MCP).
-                Use OAuth e veja quais apps acessam este espaço.
+                Use OAuth e veja quais apps acessam esta organização.
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -1,17 +1,28 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Cable, Clock, Shield, ChevronDown, ChevronUp, Trash2, Save } from "lucide-react";
+import {
+  Cable,
+  Clock,
+  Shield,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  Save,
+} from "lucide-react";
 
-interface AdAccount {
+interface ProjectOption {
   id: string;
-  meta_account_id: string;
   name: string;
+  slug: string;
+  is_default: boolean;
+  ad_account_count: number;
+  site_count: number;
 }
 
 interface OAuthConnection {
@@ -19,46 +30,23 @@ interface OAuthConnection {
   client_id: string;
   client_name: string | null;
   user_id: string;
-  allowed_accounts: string[];
+  allowed_projects: string[] | null;
   is_active: boolean;
   granted_at: string;
   last_used_at: string | null;
 }
 
 interface ConnectionManagerProps {
-  workspaceId: string;
+  organizationId: string;
   connection: OAuthConnection;
-  adAccounts: AdAccount[];
+  projects: ProjectOption[];
   canManage: boolean;
 }
 
-function normMetaId(id: string): string {
-  return id.replace(/^act_/, "");
-}
-
-function workspaceIds(adAccounts: AdAccount[]): string[] {
-  return adAccounts.map((a) => a.meta_account_id);
-}
-
-/** Persisted payload: [] means “all workspace-enabled accounts” for this client. */
-function buildAllowedPayload(working: string[], wsIds: string[]): string[] {
-  const wsNorm = new Set(wsIds.map(normMetaId));
-  const filtered = working.filter((id) => wsNorm.has(normMetaId(id)));
-  const wsSorted = [...wsIds].map(normMetaId).sort();
-  const filSorted = [...filtered].map(normMetaId).sort();
-  if (
-    wsSorted.length === filSorted.length &&
-    wsSorted.every((v, i) => v === filSorted[i])
-  ) {
-    return [];
-  }
-  return filtered;
-}
-
 export function ConnectionManager({
-  workspaceId,
+  organizationId,
   connection,
-  adAccounts,
+  projects,
   canManage,
 }: ConnectionManagerProps) {
   const [expanded, setExpanded] = useState(false);
@@ -66,41 +54,38 @@ export function ConnectionManager({
   const [saving, setSaving] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const accountKey = useMemo(() => adAccounts.map((a) => a.id).join(","), [adAccounts]);
-
   useEffect(() => {
-    const ids = workspaceIds(adAccounts);
-    const stored = connection.allowed_accounts;
-    if (stored.length === 0) {
-      setAllowed(ids);
-    } else {
-      const wsNorm = new Set(ids.map(normMetaId));
-      setAllowed(stored.filter((s) => wsNorm.has(normMetaId(s))));
-    }
-  }, [connection.id, connection.allowed_accounts, accountKey]);
+    setAllowed(connection.allowed_projects ?? []);
+  }, [connection.id, connection.allowed_projects]);
 
-  const payload = buildAllowedPayload(allowed, workspaceIds(adAccounts));
-  const hasChanges =
-    JSON.stringify([...connection.allowed_accounts].sort()) !==
-    JSON.stringify([...payload].sort());
-
-  const inheritWorkspace = connection.allowed_accounts.length === 0;
   const displayName = connection.client_name || connection.client_id;
+  const hasChanges =
+    JSON.stringify([...(connection.allowed_projects ?? [])].sort()) !==
+    JSON.stringify([...allowed].sort());
 
   async function handleSave() {
+    setError(null);
     setSaving(true);
     try {
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/oauth-connections/${connection.id}`,
+        `/api/organizations/${organizationId}/oauth-connections/${connection.id}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ allowed_accounts: payload }),
+          body: JSON.stringify({ allowed_projects: allowed }),
         }
       );
-      if (res.ok) router.refresh();
+      if (!res.ok) {
+        const { error: msg } = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setError(msg ?? "Erro ao salvar.");
+        return;
+      }
+      router.refresh();
     } finally {
       setSaving(false);
     }
@@ -110,7 +95,7 @@ export function ConnectionManager({
     setRevoking(true);
     try {
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/oauth-connections/${connection.id}`,
+        `/api/organizations/${organizationId}/oauth-connections/${connection.id}`,
         { method: "DELETE" }
       );
       if (res.ok) router.refresh();
@@ -120,23 +105,22 @@ export function ConnectionManager({
     }
   }
 
-  function toggleAccount(metaAccountId: string) {
-    setAllowed((prev) => {
-      const next = prev.includes(metaAccountId)
-        ? prev.filter((a) => a !== metaAccountId)
-        : [...prev, metaAccountId];
-      if (adAccounts.length > 0 && next.length === 0) return prev;
-      return next;
-    });
-  }
-
-  function selectAllWorkspaceAccounts() {
-    setAllowed(workspaceIds(adAccounts));
+  function toggleProject(projectId: string) {
+    setAllowed((prev) =>
+      prev.includes(projectId)
+        ? prev.filter((id) => id !== projectId)
+        : [...prev, projectId]
+    );
   }
 
   if (!connection.is_active) {
     return null;
   }
+
+  const projectsById = new Map(projects.map((p) => [p.id, p]));
+  const countLabel = allowed.length === 0
+    ? "Nenhum projeto autorizado"
+    : `${allowed.length} projeto${allowed.length === 1 ? "" : "s"} autorizado${allowed.length === 1 ? "" : "s"}`;
 
   return (
     <Card>
@@ -149,7 +133,7 @@ export function ConnectionManager({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-semibold truncate">{displayName}</h3>
-                <Badge variant="success">Active</Badge>
+                <Badge variant="success">Ativa</Badge>
               </div>
               <p className="text-xs text-muted-foreground font-mono mt-0.5 truncate">
                 Client ID: {connection.client_id}
@@ -157,25 +141,26 @@ export function ConnectionManager({
               <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
-                  Granted {new Date(connection.granted_at).toLocaleDateString("pt-BR", {
-                    day: "2-digit", month: "short", year: "numeric"
+                  Concedida em{" "}
+                  {new Date(connection.granted_at).toLocaleDateString("pt-BR", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
                   })}
                 </span>
                 {connection.last_used_at && (
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    Last used {new Date(connection.last_used_at).toLocaleDateString("pt-BR", {
-                      day: "2-digit", month: "short", year: "numeric"
-                    })}
+                    Último uso{" "}
+                    {new Date(connection.last_used_at).toLocaleDateString(
+                      "pt-BR",
+                      { day: "2-digit", month: "short", year: "numeric" }
+                    )}
                   </span>
                 )}
                 <span className="flex items-center gap-1">
                   <Shield className="h-3 w-3" />
-                  {adAccounts.length === 0
-                    ? "Nenhuma conta habilitada no espaço"
-                    : inheritWorkspace && payload.length === 0
-                      ? `Todas as contas do espaço (${adAccounts.length})`
-                      : `${payload.length || allowed.length} conta(s) para este cliente`}
+                  {countLabel}
                 </span>
               </div>
             </div>
@@ -188,7 +173,11 @@ export function ConnectionManager({
               onClick={() => setExpanded(!expanded)}
               className="shrink-0"
             >
-              {expanded ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
+              {expanded ? (
+                <ChevronUp className="h-4 w-4 mr-1" />
+              ) : (
+                <ChevronDown className="h-4 w-4 mr-1" />
+              )}
               {expanded ? "Fechar" : "Gerenciar"}
             </Button>
           )}
@@ -197,40 +186,54 @@ export function ConnectionManager({
 
       {expanded && canManage && (
         <CardContent className="border-t border-border/30 pt-4 space-y-4">
+          {error && (
+            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
           <div>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h4 className="text-sm font-medium">Contas de anúncio (MCP)</h4>
+                <h4 className="text-sm font-medium">Projetos permitidos</h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Somente contas habilitadas no espaço aparecem aqui. A seleção restringe este cliente
-                  além do que já está ativo em Integrações → Meta.
+                  O cliente MCP só verá contas de anúncio e sites dos projetos
+                  marcados abaixo.
                 </p>
               </div>
-              <Button variant="link" size="sm" onClick={selectAllWorkspaceAccounts} className="h-auto p-0 text-xs">
-                Selecionar todas do espaço
-              </Button>
             </div>
 
-            {adAccounts.length === 0 ? (
+            {projects.length === 0 ? (
               <p className="text-sm text-muted-foreground py-2">
-                Habilite ao menos uma conta de anúncio em Integrações → Meta para conceder acesso MCP.
+                Esta organização ainda não tem projetos. Crie um para conceder
+                acesso MCP.
               </p>
             ) : (
-              <div className="rounded-xl bg-secondary/40 divide-y divide-border/30 max-h-64 overflow-y-auto">
-                {adAccounts.map((acc) => {
-                  const checked = allowed.includes(acc.meta_account_id);
+              <div className="rounded-xl bg-secondary/40 divide-y divide-border/30 max-h-80 overflow-y-auto">
+                {projects.map((p) => {
+                  const checked = allowed.includes(p.id);
+                  const summary = projectsById.get(p.id);
                   return (
                     <label
-                      key={acc.id}
+                      key={p.id}
                       className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 cursor-pointer transition-colors"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-medium">{acc.name}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{acc.meta_account_id}</p>
+                        <p className="text-sm font-medium">
+                          {p.name}
+                          {p.is_default ? (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              padrão
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {summary?.ad_account_count ?? 0} contas ·{" "}
+                          {summary?.site_count ?? 0} sites
+                        </p>
                       </div>
                       <Switch
                         checked={checked}
-                        onCheckedChange={() => toggleAccount(acc.meta_account_id)}
+                        onCheckedChange={() => toggleProject(p.id)}
                       />
                     </label>
                   );
@@ -249,9 +252,12 @@ export function ConnectionManager({
           </div>
 
           <div className="border-t border-border/30 pt-4">
-            <h4 className="text-sm font-medium text-destructive mb-1">Zona de risco</h4>
+            <h4 className="text-sm font-medium text-destructive mb-1">
+              Zona de risco
+            </h4>
             <p className="text-xs text-muted-foreground mb-3">
-              Revogar bloqueia este cliente imediatamente. Será necessário autorizar de novo.
+              Revogar bloqueia este cliente imediatamente. Será necessário
+              autorizar de novo.
             </p>
 
             {confirmRevoke ? (

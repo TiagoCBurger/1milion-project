@@ -12,18 +12,18 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  if (!body?.workspace_id) {
-    return Response.json({ error: "Missing workspace_id" }, { status: 400 });
+  if (!body?.organization_id) {
+    return Response.json({ error: "Missing organization_id" }, { status: 400 });
   }
 
-  const { workspace_id } = body as { workspace_id: string };
+  const { organization_id } = body as { organization_id: string };
 
   // Verify user is owner/admin
   const { data: membership } = await supabase
     .from("memberships")
     .select("role")
     .eq("user_id", user.id)
-    .eq("workspace_id", workspace_id)
+    .eq("organization_id", organization_id)
     .in("role", ["owner", "admin"])
     .single();
 
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       pending_billing_cycle: null,
       updated_at: new Date().toISOString(),
     })
-    .eq("workspace_id", workspace_id)
+    .eq("organization_id", organization_id)
     .neq("tier", "free");
 
   if (error) {

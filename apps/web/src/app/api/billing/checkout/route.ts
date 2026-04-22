@@ -25,15 +25,15 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { workspace_id, tier, cycle } = body as {
-    workspace_id?: string;
+  const { organization_id, tier, cycle } = body as {
+    organization_id?: string;
     tier?: string;
     cycle?: string;
   };
 
-  if (!workspace_id || !tier || !cycle) {
+  if (!organization_id || !tier || !cycle) {
     return Response.json(
-      { error: "Missing required fields: workspace_id, tier, cycle" },
+      { error: "Missing required fields: organization_id, tier, cycle" },
       { status: 400 }
     );
   }
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     .from("memberships")
     .select("role")
     .eq("user_id", user.id)
-    .eq("workspace_id", workspace_id)
+    .eq("organization_id", organization_id)
     .in("role", ["owner", "admin"])
     .single();
 
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   const { data: subscription } = await admin
     .from("subscriptions")
     .select("id, abacatepay_customer_id")
-    .eq("workspace_id", workspace_id)
+    .eq("organization_id", organization_id)
     .single();
 
   if (!subscription) {
@@ -93,19 +93,19 @@ export async function POST(request: Request) {
   // Build return URL
   const origin = request.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("slug")
-    .eq("id", workspace_id)
+    .eq("id", organization_id)
     .single();
-  const slug = workspace?.slug ?? workspace_id;
+  const slug = workspace?.slug ?? organization_id;
 
   const checkout = await createSubscriptionCheckout({
     productId,
     customerId,
     returnUrl: `${origin}/dashboard/${slug}/billing/success`,
     completionUrl: `${origin}/dashboard/${slug}/billing/success`,
-    externalId: workspace_id,
-    metadata: { workspace_id, tier, cycle },
+    externalId: organization_id,
+    metadata: { organization_id, tier, cycle },
   });
 
   return Response.json({ checkout_url: checkout.url });

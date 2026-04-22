@@ -10,7 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export default function NewWorkspacePage() {
+type CreateOrgRow = {
+  out_organization_id: string;
+  out_default_project_id: string;
+  out_default_project_slug: string;
+};
+
+export default function NewOrganizationPage() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [error, setError] = useState("");
@@ -40,7 +46,7 @@ export default function NewWorkspacePage() {
       return;
     }
 
-    const { error: rpcError } = await supabase.rpc("create_workspace", {
+    const { data, error: rpcError } = await supabase.rpc("create_organization", {
       p_user_id: user.id,
       p_name: name,
       p_slug: slug,
@@ -52,8 +58,11 @@ export default function NewWorkspacePage() {
       return;
     }
 
+    const result = (Array.isArray(data) ? data[0] : data) as CreateOrgRow | null;
+    const projectSlug = result?.out_default_project_slug ?? "default";
+
     router.refresh();
-    router.push(`/dashboard/${slug}`);
+    router.push(`/dashboard/${slug}/${projectSlug}`);
   }
 
   return (
@@ -62,7 +71,7 @@ export default function NewWorkspacePage() {
         <div className="mx-auto max-w-5xl flex items-center px-6 py-4">
           <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition">
             <ArrowLeft className="h-4 w-4" />
-            Back to Workspaces
+            Voltar
           </Link>
         </div>
       </nav>
@@ -70,9 +79,10 @@ export default function NewWorkspacePage() {
       <main className="mx-auto max-w-lg px-6 py-10">
         <Card>
           <CardHeader>
-            <CardTitle>Create Workspace</CardTitle>
+            <CardTitle>Criar organização</CardTitle>
             <CardDescription>
-              Each workspace connects to your marketing platforms and tools.
+              Cada organização centraliza assinatura, membros, conexões MCP e
+              seus projetos (contas de anúncio + sites).
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -83,13 +93,13 @@ export default function NewWorkspacePage() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="name">Workspace Name</Label>
+                <Label htmlFor="name">Nome da organização</Label>
                 <Input
                   id="name"
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   required
-                  placeholder="My Agency"
+                  placeholder="Minha Agência"
                 />
               </div>
               <div className="space-y-2">
@@ -101,15 +111,19 @@ export default function NewWorkspacePage() {
                   required
                   pattern="[a-z0-9-]+"
                   className="font-mono"
-                  placeholder="my-agency"
+                  placeholder="minha-agencia"
                 />
                 <p className="text-xs text-muted-foreground">
-                  URL-friendly identifier (lowercase, no spaces)
+                  Identificador usado na URL (letras minúsculas, sem espaços).
                 </p>
               </div>
               <Button type="submit" disabled={loading} className="w-full">
-                {loading ? "Creating..." : "Create Workspace"}
+                {loading ? "Criando…" : "Criar organização"}
               </Button>
+              <p className="text-xs text-muted-foreground">
+                Um projeto &quot;Default&quot; é criado automaticamente; novos projetos
+                podem ser adicionados depois pelo seletor no menu lateral.
+              </p>
             </form>
           </CardContent>
         </Card>

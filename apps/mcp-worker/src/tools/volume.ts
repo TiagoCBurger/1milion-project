@@ -5,7 +5,11 @@ import {
   textResult,
 } from "../meta-api";
 import type { ToolContext } from "./index";
-import { isAccountAllowed, accountBlockedResult } from "./index";
+import {
+  isAccountAllowed,
+  accountBlockedResult,
+  getProjectAllowedAccounts,
+} from "./index";
 
 const MAX_CALLS_PER_INVOCATION = 40;
 const MIN_LIST_LIMIT = 1;
@@ -46,7 +50,7 @@ function isMetaError(data: Record<string, unknown>): boolean {
 }
 
 export function registerVolumeTools(ctx: ToolContext): void {
-  const { server, token, allowedAccounts } = ctx;
+  const { server, token } = ctx;
 
   server.tool(
     "batch_marketing_api_reads",
@@ -58,6 +62,10 @@ export function registerVolumeTools(ctx: ToolContext): void {
       "repeat until the Meta developer dashboard shows enough calls. Add delay_ms_between_calls if you hit throttling.",
     ].join(" "),
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe("Ad account ID (with or without act_ prefix)."),
@@ -79,6 +87,9 @@ export function registerVolumeTools(ctx: ToolContext): void {
         ),
     },
     async (args) => {
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(args.account_id, allowedAccounts)) {
         return accountBlockedResult(args.account_id);
       }

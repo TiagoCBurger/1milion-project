@@ -1,4 +1,10 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+} from "@aws-sdk/client-s3";
 
 let _s3: S3Client | null = null;
 
@@ -17,6 +23,79 @@ function getS3Client(): S3Client {
   return _s3;
 }
 
+export async function headR2Object(
+  key: string,
+): Promise<{ size: number; contentType: string | null } | null> {
+  try {
+    const res = await getS3Client().send(
+      new HeadObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME!,
+        Key: key,
+      }),
+    );
+    return {
+      size: res.ContentLength ?? 0,
+      contentType: res.ContentType ?? null,
+    };
+  } catch (e) {
+    if ((e as { name?: string }).name === "NotFound") return null;
+    throw e;
+  }
+}
+
+export async function getR2Object(key: string): Promise<Uint8Array | null> {
+  try {
+    const res = await getS3Client().send(
+      new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME!,
+        Key: key,
+      }),
+    );
+    if (!res.Body) return null;
+    const chunks: Uint8Array[] = [];
+    // @ts-expect-error - streaming Body has an async iterator in Node runtime
+    for await (const chunk of res.Body) {
+      chunks.push(chunk as Uint8Array);
+    }
+    let total = 0;
+    for (const c of chunks) total += c.byteLength;
+    const out = new Uint8Array(total);
+    let off = 0;
+    for (const c of chunks) {
+      out.set(c, off);
+      off += c.byteLength;
+    }
+    return out;
+  } catch (e) {
+    if ((e as { name?: string }).name === "NoSuchKey") return null;
+    throw e;
+  }
+}
+
+export async function putR2Object(
+  key: string,
+  body: Uint8Array,
+  contentType: string,
+): Promise<void> {
+  await getS3Client().send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    }),
+  );
+}
+
+export async function deleteR2Object(key: string): Promise<void> {
+  await getS3Client().send(
+    new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Key: key,
+    }),
+  );
+}
+
 export interface R2UploadResult {
   key: string;
   publicUrl: string;
@@ -25,7 +104,7 @@ export interface R2UploadResult {
 
 export async function uploadToR2(
   buffer: Buffer | Uint8Array,
-  workspaceId: string,
+  organizationId: string,
   type: "images" | "videos",
   fileName: string,
   contentType: string
@@ -34,7 +113,7 @@ export async function uploadToR2(
   const safeName = fileName.replace(/[^a-zA-Z0-9_.-]/g, "_").slice(0, 64);
   const ext = safeName.split(".").pop() || "bin";
   const baseName = safeName.replace(/\.[^.]+$/, "");
-  const key = `${workspaceId}/${type}/${timestamp}_${baseName}.${ext}`;
+  const key = `${organizationId}/${type}/${timestamp}_${baseName}.${ext}`;
 
   await getS3Client().send(
     new PutObjectCommand({

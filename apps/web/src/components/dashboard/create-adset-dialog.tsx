@@ -28,11 +28,11 @@ const BILLING_EVENTS = [
 ];
 
 export function CreateAdSetDialog({
-  workspaceId,
+  organizationId,
   accountId,
   campaigns,
 }: {
-  workspaceId: string;
+  organizationId: string;
   accountId: string;
   campaigns: { id: string; name: string; hasBudget: boolean; bidStrategy: string | null }[];
 }) {
@@ -82,7 +82,7 @@ export function CreateAdSetDialog({
         targeting_automation: { advantage_audience: 1 },
       };
 
-      const res = await fetch(`/api/workspaces/${workspaceId}/meta/adsets`, {
+      const res = await fetch(`/api/organizations/${organizationId}/meta/adsets`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

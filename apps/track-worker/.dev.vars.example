@@ -1,0 +1,18 @@
+# ─── track-worker local development variables ───────────────────────────────
+# Copy to .dev.vars (gitignored) and fill in real values.
+# Used by `wrangler dev` — equivalent to secrets in production.
+#
+# In production, set each with:
+#   wrangler secret put <NAME>
+
+# Supabase project URL  (Settings → API → Project URL)
+SUPABASE_URL=
+
+# Supabase service-role key  (Settings → API → service_role — never expose to browser)
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Optional: hex HMAC key for user_id signature verification. When set, the
+# worker refuses identified writes (user_profiles, custom_events, CAPI user
+# data) unless the payload includes a valid user_id_sig minted by the site's
+# backend. Generate: openssl rand -hex 32
+# USER_ID_SIGNING_KEY=

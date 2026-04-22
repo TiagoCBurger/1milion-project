@@ -52,10 +52,10 @@ describe("accountBlockedResult", () => {
     expect(result.content[0].type).toBe("text");
   });
 
-  it("includes 'Access denied' in the error JSON", () => {
+  it("includes 'account_not_in_project' error code in the JSON", () => {
     const result = accountBlockedResult("act_123");
     const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.error).toBe("Access denied");
+    expect(parsed.error).toBe("account_not_in_project");
   });
 
   it("includes the account ID in the error message", () => {

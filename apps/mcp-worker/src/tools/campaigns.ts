@@ -6,7 +6,12 @@ import {
   textResult,
 } from "../meta-api";
 import type { ToolContext } from "./index";
-import { isAccountAllowed, accountBlockedResult } from "./index";
+import {
+  isAccountAllowed,
+  accountBlockedResult,
+  getProjectAllowedAccounts,
+  scopeCheckByMetaId,
+} from "./index";
 
 const CAMPAIGN_FIELDS =
   "id,name,objective,status,daily_budget,lifetime_budget,buying_type,start_time,stop_time,created_time,updated_time,bid_strategy,special_ad_categories";
@@ -15,12 +20,16 @@ const CAMPAIGN_DETAIL_FIELDS =
   "id,name,objective,status,daily_budget,lifetime_budget,buying_type,start_time,stop_time,created_time,updated_time,bid_strategy,special_ad_categories,special_ad_category_country,budget_remaining,configured_status";
 
 export function registerCampaignsTools(ctx: ToolContext): void {
-  const { server, token, tier, allowedAccounts } = ctx;
+  const { server, token, tier } = ctx;
   // ── get_campaigns ────────────────────────────────────────────────────
   server.tool(
     "get_campaigns",
     "List campaigns for an ad account with optional status, objective, and pagination filters.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe("The ad account ID (with or without act_ prefix)."),
@@ -46,6 +55,9 @@ export function registerCampaignsTools(ctx: ToolContext): void {
         .describe("Pagination cursor returned from a previous request."),
     },
     async (args) => {
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(args.account_id, allowedAccounts)) {
         return accountBlockedResult(args.account_id);
       }
@@ -92,9 +104,16 @@ export function registerCampaignsTools(ctx: ToolContext): void {
     "get_campaign_details",
     "Get full details of a specific campaign by its ID.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       campaign_id: z.string().describe("The campaign ID to look up."),
     },
     async (args) => {
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.campaign_id);
+      if (!check.ok) return check.result;
+
       const data = await metaApiGet(args.campaign_id, token, {
         fields: CAMPAIGN_DETAIL_FIELDS,
       });
@@ -114,6 +133,10 @@ export function registerCampaignsTools(ctx: ToolContext): void {
     "create_campaign",
     "Create a new campaign in the specified ad account. Requires PRO tier.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe("The ad account ID (with or without act_ prefix)."),
@@ -164,6 +187,9 @@ export function registerCampaignsTools(ctx: ToolContext): void {
         ),
     },
     async (args) => {
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(args.account_id, allowedAccounts)) {
         return accountBlockedResult(args.account_id);
       }
@@ -239,6 +265,10 @@ export function registerCampaignsTools(ctx: ToolContext): void {
     "update_campaign",
     "Update an existing campaign's settings. Requires PRO tier.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       campaign_id: z.string().describe("The campaign ID to update."),
       name: z
         .string()
@@ -276,6 +306,9 @@ export function registerCampaignsTools(ctx: ToolContext): void {
           true,
         );
       }
+
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.campaign_id);
+      if (!check.ok) return check.result;
 
       const params: Record<string, unknown> = {};
 

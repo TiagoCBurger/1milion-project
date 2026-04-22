@@ -1,12 +1,16 @@
 // ============================================================
-// Send Test Email — verify Resend integration
+// Send Test Email — verify Resend integration.
+//
+// Locked to the caller's own email so it cannot be used as an
+// open mailer: the recipient is always `user.email`, no matter
+// what the body says.
 // POST /api/email/send-test
 // ============================================================
 
 import { createClient } from "@/lib/supabase/server";
 import { sendTransactionalEmail, WelcomeEmail, EMAIL_TAGS } from "@vibefly/email";
 
-export async function POST(request: Request) {
+export async function POST() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -14,11 +18,12 @@ export async function POST(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json() as { to?: string };
-  const to = body.to ?? user.email;
-
+  const to = user.email;
   if (!to) {
-    return Response.json({ error: "Missing recipient email" }, { status: 400 });
+    return Response.json(
+      { error: "Your account has no email address on file" },
+      { status: 400 },
+    );
   }
 
   try {

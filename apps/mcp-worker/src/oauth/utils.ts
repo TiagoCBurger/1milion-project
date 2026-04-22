@@ -9,6 +9,16 @@ export function generateToken(bytes = 32): string {
   return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** Constant-time string comparison to avoid timing oracles on secret checks. */
+export function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
 /** SHA-256 hash a string and return hex. */
 export async function sha256Hex(input: string): Promise<string> {
   const data = new TextEncoder().encode(input);
@@ -77,6 +87,23 @@ export async function verifyJwt<T = Record<string, unknown>>(
   const [headerB64, payloadB64, sigB64] = parts;
   const enc = new TextEncoder();
   const signingInput = `${headerB64}.${payloadB64}`;
+
+  // Reject anything that isn't an HS256 JWT. Without this check, a future
+  // change that adds another algorithm would silently let unverified tokens
+  // slip through — and the classic `alg: none` bypass stays locked out even
+  // though the Web Crypto import already pins HMAC-SHA256.
+  try {
+    const header = JSON.parse(
+      atob(
+        headerB64.replace(/-/g, "+").replace(/_/g, "/") +
+          "==".slice(0, (4 - (headerB64.length % 4)) % 4),
+      ),
+    ) as { alg?: unknown; typ?: unknown };
+    if (header.alg !== "HS256") return null;
+    if (header.typ !== undefined && header.typ !== "JWT") return null;
+  } catch {
+    return null;
+  }
 
   const key = await crypto.subtle.importKey(
     "raw",

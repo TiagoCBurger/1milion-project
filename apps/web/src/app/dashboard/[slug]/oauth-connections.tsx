@@ -25,14 +25,14 @@ interface OAuthConnection {
 }
 
 interface Props {
-  workspaceId: string;
+  organizationId: string;
   connections: OAuthConnection[];
   adAccounts: AdAccount[];
   canManage: boolean;
 }
 
 export function OAuthConnections({
-  workspaceId,
+  organizationId,
   connections,
   adAccounts,
   canManage,
@@ -50,7 +50,7 @@ export function OAuthConnections({
       {connections.map((conn) => (
         <ConnectionCard
           key={conn.id}
-          workspaceId={workspaceId}
+          organizationId={organizationId}
           connection={conn}
           adAccounts={adAccounts}
           canManage={canManage}
@@ -61,12 +61,12 @@ export function OAuthConnections({
 }
 
 function ConnectionCard({
-  workspaceId,
+  organizationId,
   connection,
   adAccounts,
   canManage,
 }: {
-  workspaceId: string;
+  organizationId: string;
   connection: OAuthConnection;
   adAccounts: AdAccount[];
   canManage: boolean;
@@ -88,7 +88,7 @@ function ConnectionCard({
     setSaving(true);
     try {
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/oauth-connections/${connection.id}`,
+        `/api/organizations/${organizationId}/oauth-connections/${connection.id}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -106,7 +106,7 @@ function ConnectionCard({
     setRevoking(true);
     try {
       const res = await fetch(
-        `/api/workspaces/${workspaceId}/oauth-connections/${connection.id}`,
+        `/api/organizations/${organizationId}/oauth-connections/${connection.id}`,
         { method: "DELETE" }
       );
       if (res.ok) router.refresh();

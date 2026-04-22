@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import Image from "next/image";
 import { getDecryptedToken, fetchPages } from "@/lib/meta-api";
+import { getAuthedUser, getSupabase } from "@/lib/auth-context";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -16,12 +17,12 @@ export default async function PagesPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthedUser();
   if (!user) redirect("/login");
 
+  const supabase = await getSupabase();
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id")
     .eq("slug", slug)
     .single();
@@ -33,7 +34,7 @@ export default async function PagesPage({
     return (
       <>
         <PageHeader breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Páginas Facebook" },
         ]} />
@@ -58,7 +59,7 @@ export default async function PagesPage({
   return (
     <>
       <PageHeader breadcrumbs={[
-        { label: "Espaços de trabalho", href: "/dashboard" },
+        { label: "Organizações", href: "/dashboard" },
         { label: slug, href: `/dashboard/${slug}` },
         { label: "Páginas Facebook" },
       ]} />
@@ -99,9 +100,11 @@ export default async function PagesPage({
                     {/* Page avatar */}
                     <div className="shrink-0">
                       {typeof picUrl === "string" ? (
-                        <img
+                        <Image
                           src={picUrl}
                           alt={pageName}
+                          width={48}
+                          height={48}
                           className="h-12 w-12 rounded-full object-cover"
                         />
                       ) : (

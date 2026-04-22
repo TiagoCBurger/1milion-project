@@ -1,15 +1,23 @@
+import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { META_GRAPH_BASE_URL, META_API_VERSION } from "@vibefly/shared";
 
 const BASE_URL = `${META_GRAPH_BASE_URL}/${META_API_VERSION}`;
 
 // ── In-memory cache ──────────────────────────────────────────
+//
+// Keys are prefixed with a 16-char token fingerprint so responses from
+// different orgs (which decrypt to different Meta tokens) never collide.
+// This is critical for endpoints like `me/accounts` whose path does NOT
+// include an account ID — without scoping, Org A's pages would leak into
+// Org B's fetchPages() result.
 
 interface CacheEntry {
   data: Record<string, unknown>;
   expiresAt: number;
 }
 
+const MAX_CACHE_ENTRIES = 5_000;
 const cache = new Map<string, CacheEntry>();
 
 const TTL = {
@@ -22,13 +30,21 @@ const TTL = {
   default: 60_000,
 };
 
-function cacheKey(endpoint: string, params: Record<string, unknown>): string {
+function tokenFingerprint(token: string): string {
+  return createHash("sha256").update(token).digest("hex").slice(0, 16);
+}
+
+function cacheKey(
+  endpoint: string,
+  params: Record<string, unknown>,
+  token: string,
+): string {
   const paramStr = Object.entries(params)
     .filter(([k]) => k !== "access_token")
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`)
     .join("&");
-  return `${endpoint}?${paramStr}`;
+  return `${tokenFingerprint(token)}:${endpoint}?${paramStr}`;
 }
 
 function ttlForEndpoint(endpoint: string): number {
@@ -77,29 +93,48 @@ function getCached(key: string): Record<string, unknown> | null {
 }
 
 function setCache(key: string, data: Record<string, unknown>, ttl: number): void {
+  if (cache.size >= MAX_CACHE_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest) cache.delete(oldest);
+  }
   cache.set(key, { data, expiresAt: Date.now() + ttl });
 }
 
-/** Invalidate cache entries matching a pattern (e.g. after a mutation). */
-export function invalidateCache(pattern?: string): void {
-  if (!pattern) {
+/**
+ * Invalidate cache entries matching a pattern (e.g. after a mutation). Pass
+ * `scopePrefix` to restrict the purge to a single org/token; omit it to wipe
+ * the entire cache (only use this for admin-triggered resets).
+ */
+export function invalidateCache(scopePrefix?: string, pattern?: string): void {
+  if (!scopePrefix && !pattern) {
     cache.clear();
+    tokenCache.clear();
     return;
   }
   for (const key of cache.keys()) {
-    if (key.includes(pattern)) cache.delete(key);
+    if (scopePrefix && !key.startsWith(scopePrefix)) continue;
+    if (pattern && !key.includes(pattern)) continue;
+    cache.delete(key);
   }
 }
 
 // ── Token decryption ──────────────────────────────────────────
 
-export async function getDecryptedToken(workspaceId: string): Promise<string | null> {
-  // Check token cache first
-  const tokenCacheKey = `token:${workspaceId}`;
-  const cachedToken = getCached(tokenCacheKey);
-  if (cachedToken) {
-    return cachedToken._token as string;
+// Dedicated, per-org token cache. Keyed by orgId (not by token fingerprint,
+// which we don't have yet at this point) and stored in a separate map so it
+// cannot collide with meta-graph response cache entries.
+interface TokenCacheEntry {
+  token: string;
+  expiresAt: number;
+}
+const tokenCache = new Map<string, TokenCacheEntry>();
+
+export async function getDecryptedToken(organizationId: string): Promise<string | null> {
+  const cached = tokenCache.get(organizationId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.token;
   }
+  if (cached) tokenCache.delete(organizationId);
 
   const encKey = process.env.TOKEN_ENCRYPTION_KEY;
   if (!encKey) {
@@ -108,7 +143,7 @@ export async function getDecryptedToken(workspaceId: string): Promise<string | n
   }
   const supabase = createAdminClient();
   const { data, error } = await supabase.rpc("decrypt_meta_token", {
-    p_workspace_id: workspaceId,
+    p_organization_id: organizationId,
     p_encryption_key: encKey,
   });
   if (error) {
@@ -119,8 +154,9 @@ export async function getDecryptedToken(workspaceId: string): Promise<string | n
   if (!data) {
     return null;
   }
-  setCache(tokenCacheKey, { _token: data as string }, TTL.token);
-  return data as string;
+  const token = data as string;
+  tokenCache.set(organizationId, { token, expiresAt: Date.now() + TTL.token });
+  return token;
 }
 
 // ── Meta Graph API GET ────────────────────────────────────────
@@ -130,28 +166,45 @@ export async function metaApiGet(
   token: string,
   params: Record<string, unknown> = {}
 ): Promise<Record<string, unknown>> {
-  const key = cacheKey(endpoint, params);
+  const key = cacheKey(endpoint, params, token);
   const cached = getCached(key);
   if (cached) {
-    console.log("[meta-api] CACHE HIT", endpoint);
     return cached;
   }
 
   const url = new URL(`${BASE_URL}/${endpoint}`);
-  url.searchParams.set("access_token", token);
   for (const [k, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue;
     url.searchParams.set(k, typeof value === "string" ? value : JSON.stringify(value));
   }
-  console.log("[meta-api] GET", endpoint);
-  const res = await fetch(url.toString(), { cache: "no-store" });
-  const json = (await res.json()) as Record<string, unknown>;
-  if (getMetaGraphError(json)) {
-    console.error("[meta-api] API error:", JSON.stringify(json.error));
-  } else {
-    setCache(key, json, ttlForEndpoint(endpoint));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  try {
+    // Token goes in the Authorization header, not the query string. URLs hit
+    // access logs (ours and upstream proxies) with the token still attached.
+    const res = await fetch(url.toString(), {
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
+    const json = (await res.json()) as Record<string, unknown>;
+    if (getMetaGraphError(json)) {
+      console.error("[meta-api] GET error:", endpoint, JSON.stringify(json.error));
+    } else {
+      setCache(key, json, ttlForEndpoint(endpoint));
+    }
+    return json;
+  } catch (err) {
+    const message =
+      err instanceof Error && err.name === "AbortError"
+        ? "Meta API request timed out"
+        : err instanceof Error
+          ? err.message
+          : "Network error";
+    return { error: { message, type: "NetworkError", code: 0 } };
+  } finally {
+    clearTimeout(timeout);
   }
-  return json;
 }
 
 // ── Meta Graph API POST ───────────────────────────────────────
@@ -163,28 +216,46 @@ export async function metaApiPost(
 ): Promise<Record<string, unknown>> {
   const url = `${BASE_URL}/${endpoint}`;
   const body = new URLSearchParams();
-  body.set("access_token", token);
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue;
     body.set(key, typeof value === "string" ? value : JSON.stringify(value));
   }
-  console.log("[meta-api] POST", endpoint);
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-  const json = (await res.json()) as Record<string, unknown>;
-  if (getMetaGraphError(json)) {
-    console.error("[meta-api] POST error:", JSON.stringify(json.error));
-  } else {
-    // Invalidate related caches after successful mutation
-    if (endpoint.includes("/campaigns")) invalidateCache("/campaigns");
-    if (endpoint.includes("/adsets")) invalidateCache("/adsets");
-    if (endpoint.includes("/ads")) invalidateCache("/ads");
-    if (endpoint.includes("/adcreatives")) invalidateCache("/adcreatives");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Bearer ${token}`,
+      },
+      body: body.toString(),
+      signal: controller.signal,
+    });
+    const json = (await res.json()) as Record<string, unknown>;
+    if (getMetaGraphError(json)) {
+      console.error("[meta-api] POST error:", endpoint, JSON.stringify(json.error));
+    } else {
+      // Invalidate related caches after successful mutation. Scoped to the
+      // token fingerprint so we don't flush entries belonging to other orgs.
+      const scope = tokenFingerprint(token);
+      if (endpoint.includes("/campaigns")) invalidateCache(`${scope}:`, "/campaigns");
+      if (endpoint.includes("/adsets")) invalidateCache(`${scope}:`, "/adsets");
+      if (endpoint.includes("/ads")) invalidateCache(`${scope}:`, "/ads");
+      if (endpoint.includes("/adcreatives")) invalidateCache(`${scope}:`, "/adcreatives");
+    }
+    return json;
+  } catch (err) {
+    const message =
+      err instanceof Error && err.name === "AbortError"
+        ? "Meta API request timed out"
+        : err instanceof Error
+          ? err.message
+          : "Network error";
+    return { error: { message, type: "NetworkError", code: 0 } };
+  } finally {
+    clearTimeout(timeout);
   }
-  return json;
 }
 
 // ── Meta Graph API multipart upload ──────────────────────────
@@ -199,17 +270,34 @@ export async function metaApiUploadImage(
 ): Promise<Record<string, unknown>> {
   const url = `${BASE_URL}/${ensureActPrefix(accountId)}/adimages`;
   const form = new FormData();
-  form.append("access_token", token);
   form.append("filename", new Blob([new Uint8Array(fileBuffer)], { type: contentType }), fileName);
   if (imageName) form.append("name", imageName);
 
-  console.log("[meta-api] UPLOAD IMAGE", accountId, fileName);
-  const res = await fetch(url, { method: "POST", body: form });
-  const json = (await res.json()) as Record<string, unknown>;
-  if (getMetaGraphError(json)) {
-    console.error("[meta-api] Upload error:", JSON.stringify(json.error));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60_000);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+      signal: controller.signal,
+    });
+    const json = (await res.json()) as Record<string, unknown>;
+    if (getMetaGraphError(json)) {
+      console.error("[meta-api] Upload error:", JSON.stringify(json.error));
+    }
+    return json;
+  } catch (err) {
+    const message =
+      err instanceof Error && err.name === "AbortError"
+        ? "Meta image upload timed out"
+        : err instanceof Error
+          ? err.message
+          : "Network error";
+    return { error: { message, type: "NetworkError", code: 0 } };
+  } finally {
+    clearTimeout(timeout);
   }
-  return json;
 }
 
 // ── Helpers ───────────────────────────────────────────────────

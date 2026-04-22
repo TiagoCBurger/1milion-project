@@ -44,21 +44,21 @@ const STORED_CLIENT = {
 
 const STORED_AUTH_CODE = {
   client_id: CLIENT_ID,
-  workspace_id: "ws-1",
+  organization_id: "ws-1",
   user_id: "user-1",
   code_challenge: "test_challenge",
   redirect_uri: "http://localhost/callback",
   scope: "mcp",
-  allowed_accounts: ["act_111", "act_222"],
+  allowed_projects: ["proj-111", "proj-222"],
   created_at: NOW,
 };
 
 const STORED_REFRESH_TOKEN = {
   client_id: CLIENT_ID,
-  workspace_id: "ws-1",
+  organization_id: "ws-1",
   user_id: "user-1",
   scope: "mcp",
-  allowed_accounts: ["act_333"],
+  allowed_projects: ["proj-333"],
   created_at: NOW,
 };
 
@@ -74,12 +74,12 @@ function makeTokenRequest(body: Record<string, string>): Request {
 function mockFetchDefault() {
   globalThis.fetch = vi.fn().mockImplementation(async (url: string | URL) => {
     const u = typeof url === "string" ? url : url.toString();
-    if (u.includes("get_workspace_context")) {
+    if (u.includes("get_organization_context")) {
       return {
         ok: true,
         json: async () => [
           {
-            workspace_id: "ws-1",
+            organization_id: "ws-1",
             tier: "pro",
             max_mcp_connections: -1,
           },
@@ -136,7 +136,7 @@ describe("Token endpoint — connection recording", () => {
 
     expect(upsertCall).toBeDefined();
     const body = JSON.parse(upsertCall[1].body);
-    expect(body.p_workspace_id).toBe("ws-1");
+    expect(body.p_organization_id).toBe("ws-1");
     expect(body.p_client_id).toBe(CLIENT_ID);
     expect(body.p_user_id).toBe("user-1");
   });
@@ -159,7 +159,7 @@ describe("Token endpoint — connection recording", () => {
     );
 
     const body = JSON.parse(upsertCall[1].body);
-    expect(body.p_allowed_accounts).toEqual(["act_111", "act_222"]);
+    expect(body.p_allowed_projects).toEqual(["proj-111", "proj-222"]);
   });
 
   it("calls upsert_oauth_connection on refresh_token grant", async () => {
@@ -182,7 +182,7 @@ describe("Token endpoint — connection recording", () => {
 
     expect(upsertCall).toBeDefined();
     const body = JSON.parse(upsertCall[1].body);
-    expect(body.p_allowed_accounts).toEqual(["act_333"]);
+    expect(body.p_allowed_projects).toEqual(["proj-333"]);
   });
 
   it("uses client_name from KV client registration", async () => {
@@ -236,12 +236,12 @@ describe("Token endpoint — connection recording", () => {
     expect(body.p_client_name).toBe(CLIENT_ID);
   });
 
-  it("passes empty array when allowed_accounts is undefined", async () => {
-    // Auth code without allowed_accounts
+  it("passes empty array when allowed_projects is undefined", async () => {
+    // Auth code without allowed_projects
     (env.OAUTH_KV.get as any).mockImplementation(async (key: string) => {
       if (key === `oauth:client:${CLIENT_ID}`) return STORED_CLIENT;
       if (key === `oauth:code:mock_hash`) {
-        return { ...STORED_AUTH_CODE, allowed_accounts: undefined };
+        return { ...STORED_AUTH_CODE, allowed_projects: undefined };
       }
       return null;
     });
@@ -263,17 +263,17 @@ describe("Token endpoint — connection recording", () => {
     );
 
     const body = JSON.parse(upsertCall[1].body);
-    expect(body.p_allowed_accounts).toEqual([]);
+    expect(body.p_allowed_projects).toEqual([]);
   });
 
   it("does not block token issuance if recordConnection fails", async () => {
     (globalThis.fetch as any).mockImplementation(async (url: string | URL) => {
       const u = typeof url === "string" ? url : url.toString();
-      if (u.includes("get_workspace_context")) {
+      if (u.includes("get_organization_context")) {
         return {
           ok: true,
           json: async () => [
-            { workspace_id: "ws-1", tier: "pro", max_mcp_connections: -1 },
+            { organization_id: "ws-1", tier: "pro", max_mcp_connections: -1 },
           ],
         };
       }
@@ -302,12 +302,12 @@ describe("Token endpoint — connection recording", () => {
   it("returns invalid_grant when MCP connection limit is reached (authorization_code)", async () => {
     (globalThis.fetch as any).mockImplementation(async (url: string | URL) => {
       const u = typeof url === "string" ? url : url.toString();
-      if (u.includes("get_workspace_context")) {
+      if (u.includes("get_organization_context")) {
         return {
           ok: true,
           json: async () => [
             {
-              workspace_id: "ws-1",
+              organization_id: "ws-1",
               tier: "free",
               max_mcp_connections: 1,
             },
@@ -315,9 +315,12 @@ describe("Token endpoint — connection recording", () => {
         };
       }
       if (u.includes("/oauth_connections?")) {
+        // HEAD request with `Prefer: count=exact` — the count comes back in
+        // the `content-range` header, not the body.
         return {
           ok: true,
-          json: async () => [{ id: "other-conn" }],
+          headers: new Headers({ "content-range": "0-0/1" }),
+          json: async () => [],
         };
       }
       return { ok: true, json: async () => ({}) };

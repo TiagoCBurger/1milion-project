@@ -7,8 +7,9 @@ import {
 } from "@/lib/oauth-state";
 
 describe("OAuth State Cookie", () => {
-  const workspaceId = "ws-abc-123";
-  const slug = "my-workspace";
+  const organizationId = "org-abc-123";
+  const workspaceId = organizationId; // alias kept for readability in the older test cases
+  const slug = "my-organization";
 
   describe("createOAuthStateCookie", () => {
     it("generates a 64-char hex state", () => {
@@ -59,7 +60,7 @@ describe("OAuth State Cookie", () => {
       const cookieValue = cookieHeader.split("=")[1].split(";")[0];
 
       const result = validateOAuthStateCookie(cookieValue, state);
-      expect(result).toEqual({ workspaceId, slug });
+      expect(result).toEqual({ organizationId, slug });
     });
 
     it("rejects mismatched state", () => {

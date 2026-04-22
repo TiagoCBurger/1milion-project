@@ -1,8 +1,8 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getDecryptedToken, fetchInsights } from "@/lib/meta-api";
-import { getEnabledAdAccounts } from "@/lib/workspace-data";
+import { getEnabledAdAccounts } from "@/lib/organization-data";
+import { getAuthedUser, getSupabase, getOrganizationBySlug } from "@/lib/auth-context";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -64,45 +64,39 @@ export default async function WorkspacePage({
   const { slug } = await params;
   const { account_id, time_range } = await searchParams;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthedUser();
   if (!user) redirect("/login");
 
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("id, name, slug")
-    .eq("slug", slug)
-    .single();
-
+  const workspace = await getOrganizationBySlug(slug);
   if (!workspace) notFound();
 
-  const { data: metaToken } = await supabase
-    .from("meta_tokens")
-    .select("is_valid")
-    .eq("workspace_id", workspace.id)
-    .maybeSingle();
+  const supabase = await getSupabase();
 
-  const metaConnected = metaToken?.is_valid === true;
+  // Fan out the four independent status lookups in parallel. Each is a small
+  // count-style query; serializing them was adding ~250-400ms of idle wait.
+  const [metaTokenRes, apiKeysRes, oauthRes] = await Promise.all([
+    supabase
+      .from("meta_tokens")
+      .select("is_valid")
+      .eq("organization_id", workspace.id)
+      .maybeSingle(),
+    supabase
+      .from("api_keys")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", workspace.id)
+      .eq("is_active", true),
+    supabase
+      .from("oauth_connections")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", workspace.id)
+      .eq("is_active", true),
+  ]);
 
-  const { data: activeApiKeys } = await supabase
-    .from("api_keys")
-    .select("id")
-    .eq("workspace_id", workspace.id)
-    .eq("is_active", true);
-
-  const { data: activeOAuth } = await supabase
-    .from("oauth_connections")
-    .select("id")
-    .eq("workspace_id", workspace.id)
-    .eq("is_active", true);
-
-  const mcpConfigured =
-    (activeApiKeys?.length ?? 0) > 0 || (activeOAuth?.length ?? 0) > 0;
-
-  const mcpCount =
-    (activeApiKeys?.length ?? 0) + (activeOAuth?.length ?? 0);
+  const metaConnected = metaTokenRes.data?.is_valid === true;
+  const activeApiKeyCount = apiKeysRes.count ?? 0;
+  const activeOAuthCount = oauthRes.count ?? 0;
+  const mcpConfigured = activeApiKeyCount > 0 || activeOAuthCount > 0;
+  const mcpCount = activeApiKeyCount + activeOAuthCount;
 
   const checklistItems: Array<{
     key: string;
@@ -118,7 +112,7 @@ export default async function WorkspacePage({
       key: "meta",
       title: "Conectar o Facebook (Meta)",
       description:
-        "Autorize sua conta Meta para gerenciar contas de anúncios, campanhas e criativos neste espaço.",
+        "Autorize sua conta Meta para gerenciar contas de anúncios, campanhas e criativos nesta organização.",
       href: `/dashboard/${slug}/integrations/meta`,
       cta: "Conectar Meta",
       icon: Link2,
@@ -139,9 +133,14 @@ export default async function WorkspacePage({
 
   const showChecklist = checklistItems.length > 0;
 
-  const token = metaConnected ? await getDecryptedToken(workspace.id) : null;
-  const accounts =
-    metaConnected && token ? await getEnabledAdAccounts(workspace.id) : [];
+  // Token + enabled accounts are independent after the above status checks —
+  // kick both off together so the longer of the two defines the wait.
+  const [token, accounts] = metaConnected
+    ? await Promise.all([
+        getDecryptedToken(workspace.id),
+        getEnabledAdAccounts(workspace.id),
+      ])
+    : [null, [] as Awaited<ReturnType<typeof getEnabledAdAccounts>>];
 
   const showMainDashboard = Boolean(token && accounts.length > 0);
 
@@ -186,7 +185,7 @@ export default async function WorkspacePage({
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: workspace.name },
         ]}
       />
@@ -198,7 +197,7 @@ export default async function WorkspacePage({
               <CardTitle className="text-xl">Configuração</CardTitle>
               <CardDescription>
                 Conclua os itens abaixo para usar anúncios e ferramentas MCP
-                neste espaço.
+                nesta organização.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -241,7 +240,7 @@ export default async function WorkspacePage({
           <EmptyState
             icon={Building2}
             title="Nenhuma conta de anúncios ativa"
-            description="Habilite pelo menos uma conta de anúncios no Business Manager sincronizado com este espaço."
+            description="Habilite pelo menos uma conta de anúncios no Business Manager sincronizado com esta organização."
           >
             <Button asChild>
               <Link href={`/dashboard/${slug}/integrations/meta`}>
@@ -282,7 +281,7 @@ export default async function WorkspacePage({
               <StatCard
                 title="Contas de anúncio"
                 value={accounts.length}
-                subtitle="ativas neste espaço"
+                subtitle="ativas nesta organização"
                 icon={Building2}
               />
               <StatCard

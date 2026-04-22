@@ -15,6 +15,10 @@ vi.mock("@/lib/supabase/admin", () => ({
   })),
 }));
 
+vi.mock("@/lib/organization-write-guard", () => ({
+  assertOrganizationCanWrite: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock("@/lib/r2-upload", () => ({
   uploadToR2: vi.fn().mockResolvedValue({
     key: "ws/images/123_test.jpg",
@@ -60,7 +64,7 @@ const params = Promise.resolve({ id: "workspace-123" });
 
 // ── Campaign Create Route ────────────────────────────────────
 
-describe("POST /api/workspaces/[id]/meta/campaigns", () => {
+describe("POST /api/organizations/[id]/meta/campaigns", () => {
   let originalFetch: typeof global.fetch;
 
   beforeEach(() => {
@@ -75,9 +79,9 @@ describe("POST /api/workspaces/[id]/meta/campaigns", () => {
   it("returns 401 when not authenticated", async () => {
     setupNoAuth();
     const { POST } = await import(
-      "@/app/api/workspaces/[id]/meta/campaigns/route"
+      "@/app/api/organizations/[id]/meta/campaigns/route"
     );
-    const req = new Request("http://localhost/api/workspaces/ws-1/meta/campaigns", {
+    const req = new Request("http://localhost/api/organizations/ws-1/meta/campaigns", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ account_id: "123", name: "Test", objective: "OUTCOME_TRAFFIC" }),
@@ -91,7 +95,7 @@ describe("POST /api/workspaces/[id]/meta/campaigns", () => {
   it("returns 403 when not a member", async () => {
     setupNoMembership();
     const { POST } = await import(
-      "@/app/api/workspaces/[id]/meta/campaigns/route"
+      "@/app/api/organizations/[id]/meta/campaigns/route"
     );
     const req = new Request("http://localhost/test", {
       method: "POST",
@@ -107,7 +111,7 @@ describe("POST /api/workspaces/[id]/meta/campaigns", () => {
   it("returns 400 when missing required fields", async () => {
     setupAuth();
     const { POST } = await import(
-      "@/app/api/workspaces/[id]/meta/campaigns/route"
+      "@/app/api/organizations/[id]/meta/campaigns/route"
     );
     const req = new Request("http://localhost/test", {
       method: "POST",
@@ -139,7 +143,7 @@ describe("POST /api/workspaces/[id]/meta/campaigns", () => {
     }));
 
     const { POST } = await import(
-      "@/app/api/workspaces/[id]/meta/campaigns/route"
+      "@/app/api/organizations/[id]/meta/campaigns/route"
     );
     const req = new Request("http://localhost/test", {
       method: "POST",
@@ -167,7 +171,7 @@ describe("POST /api/workspaces/[id]/meta/campaigns", () => {
 
 // ── Campaign Update Route ────────────────────────────────────
 
-describe("PATCH /api/workspaces/[id]/meta/campaigns/[campaignId]", () => {
+describe("PATCH /api/organizations/[id]/meta/campaigns/[campaignId]", () => {
   let originalFetch: typeof global.fetch;
 
   beforeEach(() => {
@@ -182,7 +186,7 @@ describe("PATCH /api/workspaces/[id]/meta/campaigns/[campaignId]", () => {
   it("returns 401 when not authenticated", async () => {
     setupNoAuth();
     const { PATCH } = await import(
-      "@/app/api/workspaces/[id]/meta/campaigns/[campaignId]/route"
+      "@/app/api/organizations/[id]/meta/campaigns/[campaignId]/route"
     );
     const req = new Request("http://localhost/test", {
       method: "PATCH",
@@ -200,13 +204,13 @@ describe("PATCH /api/workspaces/[id]/meta/campaigns/[campaignId]", () => {
 
 // ── Ad Set Create Route ──────────────────────────────────────
 
-describe("POST /api/workspaces/[id]/meta/adsets", () => {
+describe("POST /api/organizations/[id]/meta/adsets", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("returns 400 when missing required fields", async () => {
     setupAuth();
     const { POST } = await import(
-      "@/app/api/workspaces/[id]/meta/adsets/route"
+      "@/app/api/organizations/[id]/meta/adsets/route"
     );
     const req = new Request("http://localhost/test", {
       method: "POST",
@@ -223,13 +227,13 @@ describe("POST /api/workspaces/[id]/meta/adsets", () => {
 
 // ── Ad Create Route ──────────────────────────────────────────
 
-describe("POST /api/workspaces/[id]/meta/ads", () => {
+describe("POST /api/organizations/[id]/meta/ads", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("returns 400 when missing required fields", async () => {
     setupAuth();
     const { POST } = await import(
-      "@/app/api/workspaces/[id]/meta/ads/route"
+      "@/app/api/organizations/[id]/meta/ads/route"
     );
     const req = new Request("http://localhost/test", {
       method: "POST",
@@ -246,13 +250,13 @@ describe("POST /api/workspaces/[id]/meta/ads", () => {
 
 // ── Creative Create Route ────────────────────────────────────
 
-describe("POST /api/workspaces/[id]/meta/creatives", () => {
+describe("POST /api/organizations/[id]/meta/creatives", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("returns 400 when missing page_id", async () => {
     setupAuth();
     const { POST } = await import(
-      "@/app/api/workspaces/[id]/meta/creatives/route"
+      "@/app/api/organizations/[id]/meta/creatives/route"
     );
     const req = new Request("http://localhost/test", {
       method: "POST",
@@ -269,13 +273,13 @@ describe("POST /api/workspaces/[id]/meta/creatives", () => {
 
 // ── Image Upload Route ───────────────────────────────────────
 
-describe("POST /api/workspaces/[id]/meta/images", () => {
+describe("POST /api/organizations/[id]/meta/images", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("returns 400 when no file provided", async () => {
     setupAuth();
     const { POST } = await import(
-      "@/app/api/workspaces/[id]/meta/images/route"
+      "@/app/api/organizations/[id]/meta/images/route"
     );
     const formData = new FormData();
     formData.append("account_id", "123");
@@ -295,7 +299,7 @@ describe("POST /api/workspaces/[id]/meta/images", () => {
   it("returns 400 when file exceeds 30MB", async () => {
     setupAuth();
     const { POST } = await import(
-      "@/app/api/workspaces/[id]/meta/images/route"
+      "@/app/api/organizations/[id]/meta/images/route"
     );
 
     // Create a fake file > 30MB

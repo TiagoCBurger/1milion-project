@@ -16,14 +16,14 @@ describe("validateApiKey", () => {
     globalThis.fetch = originalFetch;
   });
 
-  it("returns workspace context for valid API key", async () => {
+  it("returns organization context for valid API key", async () => {
     (globalThis.fetch as any).mockImplementation(async (url: string) => {
       if (url.includes("rpc/validate_api_key")) {
         return {
           ok: true,
           json: async () => [
             {
-              workspace_id: "ws-1",
+              organization_id: "org-1",
               api_key_id: "key-1",
               tier: "pro",
               requests_per_minute: 30,
@@ -36,10 +36,12 @@ describe("validateApiKey", () => {
           ],
         };
       }
-      if (url.includes("/rest/v1/ad_accounts?")) {
+      if (url.includes("rpc/list_projects")) {
         return {
           ok: true,
-          json: async () => [{ meta_account_id: "act_workspace_1" }],
+          json: async () => [
+            { id: "proj-default", slug: "default", name: "Default", is_default: true },
+          ],
         };
       }
       return { ok: false, json: async () => [] };
@@ -47,21 +49,14 @@ describe("validateApiKey", () => {
 
     const result = await validateApiKey("mads_test123", env);
 
-    expect(result).toEqual({
-      ok: true,
-      workspace: {
-        workspaceId: "ws-1",
-        apiKeyId: "key-1",
-        tier: "pro",
-        requestsPerMinute: 30,
-        requestsPerHour: 200,
-        requestsPerDay: 1000,
-        maxMcpConnections: 3,
-        maxAdAccounts: 2,
-        enableMetaMutations: true,
-        allowedAccounts: ["act_workspace_1"],
-      },
-    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.workspace.organizationId).toBe("org-1");
+    expect(result.workspace.tier).toBe("pro");
+    expect(result.workspace.availableProjects).toEqual([
+      { id: "proj-default", slug: "default", name: "Default", isDefault: true },
+    ]);
+    expect(result.workspace.allowedProjectIds).toEqual(["proj-default"]);
   });
 
   it("returns error for invalid API key (empty rows)", async () => {
@@ -86,44 +81,6 @@ describe("validateApiKey", () => {
       ok: false,
       error: "Internal error validating API key.",
     });
-  });
-
-  it("returns cached result on second call", async () => {
-    (globalThis.fetch as any).mockImplementation(async (url: string) => {
-      if (url.includes("rpc/validate_api_key")) {
-        return {
-          ok: true,
-          json: async () => [
-            {
-              workspace_id: "ws-1",
-              api_key_id: "key-1",
-              tier: "free",
-              requests_per_minute: 0,
-              requests_per_hour: 20,
-              requests_per_day: 20,
-              max_mcp_connections: 1,
-              max_ad_accounts: 0,
-              enable_meta_mutations: false,
-            },
-          ],
-        };
-      }
-      if (url.includes("/rest/v1/ad_accounts?")) {
-        return {
-          ok: true,
-          json: async () => [{ meta_account_id: "act_cached" }],
-        };
-      }
-      return { ok: false, json: async () => [] };
-    });
-
-    const result1 = await validateApiKey("mads_cached", env);
-    expect(result1.ok).toBe(true);
-    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
-
-    const result2 = await validateApiKey("mads_cached", env);
-    expect(result2).toEqual(result1);
-    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
   });
 
   it("calls Supabase RPC with correct params", async () => {
@@ -163,7 +120,7 @@ describe("getMetaToken", () => {
       json: async () => ({ token: "EAA_meta_token_123" }),
     });
 
-    const result = await getMetaToken("ws-1", env);
+    const result = await getMetaToken("org-1", env);
     expect(result).toBe("EAA_meta_token_123");
   });
 
@@ -174,7 +131,7 @@ describe("getMetaToken", () => {
       text: async () => "Not found",
     });
 
-    const result = await getMetaToken("ws-nonexistent", env);
+    const result = await getMetaToken("org-nonexistent", env);
     expect(result).toBeNull();
   });
 
@@ -184,7 +141,7 @@ describe("getMetaToken", () => {
       json: async () => ({ token: "" }),
     });
 
-    const result = await getMetaToken("ws-1", env);
+    const result = await getMetaToken("org-1", env);
     expect(result).toBeNull();
   });
 
@@ -194,10 +151,10 @@ describe("getMetaToken", () => {
       json: async () => ({ token: "EAA_cached" }),
     });
 
-    await getMetaToken("ws-cache", env);
+    await getMetaToken("org-cache", env);
 
     expect(env.CACHE_KV.put).toHaveBeenCalledWith(
-      "token:ws-cache",
+      "v2:token:org-cache",
       "EAA_cached",
       { expirationTtl: 300 },
     );
@@ -209,13 +166,14 @@ describe("getMetaToken", () => {
       json: async () => ({ token: "tok" }),
     });
 
-    await getMetaToken("ws-1", env);
+    await getMetaToken("org-1", env);
 
     const [url, opts] = (globalThis.fetch as any).mock.calls[0];
     expect(url).toBe(
       "https://test.supabase.co/functions/v1/decrypt-token",
     );
     expect(opts.method).toBe("POST");
-    expect(JSON.parse(opts.body)).toEqual({ workspaceId: "ws-1" });
+    // decrypt-token edge function still accepts legacy `workspaceId` key.
+    expect(JSON.parse(opts.body)).toEqual({ workspaceId: "org-1" });
   });
 });

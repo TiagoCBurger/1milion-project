@@ -1,13 +1,13 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import {
   getDecryptedToken,
   fetchAdSets,
   metaApiGet,
   metaUserFacingError,
 } from "@/lib/meta-api";
-import { getEnabledAdAccounts } from "@/lib/workspace-data";
+import { getEnabledAdAccounts } from "@/lib/organization-data";
+import { getAuthedUser, getSupabase } from "@/lib/auth-context";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CampaignsTopNav } from "@/components/dashboard/campaigns-top-nav";
 import { AccountSelector } from "@/components/dashboard/account-selector";
@@ -48,28 +48,28 @@ export default async function CampaignDetailPage({
 }) {
   const { slug, campaignId } = await params;
   const { account_id } = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthedUser();
   if (!user) redirect("/login");
 
+  const supabase = await getSupabase();
   const { data: workspace } = await supabase
-    .from("workspaces")
+    .from("organizations")
     .select("id")
     .eq("slug", slug)
     .single();
   if (!workspace) notFound();
 
-  const token = await getDecryptedToken(workspace.id);
-  const accounts = await getEnabledAdAccounts(workspace.id);
+  const [token, accounts] = await Promise.all([
+    getDecryptedToken(workspace.id),
+    getEnabledAdAccounts(workspace.id),
+  ]);
 
   if (!token || accounts.length === 0) {
     return (
       <>
         <PageHeader
           breadcrumbs={[
-            { label: "Espaços de trabalho", href: "/dashboard" },
+            { label: "Organizações", href: "/dashboard" },
             { label: slug, href: `/dashboard/${slug}` },
             { label: "Campanhas", href: `/dashboard/${slug}/campaigns` },
             { label: campaignId },
@@ -83,7 +83,7 @@ export default async function CampaignDetailPage({
             description={
               !token
                 ? "Conecte a Meta para ver conjuntos desta campanha."
-                : "Ative pelo menos uma conta de anúncios no painel do espaço."
+                : "Ative pelo menos uma conta de anúncios no painel da organização."
             }
           >
             <Button asChild>
@@ -100,7 +100,10 @@ export default async function CampaignDetailPage({
   const selectedAccount = account_id ?? accounts[0].meta_account_id;
   const q = `account_id=${encodeURIComponent(selectedAccount)}`;
 
-  const campaignJson = await metaApiGet(campaignId, token, { fields: campaignFields });
+  const [campaignJson, adsetsRes] = await Promise.all([
+    metaApiGet(campaignId, token, { fields: campaignFields }),
+    fetchAdSets(token, selectedAccount, { campaignId, limit: 100 }),
+  ]);
   const campaignErr = metaUserFacingError(campaignJson);
   if (campaignErr || campaignJson["id"] == null) {
     notFound();
@@ -108,17 +111,13 @@ export default async function CampaignDetailPage({
 
   const campaignName = String(campaignJson["name"] ?? campaignId);
   const campaignStatus = String(campaignJson["status"] ?? "—");
-
-  const { data: adsets, error } = await fetchAdSets(token, selectedAccount, {
-    campaignId,
-    limit: 100,
-  });
+  const { data: adsets, error } = adsetsRes;
 
   return (
     <>
       <PageHeader
         breadcrumbs={[
-          { label: "Espaços de trabalho", href: "/dashboard" },
+          { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
           { label: "Campanhas", href: `/dashboard/${slug}/campaigns` },
           { label: campaignName },

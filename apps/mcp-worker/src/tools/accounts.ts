@@ -6,7 +6,11 @@ import {
   centsToAmount,
 } from "../meta-api";
 import type { ToolContext } from "./index";
-import { isAccountAllowed, accountBlockedResult } from "./index";
+import {
+  isAccountAllowed,
+  accountBlockedResult,
+  getProjectAllowedAccounts,
+} from "./index";
 
 const ACCOUNT_FIELDS =
   "id,name,account_id,account_status,amount_spent,balance,currency,age,business_city,business_country_code";
@@ -51,12 +55,18 @@ function normalizeMonetary(acc: AdAccount): AdAccount {
 }
 
 export function registerAccountsTools(ctx: ToolContext): void {
-  const { server, token, tier, allowedAccounts } = ctx;
+  const { server, token } = ctx;
   // ── get_ad_accounts ──────────────────────────────────────────────────
   server.tool(
     "get_ad_accounts",
-    "List all ad accounts accessible by the given user or the current user.",
+    "List the ad accounts that belong to the active project.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe(
+          "Project ID or slug to scope the request. Omit if the connection only has one project.",
+        ),
       user_id: z
         .string()
         .default("me")
@@ -67,6 +77,10 @@ export function registerAccountsTools(ctx: ToolContext): void {
         .describe("Maximum number of ad accounts to return."),
     },
     async (args) => {
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
+
       const data = await metaApiGet(`${args.user_id}/adaccounts`, token, {
         fields: ACCOUNT_FIELDS,
         limit: args.limit,
@@ -78,16 +92,15 @@ export function registerAccountsTools(ctx: ToolContext): void {
 
       let accounts = ((data as any).data ?? []) as AdAccount[];
 
-      if (allowedAccounts !== undefined) {
-        accounts = accounts.filter((acc) => {
-          const id = (acc.account_id as string) || (acc.id as string) || "";
-          return isAccountAllowed(id, allowedAccounts);
-        });
-      }
+      accounts = accounts.filter((acc) => {
+        const id = (acc.account_id as string) || (acc.id as string) || "";
+        return isAccountAllowed(id, allowedAccounts);
+      });
 
       const normalized = accounts.map(normalizeMonetary);
 
       return textResult({
+        project: { id: scope.project.id, slug: scope.project.slug, name: scope.project.name },
         accounts: normalized,
         total: normalized.length,
         paging: (data as any).paging,
@@ -100,6 +113,10 @@ export function registerAccountsTools(ctx: ToolContext): void {
     "get_account_info",
     "Get detailed information about a specific ad account including status, spend, and DSA requirements.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe(
@@ -107,6 +124,9 @@ export function registerAccountsTools(ctx: ToolContext): void {
         ),
     },
     async (args) => {
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(args.account_id, allowedAccounts)) {
         return accountBlockedResult(args.account_id);
       }
@@ -156,6 +176,10 @@ export function registerAccountsTools(ctx: ToolContext): void {
     "get_account_pages",
     "Get Facebook Pages accessible by the current user or associated with an ad account.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       account_id: z
         .string()
         .describe(
@@ -163,6 +187,7 @@ export function registerAccountsTools(ctx: ToolContext): void {
         ),
     },
     async (args) => {
+      // "me" lists the user's own pages regardless of project scope.
       if (args.account_id === "me") {
         const data = await metaApiGet("me/accounts", token, {
           fields: PAGE_FIELDS,
@@ -178,6 +203,9 @@ export function registerAccountsTools(ctx: ToolContext): void {
         });
       }
 
+      const scope = await getProjectAllowedAccounts(ctx, args);
+      if (!scope.ok) return scope.result;
+      const { allowedAccounts } = scope;
       if (!isAccountAllowed(args.account_id, allowedAccounts)) {
         return accountBlockedResult(args.account_id);
       }
