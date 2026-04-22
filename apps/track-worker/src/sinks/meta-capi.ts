@@ -63,6 +63,7 @@ export async function sendCapiEvent(
   if (payload.props) Object.assign(custom_data, payload.props);
 
   const body = {
+    access_token: capiToken,
     data: [
       {
         event_name: eventName,
@@ -76,14 +77,16 @@ export async function sendCapiEvent(
     ],
   };
 
-  await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${pixelId}/events?access_token=${capiToken}`, {
+  await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${pixelId}/events`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
 }
 
-// Calls analytics.decrypt_capi_token(p_site_id, p_encryption_key) → TEXT
+// Calls analytics.decrypt_capi_token(p_site_id) → TEXT. The symmetric key
+// lives in Supabase Vault (see migration 040) and is read server-side by
+// the RPC, so the worker never handles it.
 export async function decryptCapiToken(env: Env, siteId: string): Promise<string | null> {
   const url = `${env.SUPABASE_URL}/rest/v1/rpc/decrypt_capi_token`;
   const res = await fetch(url, {
@@ -95,7 +98,7 @@ export async function decryptCapiToken(env: Env, siteId: string): Promise<string
       apikey: env.SUPABASE_SERVICE_ROLE_KEY,
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
     },
-    body: JSON.stringify({ p_site_id: siteId, p_encryption_key: env.CAPI_ENCRYPTION_KEY }),
+    body: JSON.stringify({ p_site_id: siteId }),
   });
   if (!res.ok) return null;
   const token = (await res.json()) as string | null;

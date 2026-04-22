@@ -41,17 +41,23 @@ export async function PATCH(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await request.json() as Partial<
-    Pick<EmailPreference, "marketing_opted_in" | "product_updates" | "tips_and_tricks">
-  >;
+  const raw = (await request.json()) as Record<string, unknown>;
+
+  // Explicit allowlist so a `user_id` in the body can never override the
+  // authenticated user. A spread here would silently let any caller upsert
+  // another account's preferences (mass-unsubscribe primitive).
+  const update: Partial<Pick<EmailPreference, "marketing_opted_in" | "product_updates" | "tips_and_tricks">> = {};
+  if (typeof raw.marketing_opted_in === "boolean") update.marketing_opted_in = raw.marketing_opted_in;
+  if (typeof raw.product_updates === "boolean") update.product_updates = raw.product_updates;
+  if (typeof raw.tips_and_tricks === "boolean") update.tips_and_tricks = raw.tips_and_tricks;
 
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("email_preferences")
     .upsert(
       {
+        ...update,
         user_id: user.id,
-        ...body,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id" }

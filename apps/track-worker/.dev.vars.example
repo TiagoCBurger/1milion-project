@@ -11,7 +11,8 @@ SUPABASE_URL=
 # Supabase service-role key  (Settings → API → service_role — never expose to browser)
 SUPABASE_SERVICE_ROLE_KEY=
 
-# 32-byte hex key used to encrypt/decrypt CAPI access tokens at rest in Postgres.
-# Generate: openssl rand -hex 32
-# Must match CAPI_ENCRYPTION_KEY in apps/web/.env.local.
-CAPI_ENCRYPTION_KEY=your-32-byte-hex-key
+# Optional: hex HMAC key for user_id signature verification. When set, the
+# worker refuses identified writes (user_profiles, custom_events, CAPI user
+# data) unless the payload includes a valid user_id_sig minted by the site's
+# backend. Generate: openssl rand -hex 32
+# USER_ID_SIGNING_KEY=

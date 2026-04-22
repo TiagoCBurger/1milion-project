@@ -5,6 +5,7 @@ import {
   isAccountAllowed,
   accountBlockedResult,
   getProjectAllowedAccounts,
+  scopeCheckByMetaId,
 } from "./index";
 
 export function registerAdsetTools(ctx: ToolContext) {
@@ -72,9 +73,16 @@ export function registerAdsetTools(ctx: ToolContext) {
     "get_adset_details",
     "Get detailed information about a specific ad set",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       adset_id: z.string().describe("The ad set ID to retrieve details for"),
     },
-    async ({ adset_id }) => {
+    async (args) => {
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.adset_id);
+      if (!check.ok) return check.result;
+
       const fields = [
         "id", "name", "campaign_id", "status",
         "frequency_control_specs{event,interval_days,max_frequency}",
@@ -86,7 +94,7 @@ export function registerAdsetTools(ctx: ToolContext) {
         "dsa_beneficiary", "dsa_payor", "is_dynamic_creative",
       ].join(",");
 
-      const data = await metaApiGet(adset_id, token, { fields });
+      const data = await metaApiGet(args.adset_id, token, { fields });
       return textResult(data);
     }
   );
@@ -247,6 +255,10 @@ export function registerAdsetTools(ctx: ToolContext) {
     "update_adset",
     "Update an existing ad set (Pro tier required)",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       adset_id: z.string().describe("The ad set ID to update"),
       name: z.string().optional().describe("New name for the ad set"),
       status: z
@@ -294,10 +306,13 @@ export function registerAdsetTools(ctx: ToolContext) {
         .optional()
         .describe("DSA payor for EU Digital Services Act compliance"),
     },
-    async ({ adset_id, ...updates }) => {
+    async ({ project_id, adset_id, ...updates }) => {
       if (tier === "free") {
         return textResult("update_adset requires a Pro or Enterprise subscription. Upgrade at https://yourdomain.com/pricing", true);
       }
+
+      const check = await scopeCheckByMetaId(ctx, project_id, adset_id);
+      if (!check.ok) return check.result;
 
       const params: Record<string, unknown> = {};
 

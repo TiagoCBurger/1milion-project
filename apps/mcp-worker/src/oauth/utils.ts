@@ -88,6 +88,23 @@ export async function verifyJwt<T = Record<string, unknown>>(
   const enc = new TextEncoder();
   const signingInput = `${headerB64}.${payloadB64}`;
 
+  // Reject anything that isn't an HS256 JWT. Without this check, a future
+  // change that adds another algorithm would silently let unverified tokens
+  // slip through — and the classic `alg: none` bypass stays locked out even
+  // though the Web Crypto import already pins HMAC-SHA256.
+  try {
+    const header = JSON.parse(
+      atob(
+        headerB64.replace(/-/g, "+").replace(/_/g, "/") +
+          "==".slice(0, (4 - (headerB64.length % 4)) % 4),
+      ),
+    ) as { alg?: unknown; typ?: unknown };
+    if (header.alg !== "HS256") return null;
+    if (header.typ !== undefined && header.typ !== "JWT") return null;
+  } catch {
+    return null;
+  }
+
   const key = await crypto.subtle.importKey(
     "raw",
     enc.encode(secret),

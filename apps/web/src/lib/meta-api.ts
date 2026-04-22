@@ -173,7 +173,6 @@ export async function metaApiGet(
   }
 
   const url = new URL(`${BASE_URL}/${endpoint}`);
-  url.searchParams.set("access_token", token);
   for (const [k, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue;
     url.searchParams.set(k, typeof value === "string" ? value : JSON.stringify(value));
@@ -181,8 +180,11 @@ export async function metaApiGet(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
+    // Token goes in the Authorization header, not the query string. URLs hit
+    // access logs (ours and upstream proxies) with the token still attached.
     const res = await fetch(url.toString(), {
       cache: "no-store",
+      headers: { Authorization: `Bearer ${token}` },
       signal: controller.signal,
     });
     const json = (await res.json()) as Record<string, unknown>;
@@ -214,7 +216,6 @@ export async function metaApiPost(
 ): Promise<Record<string, unknown>> {
   const url = `${BASE_URL}/${endpoint}`;
   const body = new URLSearchParams();
-  body.set("access_token", token);
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue;
     body.set(key, typeof value === "string" ? value : JSON.stringify(value));
@@ -224,7 +225,10 @@ export async function metaApiPost(
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Bearer ${token}`,
+      },
       body: body.toString(),
       signal: controller.signal,
     });
@@ -266,7 +270,6 @@ export async function metaApiUploadImage(
 ): Promise<Record<string, unknown>> {
   const url = `${BASE_URL}/${ensureActPrefix(accountId)}/adimages`;
   const form = new FormData();
-  form.append("access_token", token);
   form.append("filename", new Blob([new Uint8Array(fileBuffer)], { type: contentType }), fileName);
   if (imageName) form.append("name", imageName);
 
@@ -275,6 +278,7 @@ export async function metaApiUploadImage(
   try {
     const res = await fetch(url, {
       method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
       body: form,
       signal: controller.signal,
     });

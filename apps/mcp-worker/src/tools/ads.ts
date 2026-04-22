@@ -5,6 +5,7 @@ import {
   isAccountAllowed,
   accountBlockedResult,
   getProjectAllowedAccounts,
+  scopeCheckByMetaId,
 } from "./index";
 
 export function registerAdTools(ctx: ToolContext) {
@@ -82,16 +83,23 @@ export function registerAdTools(ctx: ToolContext) {
     "get_ad_details",
     "Get detailed information about a specific ad",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       ad_id: z.string().describe("The ad ID to retrieve details for"),
     },
-    async ({ ad_id }) => {
+    async (args) => {
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.ad_id);
+      if (!check.ok) return check.result;
+
       const fields = [
         "id", "name", "adset_id", "campaign_id", "status", "creative",
         "created_time", "updated_time", "bid_amount", "conversion_domain",
         "tracking_specs", "preview_shareable_link",
       ].join(",");
 
-      const data = await metaApiGet(ad_id, token, { fields });
+      const data = await metaApiGet(args.ad_id, token, { fields });
       return textResult(data);
     }
   );
@@ -166,6 +174,10 @@ export function registerAdTools(ctx: ToolContext) {
     "update_ad",
     "Update an existing ad (Pro tier required)",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       ad_id: z.string().describe("The ad ID to update"),
       status: z
         .string()
@@ -184,10 +196,13 @@ export function registerAdTools(ctx: ToolContext) {
         .optional()
         .describe("Updated tracking specs as an array of objects"),
     },
-    async ({ ad_id, ...updates }) => {
+    async ({ project_id, ad_id, ...updates }) => {
       if (tier === "free") {
         return textResult("update_ad requires a Pro or Enterprise subscription. Upgrade at https://yourdomain.com/pricing", true);
       }
+
+      const check = await scopeCheckByMetaId(ctx, project_id, ad_id);
+      if (!check.ok) return check.result;
 
       const params: Record<string, unknown> = {};
 

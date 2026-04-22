@@ -45,4 +45,31 @@ describe("analyticsPayloadSchema", () => {
     const r = analyticsPayloadSchema.safeParse({ ...base, currency: "USDA" });
     expect(r.success).toBe(false);
   });
+
+  it("accepts E.164-ish phone", () => {
+    const r = analyticsPayloadSchema.safeParse({
+      ...base,
+      user: { phone: "+55 (11) 98765-4321" },
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("rejects garbage phone", () => {
+    const r = analyticsPayloadSchema.safeParse({
+      ...base,
+      user: { phone: "hello world" },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("accepts hex user_id_sig", () => {
+    const sig = "a".repeat(64);
+    const r = analyticsPayloadSchema.safeParse({ ...base, user_id: "u1", user_id_sig: sig });
+    expect(r.success).toBe(true);
+  });
+
+  it("rejects short user_id_sig", () => {
+    const r = analyticsPayloadSchema.safeParse({ ...base, user_id: "u1", user_id_sig: "abcd" });
+    expect(r.success).toBe(false);
+  });
 });

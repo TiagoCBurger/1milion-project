@@ -16,7 +16,18 @@ function getWebhookSecret(): string {
   return secret;
 }
 
-// AbacatePay public key for HMAC-SHA256 webhook signature verification
+// NOTE on webhook authentication:
+//
+// AbacatePay publishes a fixed HMAC "public key" in their docs — the same
+// string for every merchant — so the HMAC X-Webhook-Signature cannot prove
+// authenticity (anyone with internet access can compute it). The real gate
+// is the per-merchant `webhookSecret` query-string parameter that the route
+// compares against ABACATEPAY_WEBHOOK_SECRET.
+//
+// We still verify the HMAC because it acts as a body-integrity check and
+// matches what the docs recommend, but `verifyWebhookSignature` is NOT a
+// sufficient gate on its own — the query secret check MUST run first and
+// MUST be timing-safe.
 const ABACATEPAY_PUBLIC_KEY =
   "t9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9";
 
@@ -168,12 +179,18 @@ export function getProductId(tier: PaidTier, cycle: BillingCycle): string {
 // ── Webhook verification ─────────────────────────────────────
 
 /**
- * Verifies the webhook query string secret.
+ * Verifies the webhook query string secret using a timing-safe comparison.
+ * This is the ONLY real authenticity check — see the note on ABACATEPAY_PUBLIC_KEY.
  */
 export function verifyWebhookQuerySecret(querySecret: string | null): boolean {
   if (!querySecret) return false;
   const expected = getWebhookSecret();
-  return querySecret === expected;
+  if (querySecret.length !== expected.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < expected.length; i++) {
+    mismatch |= querySecret.charCodeAt(i) ^ expected.charCodeAt(i);
+  }
+  return mismatch === 0;
 }
 
 /**

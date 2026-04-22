@@ -7,6 +7,11 @@ interface PatchBody {
   is_active?: boolean;
 }
 
+// Meta pixel IDs are numeric strings (15-16 digits). Rejecting anything else
+// stops a malicious admin from injecting HTML/JS if pixel_id is ever embedded
+// in an inline <script> or dangerouslySetInnerHTML downstream.
+const PIXEL_ID_RE = /^\d{6,20}$/;
+
 async function authorizeWrite(organizationId: string) {
   const supabase = await createClient();
   const {
@@ -52,7 +57,13 @@ export async function PATCH(
   if (!owning) return Response.json({ error: "Site not found" }, { status: 404 });
 
   const update: Record<string, unknown> = {};
-  if (body.pixel_id !== undefined) update.pixel_id = body.pixel_id || null;
+  if (body.pixel_id !== undefined) {
+    const trimmed = typeof body.pixel_id === "string" ? body.pixel_id.trim() : "";
+    if (trimmed && !PIXEL_ID_RE.test(trimmed)) {
+      return Response.json({ error: "pixel_id deve ser numérico" }, { status: 400 });
+    }
+    update.pixel_id = trimmed || null;
+  }
   if (body.is_active !== undefined) update.is_active = Boolean(body.is_active);
 
   // Clear token via direct UPDATE (RPC only sets a value).
@@ -69,14 +80,12 @@ export async function PATCH(
     if (updateErr) return Response.json({ error: updateErr.message }, { status: 500 });
   }
 
-  // Set token via RPC (encrypts server-side using pgp_sym_encrypt).
+  // Set token via RPC. The RPC reads its symmetric key from Supabase Vault
+  // (see migration 040) — callers no longer need CAPI_ENCRYPTION_KEY.
   if (body.capi_access_token && body.capi_access_token.length > 0) {
-    const key = process.env.CAPI_ENCRYPTION_KEY;
-    if (!key) return Response.json({ error: "CAPI_ENCRYPTION_KEY not configured" }, { status: 500 });
     const { error: rpcErr } = await analytics.rpc("encrypt_capi_token", {
       p_site_id: siteId,
       p_token: body.capi_access_token,
-      p_encryption_key: key,
     });
     if (rpcErr) return Response.json({ error: rpcErr.message }, { status: 500 });
   }

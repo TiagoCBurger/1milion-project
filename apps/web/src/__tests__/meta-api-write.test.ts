@@ -55,9 +55,10 @@ describe("Meta API Write Operations", () => {
       expect(url).toContain("act_123/campaigns");
       expect(options.method).toBe("POST");
       expect(options.headers["Content-Type"]).toBe("application/x-www-form-urlencoded");
+      expect(options.headers.Authorization).toBe("Bearer token123");
 
       const body = options.body as string;
-      expect(body).toContain("access_token=token123");
+      expect(body).not.toContain("access_token=");
       expect(body).toContain("name=Test+Campaign");
       expect(body).toContain("objective=OUTCOME_TRAFFIC");
       expect(body).toContain("status=PAUSED");
@@ -166,9 +167,10 @@ describe("Meta API Write Operations", () => {
       expect(options.method).toBe("POST");
       // FormData doesn't have Content-Type header set manually
       expect(options.body).toBeInstanceOf(FormData);
+      expect(options.headers.Authorization).toBe("Bearer token");
 
       const form = options.body as FormData;
-      expect(form.get("access_token")).toBe("token");
+      expect(form.get("access_token")).toBeNull();
       expect(form.get("name")).toBe("My Image");
       expect(form.get("filename")).toBeInstanceOf(Blob);
 

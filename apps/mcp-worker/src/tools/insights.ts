@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { metaApiGet, textResult } from "../meta-api";
 import type { ToolContext } from "./index";
+import { scopeCheckByMetaId } from "./index";
 
 const INSIGHT_FIELDS = [
   "account_id",
@@ -64,6 +65,10 @@ export function registerInsightTools(ctx: ToolContext): void {
     "get_insights",
     "Get performance insights (metrics, KPIs) for a Meta Ads object (account, campaign, adset, or ad). Supports date presets, custom time ranges, breakdowns, and pagination.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       object_id: z
         .string()
         .describe(
@@ -103,6 +108,9 @@ export function registerInsightTools(ctx: ToolContext): void {
         ),
     },
     async (args) => {
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.object_id);
+      if (!check.ok) return check.result;
+
       const params: Record<string, unknown> = {
         fields: INSIGHT_FIELDS,
         level: args.level,

@@ -8,6 +8,7 @@ import {
   isAccountAllowed,
   accountBlockedResult,
   getProjectAllowedAccounts,
+  scopeCheckByMetaId,
 } from "./index";
 import type { SubscriptionTier } from "@vibefly/shared";
 
@@ -28,11 +29,18 @@ export function registerCreativeTools(ctx: ToolContext): void {
     "get_ad_creatives",
     "List all creatives associated with a Meta ad account or ad.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       ad_id: z
         .string()
         .describe("The ad ID to retrieve creatives for."),
     },
     async (args) => {
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.ad_id);
+      if (!check.ok) return check.result;
+
       const data = await metaApiGet(`${args.ad_id}/adcreatives`, token, {
         fields: CREATIVE_LIST_FIELDS,
       });
@@ -50,11 +58,18 @@ export function registerCreativeTools(ctx: ToolContext): void {
     "get_creative_details",
     "Get detailed information about a specific ad creative including asset feed spec and object story spec.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       creative_id: z
         .string()
         .describe("The creative ID to retrieve details for."),
     },
     async (args) => {
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.creative_id);
+      if (!check.ok) return check.result;
+
       const data = await metaApiGet(args.creative_id, token, {
         fields: CREATIVE_DETAIL_FIELDS,
       });
@@ -72,11 +87,18 @@ export function registerCreativeTools(ctx: ToolContext): void {
     "get_ad_image",
     "Get image info and URLs for a Meta ad. Returns thumbnail and image URLs.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       ad_id: z
         .string()
         .describe("The ad ID to retrieve image information for."),
     },
     async (args) => {
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.ad_id);
+      if (!check.ok) return check.result;
+
       const data = await metaApiGet(args.ad_id, token, {
         fields: "creative{id,thumbnail_url,image_url,image_hash},account_id",
       });
@@ -123,6 +145,10 @@ export function registerCreativeTools(ctx: ToolContext): void {
     "get_ad_video",
     "Get video info, source URL, and thumbnail for a Meta ad video. Provide either ad_id or video_id.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       ad_id: z
         .string()
         .optional()
@@ -141,6 +167,12 @@ export function registerCreativeTools(ctx: ToolContext): void {
           true,
         );
       }
+
+      // Scope-check the supplied id — for video_id Meta's /video endpoint
+      // exposes account_id only on advideos, so fall back to checking the ad.
+      const scopeTargetId = args.ad_id ?? args.video_id!;
+      const check = await scopeCheckByMetaId(ctx, args.project_id, scopeTargetId);
+      if (!check.ok) return check.result;
 
       if (!resolvedVideoId && args.ad_id) {
         const creativeData = await metaApiGet(
@@ -561,6 +593,10 @@ export function registerCreativeTools(ctx: ToolContext): void {
     "update_ad_creative",
     "Update an ad creative. Note: Meta API only reliably allows updating the name. To change content, create a new creative.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       creative_id: z
         .string()
         .describe("The creative ID to update."),
@@ -576,6 +612,9 @@ export function registerCreativeTools(ctx: ToolContext): void {
           true,
         );
       }
+
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.creative_id);
+      if (!check.ok) return check.result;
 
       const params: Record<string, unknown> = {};
       if (args.name) params.name = args.name;

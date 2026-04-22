@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Env, ProjectSummary } from "../types";
 import { fetchProjectEnabledMetaAccountIds, normalizeMetaAccountId } from "../project-ad-accounts";
+import { metaApiGet, textResult } from "../meta-api";
 import { registerAccountsTools } from "./accounts";
 import { registerCampaignsTools } from "./campaigns";
 import { registerAdsetTools } from "./adsets";
@@ -226,6 +227,83 @@ export async function getProjectAllowedAccounts(
       scope.projectId === "__legacy__" ? undefined : scope.metaAccountIds,
     project: scope.project,
   };
+}
+
+/**
+ * Resolve the parent ad account of a Meta object (ad, adset, campaign, creative)
+ * and enforce that it belongs to the caller's project scope.
+ *
+ * Tools that accept a raw Meta object ID (by-ID read/mutation) must call this
+ * before touching Meta: otherwise an OAuth connection restricted to project A
+ * can still act on project B's objects as long as it knows the ID.
+ *
+ * For act_* IDs we skip the Meta round-trip and validate the account directly.
+ * For every other ID we fetch `?fields=account_id` — one extra Graph call per
+ * tool invocation. Returns an error envelope the caller returns as-is.
+ */
+export async function scopeCheckByMetaId(
+  ctx: ToolContext,
+  projectIdOrSlug: string | undefined,
+  objectId: string,
+): Promise<
+  | { ok: true; accountId: string | null }
+  | { ok: false; result: ReturnType<typeof textResult> }
+> {
+  const scope = await getProjectAllowedAccounts(ctx, {
+    project_id: projectIdOrSlug,
+  });
+  if (!scope.ok) return { ok: false, result: scope.result };
+  const { allowedAccounts } = scope;
+
+  // Legacy/test mode: getProjectAllowedAccounts returns undefined when the
+  // context has no project list wired. isAccountAllowed(_, undefined) === true
+  // by contract — skip the Meta resolve entirely so unit tests don't have to
+  // mock an extra Graph call per tool.
+  if (allowedAccounts === undefined) {
+    return { ok: true, accountId: null };
+  }
+
+  // act_123 — no parent to resolve, check directly.
+  if (objectId.startsWith("act_")) {
+    if (!isAccountAllowed(objectId, allowedAccounts)) {
+      return { ok: false, result: accountBlockedResult(objectId) };
+    }
+    return { ok: true, accountId: normalizeMetaAccountId(objectId) };
+  }
+
+  const data = await metaApiGet(objectId, ctx.token, { fields: "account_id" });
+  if ((data as any).error) {
+    return {
+      ok: false,
+      result: textResult(
+        {
+          error: "resolve_failed",
+          message: `Could not resolve parent ad account for id ${objectId}.`,
+          details: (data as any).error,
+        },
+        true,
+      ),
+    };
+  }
+  const accountId = (data as any).account_id;
+  if (!accountId) {
+    return {
+      ok: false,
+      result: textResult(
+        {
+          error: "resolve_failed",
+          message: `Meta returned no account_id for id ${objectId}.`,
+        },
+        true,
+      ),
+    };
+  }
+
+  const accountStr = String(accountId);
+  if (!isAccountAllowed(accountStr, allowedAccounts)) {
+    return { ok: false, result: accountBlockedResult(accountStr) };
+  }
+  return { ok: true, accountId: accountStr };
 }
 
 /**

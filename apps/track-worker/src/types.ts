@@ -4,11 +4,15 @@ export interface Env {
   ANALYTICS: AnalyticsEngineDataset;
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
-  CAPI_ENCRYPTION_KEY: string;
-  ALLOWED_SCRIPT_ORIGINS: string;
+  // Optional HMAC key for user_id signatures. When set, identified writes
+  // (custom_events, user_profiles, CAPI user_data) require a valid signature.
+  USER_ID_SIGNING_KEY?: string;
 }
 
 export type EventType = "pageview" | "custom" | "outbound" | "performance" | "identify";
+
+export type TraitValue = string | number | boolean | null;
+export type FlatRecord = Record<string, TraitValue>;
 
 export interface AnalyticsUser {
   id?: string;
@@ -17,7 +21,7 @@ export interface AnalyticsUser {
   first_name?: string;
   last_name?: string;
   external_id?: string;
-  traits?: Record<string, unknown>;
+  traits?: FlatRecord;
 }
 
 export interface WebVitals {
@@ -38,11 +42,12 @@ export interface AnalyticsPayload {
   page_title?: string;
   session_id: string;
   user_id?: string;
+  user_id_sig?: string;
   screen_width?: number;
   screen_height?: number;
   timezone?: string;
   language?: string;
-  props?: Record<string, unknown>;
+  props?: FlatRecord;
   user?: AnalyticsUser;
   web_vitals?: WebVitals;
   value?: number;
@@ -52,7 +57,7 @@ export interface AnalyticsPayload {
 
 export interface SiteConfig {
   id: string;
-  workspace_id: string;
+  organization_id: string;
   domain: string;
   public_key: string;
   pixel_id: string | null;

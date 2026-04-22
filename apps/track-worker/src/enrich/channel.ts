@@ -9,9 +9,12 @@ export interface ChannelData {
   referrer_path?: string;
 }
 
-const SEARCH_DOMAINS = /(google|bing|yahoo|duckduckgo|yandex|baidu|ecosia)\./i;
-const SOCIAL_DOMAINS = /(facebook|instagram|twitter|x\.com|linkedin|tiktok|pinterest|reddit|youtube|snapchat|threads)\./i;
-const VIDEO_DOMAINS = /(youtube|vimeo|twitch|dailymotion)\./i;
+// Match only when the brand appears as a complete label in the hostname
+// (between dots or at the start), so `twitter-lookalike.com` is not
+// classified as twitter.
+const SEARCH_DOMAINS = /(?:^|\.)(google|bing|yahoo|duckduckgo|yandex|baidu|ecosia)\./i;
+const SOCIAL_DOMAINS = /(?:^|\.)(facebook|instagram|twitter|x|linkedin|tiktok|pinterest|reddit|youtube|snapchat|threads)\./i;
+const VIDEO_DOMAINS = /(?:^|\.)(youtube|vimeo|twitch|dailymotion)\./i;
 
 export function detectChannel(rawUrl: string, referrer: string | undefined): ChannelData {
   const url = safeUrl(rawUrl);

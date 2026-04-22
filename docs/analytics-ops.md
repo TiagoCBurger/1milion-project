@@ -17,11 +17,31 @@ Guia operacional da feature de analytics. Complementa `analytics-plan.md` (desig
 ### 1. Supabase
 
 ```bash
-pnpm supabase db push   # aplica 023_analytics_schema.sql
+pnpm supabase db push   # aplica 023_analytics_schema.sql + ... + 040_capi_key_in_vault.sql
 ```
 
 Depois, **no Dashboard**: Settings → API → Exposed schemas → adicionar `analytics`.
 Sem este passo, a API PostgREST devolve 404 para qualquer `/rest/v1/…` de tabelas do schema.
+
+#### 1a. Popular o CAPI encryption key no Vault (obrigatório a cada projeto novo)
+
+> ⚠️ **Toda vez que você criar um novo projeto Supabase (staging → prod, novo ambiente, clone)**, é preciso repetir este passo **antes** de aplicar a migração `040` — senão o `decrypt_capi_token` falha e o CAPI para em todos os sites.
+>
+> A migração `040_capi_key_in_vault.sql` espera um secret chamado `analytics.capi_encryption_key` dentro de `vault.secrets`. O valor é a mesma hex key que antes vivia na env var `CAPI_ENCRYPTION_KEY` do worker / web.
+>
+> 1. Gerar (ou reaproveitar) o hex: `openssl rand -hex 32`
+> 2. No SQL Editor do novo projeto Supabase:
+>    ```sql
+>    SELECT vault.create_secret(
+>      'COLE_AQUI_O_HEX_DESTE_AMBIENTE',
+>      'analytics.capi_encryption_key'
+>    );
+>    ```
+> 3. Só então aplicar `pnpm supabase db push` (se a 040 rodar sem o secret ela cria as funções, mas o primeiro `decrypt_capi_token` explode).
+> 4. Se já houver tokens CAPI cifrados no banco, o hex precisa ser **o mesmo** usado originalmente pra cifrá-los, senão a decriptografia de `pgp_sym_decrypt` falha em massa. Staging e prod são projetos separados — podem usar hex diferentes, desde que cada banco use consistentemente o seu.
+> 5. Dar deploy no worker/web **sem** `CAPI_ENCRYPTION_KEY` (essa env var foi retirada em 040).
+
+Para rotacionar o hex depois: `SELECT vault.update_secret((SELECT id FROM vault.secrets WHERE name = 'analytics.capi_encryption_key'), 'NOVO_HEX');` — mas isso invalida todos os tokens já cifrados, então só faz sentido junto com um re-encrypt de todos os `analytics.sites.capi_encrypted_token`.
 
 ### 2. Cloudflare API Token
 
@@ -34,17 +54,19 @@ Copiar o token e o `Account ID` (disponível em qualquer página do dash).
 ```
 CF_ACCOUNT_ID=...
 CF_AE_API_TOKEN=...
-CAPI_ENCRYPTION_KEY=<mesma string do worker>
 NEXT_PUBLIC_TRACK_SCRIPT_URL=https://track.vibefly.app/s.js
 NEXT_PUBLIC_TRACK_ENDPOINT=https://track.vibefly.app/event
 ```
+
+> `CAPI_ENCRYPTION_KEY` **não é mais** env var. A chave vive no Supabase Vault (ver seção 1a). Deixar resquício dela no env não quebra nada, mas também não é lido por ninguém desde a migração 040.
 
 **Worker secrets**:
 ```bash
 cd apps/track-worker
 wrangler secret put SUPABASE_URL
 wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-wrangler secret put CAPI_ENCRYPTION_KEY
+# Opcional — habilita verificação HMAC de user_id (ver docs/security-notes).
+# wrangler secret put USER_ID_SIGNING_KEY
 ```
 
 ### 4. Deploy
@@ -104,4 +126,6 @@ Migrar para Workers Paid ($5/mês) sobe os dois primeiros limites para 100M/mês
 
 **429 em cima do tracker** — normal em bot scrape; o navegador de um usuário real não estoura 30 rps.
 
-**CAPI "token_missing"** — RPC `decrypt_capi_token` retornou vazio. Provável causa: `CAPI_ENCRYPTION_KEY` do worker diferente da que foi usada para encriptar via Next.js. Reconfigurar o token no site.
+**CAPI "token_missing"** — RPC `decrypt_capi_token` retornou vazio. Causas possíveis:
+- O vault secret `analytics.capi_encryption_key` não foi populado neste projeto Supabase (ver seção 1a).
+- O hex do vault é diferente do que foi usado pra cifrar o token do site — `pgp_sym_decrypt` falha silenciosamente e a função devolve NULL. Reconfigurar o CAPI access token nesse site (a UI cifra de novo com o hex atual do vault).

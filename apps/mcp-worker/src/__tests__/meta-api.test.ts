@@ -123,7 +123,7 @@ describe("metaApiGet", () => {
     globalThis.fetch = originalFetch;
   });
 
-  it("builds correct URL with token and params", async () => {
+  it("builds correct URL with params and sends token via Authorization header", async () => {
     (globalThis.fetch as any).mockResolvedValue({
       json: async () => ({ data: [] }),
     });
@@ -133,12 +133,13 @@ describe("metaApiGet", () => {
       limit: 10,
     });
 
-    const calledUrl = (globalThis.fetch as any).mock.calls[0][0];
+    const [calledUrl, opts] = (globalThis.fetch as any).mock.calls[0];
     const url = new URL(calledUrl);
     expect(url.pathname).toBe("/v24.0/me/adaccounts");
-    expect(url.searchParams.get("access_token")).toBe("test_token");
+    expect(url.searchParams.has("access_token")).toBe(false);
     expect(url.searchParams.get("fields")).toBe("id,name");
     expect(url.searchParams.get("limit")).toBe("10");
+    expect(opts.headers.Authorization).toBe("Bearer test_token");
   });
 
   it("skips null/undefined params", async () => {
@@ -196,7 +197,7 @@ describe("metaApiPost", () => {
     globalThis.fetch = originalFetch;
   });
 
-  it("sends POST with form-encoded body", async () => {
+  it("sends POST with form-encoded body and token in Authorization header", async () => {
     (globalThis.fetch as any).mockResolvedValue({
       json: async () => ({ id: "123" }),
     });
@@ -212,9 +213,10 @@ describe("metaApiPost", () => {
     expect(opts.headers["Content-Type"]).toBe(
       "application/x-www-form-urlencoded",
     );
+    expect(opts.headers.Authorization).toBe("Bearer test_token");
 
     const body = new URLSearchParams(opts.body);
-    expect(body.get("access_token")).toBe("test_token");
+    expect(body.has("access_token")).toBe(false);
     expect(body.get("name")).toBe("My Campaign");
     expect(body.get("objective")).toBe("OUTCOME_TRAFFIC");
   });

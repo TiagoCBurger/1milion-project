@@ -2,6 +2,12 @@
 
 import { useCallback } from "react";
 
+declare global {
+  interface Window {
+    fbq?: (...args: unknown[]) => void;
+  }
+}
+
 const TRACK_WORKER_URL =
   process.env.NEXT_PUBLIC_TRACK_WORKER_URL ?? "https://track-worker.ticburger.workers.dev";
 

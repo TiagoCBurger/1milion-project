@@ -22,7 +22,6 @@ export async function metaApiGet(
   params: Record<string, unknown> = {}
 ): Promise<Record<string, unknown>> {
   const url = new URL(`${BASE_URL}/${endpoint}`);
-  url.searchParams.set("access_token", token);
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue;
     url.searchParams.set(
@@ -33,7 +32,13 @@ export async function metaApiGet(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), META_REQUEST_TIMEOUT_MS);
   try {
-    const res = await fetch(url.toString(), { signal: controller.signal });
+    // Pass the token in the Authorization header. Meta accepts both
+    // query-string and header, but query-string tokens can leak into
+    // CDN outbound access logs — use the header and keep the URL clean.
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
     return (await res.json()) as Record<string, unknown>;
   } catch (err) {
     return errorFromException(err);
@@ -53,7 +58,6 @@ export async function metaApiPost(
 ): Promise<Record<string, unknown>> {
   const url = `${BASE_URL}/${endpoint}`;
   const body = new URLSearchParams();
-  body.set("access_token", token);
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue;
     body.set(
@@ -66,7 +70,10 @@ export async function metaApiPost(
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Bearer ${token}`,
+      },
       body: body.toString(),
       signal: controller.signal,
     });

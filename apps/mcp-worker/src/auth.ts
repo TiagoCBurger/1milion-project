@@ -454,9 +454,11 @@ export async function verifyOAuthAccessToken(
     }
   }
 
-  // If no allowed_projects on the token or connection, infer from legacy
-  // allowed_accounts (tokens minted before 029). Fall back to all projects
-  // so the session doesn't lock the user out while the DB catches up.
+  // If no allowed_projects on the token or connection, try the legacy
+  // allowed_accounts field (tokens minted before 029). If that still yields
+  // nothing, refuse the request instead of silently promoting the session
+  // to every project in the org — a scope-restricted OAuth grant must not
+  // turn into org-wide access just because a row is malformed or empty.
   if (allowedProjects.length === 0) {
     const legacyAccounts = stored.allowed_accounts ?? [];
     if (legacyAccounts.length > 0) {
@@ -467,11 +469,37 @@ export async function verifyOAuthAccessToken(
       );
     }
     if (allowedProjects.length === 0) {
-      allowedProjects = projects.map((p) => p.id);
+      console.warn(
+        "[oauth] token has no allowed_projects and no resolvable legacy accounts; refusing request. organization:",
+        organizationId,
+        "client:",
+        stored.client_id,
+      );
+      return {
+        ok: false,
+        error:
+          "This MCP connection has no projects authorized. Ask an organization admin to grant project access at vibefly.app/dashboard and reconnect.",
+      };
     }
   }
 
   const visibleProjects = projects.filter((p) => allowedProjects.includes(p.id));
+
+  if (visibleProjects.length === 0) {
+    // allowedProjects references project IDs that no longer exist on the org.
+    // Don't fall back to the full project list — refuse instead.
+    console.warn(
+      "[oauth] allowed_projects does not intersect org projects; refusing. organization:",
+      organizationId,
+      "client:",
+      stored.client_id,
+    );
+    return {
+      ok: false,
+      error:
+        "This MCP connection's authorized projects no longer exist on the organization. Re-authorize at vibefly.app/dashboard.",
+    };
+  }
 
   return {
     ok: true,
@@ -485,9 +513,8 @@ export async function verifyOAuthAccessToken(
       maxMcpConnections: row.max_mcp_connections,
       maxAdAccounts: row.max_ad_accounts ?? 0,
       enableMetaMutations: row.enable_meta_mutations === true,
-      availableProjects: visibleProjects.length > 0 ? visibleProjects : projects,
-      allowedProjectIds:
-        visibleProjects.length > 0 ? visibleProjects.map((p) => p.id) : allowedProjects,
+      availableProjects: visibleProjects,
+      allowedProjectIds: visibleProjects.map((p) => p.id),
     },
   };
 }

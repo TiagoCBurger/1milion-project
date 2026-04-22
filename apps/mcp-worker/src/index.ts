@@ -265,7 +265,7 @@ function buildServer(
 
 async function authenticateRequest(
   request: Request,
-  url: URL,
+  _url: URL,
   env: Env
 ): Promise<AuthResult> {
   const authHeader = request.headers.get("Authorization");
@@ -280,12 +280,8 @@ async function authenticateRequest(
     return verifyOAuthAccessToken(authHeader.slice(7), env);
   }
 
-  // API key via query param
-  const keyParam = url.searchParams.get("key");
-  if (keyParam?.startsWith("mads_")) {
-    return validateApiKey(keyParam, env);
-  }
-
+  // Deliberately no query-param fallback: URLs end up in CDN access logs,
+  // browser history, and Referer headers — never accept the API key there.
   return { ok: false, error: "no_credentials" };
 }
 

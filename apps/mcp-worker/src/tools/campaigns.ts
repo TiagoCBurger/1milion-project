@@ -10,6 +10,7 @@ import {
   isAccountAllowed,
   accountBlockedResult,
   getProjectAllowedAccounts,
+  scopeCheckByMetaId,
 } from "./index";
 
 const CAMPAIGN_FIELDS =
@@ -103,9 +104,16 @@ export function registerCampaignsTools(ctx: ToolContext): void {
     "get_campaign_details",
     "Get full details of a specific campaign by its ID.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       campaign_id: z.string().describe("The campaign ID to look up."),
     },
     async (args) => {
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.campaign_id);
+      if (!check.ok) return check.result;
+
       const data = await metaApiGet(args.campaign_id, token, {
         fields: CAMPAIGN_DETAIL_FIELDS,
       });
@@ -257,6 +265,10 @@ export function registerCampaignsTools(ctx: ToolContext): void {
     "update_campaign",
     "Update an existing campaign's settings. Requires PRO tier.",
     {
+      project_id: z
+        .string()
+        .optional()
+        .describe("Project ID or slug to scope the request."),
       campaign_id: z.string().describe("The campaign ID to update."),
       name: z
         .string()
@@ -294,6 +306,9 @@ export function registerCampaignsTools(ctx: ToolContext): void {
           true,
         );
       }
+
+      const check = await scopeCheckByMetaId(ctx, args.project_id, args.campaign_id);
+      if (!check.ok) return check.result;
 
       const params: Record<string, unknown> = {};
 
