@@ -7,8 +7,8 @@
 // payment-failure event (see docs/openapi.yaml enum), so the
 // BillingFailedEmail dispatch lives here instead of the webhook.
 //
-// Auth: `x-mcp-service-token` header, constant-time comparison
-// against MCP_SERVICE_TOKEN. Same pattern as the meta-token
+// Auth: `x-internal-api-token` header, constant-time comparison
+// against INTERNAL_API_TOKEN. Same pattern as the meta-token
 // refresh endpoint.
 //
 // Behaviour:
@@ -30,7 +30,7 @@ import {
 } from "@vibefly/email";
 import { recordAudit, extractRequestMeta } from "@/lib/audit";
 
-const MCP_SERVICE_TOKEN = process.env.MCP_SERVICE_TOKEN;
+const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
 const MAX_BATCH = 50;
 const REMIND_AFTER_HOURS = 24;
 
@@ -51,12 +51,12 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 export async function POST(request: Request) {
-  if (!MCP_SERVICE_TOKEN || MCP_SERVICE_TOKEN.length < 32) {
+  if (!INTERNAL_API_TOKEN || INTERNAL_API_TOKEN.length < 32) {
     return Response.json({ error: "Service not configured" }, { status: 503 });
   }
 
-  const provided = request.headers.get("x-mcp-service-token");
-  if (!provided || !timingSafeEqual(provided, MCP_SERVICE_TOKEN)) {
+  const provided = request.headers.get("x-internal-api-token");
+  if (!provided || !timingSafeEqual(provided, INTERNAL_API_TOKEN)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

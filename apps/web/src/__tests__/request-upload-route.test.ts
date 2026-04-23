@@ -98,7 +98,7 @@ function setupAdmin(opts: Parameters<typeof buildAdminChain>[0]) {
 
 describe("POST /request-upload", () => {
   beforeEach(() => {
-    delete process.env.MCP_SERVICE_TOKEN;
+    delete process.env.INTERNAL_API_TOKEN;
     mockAdminFromCalls.length = 0;
     setupOwnerSession();
   });

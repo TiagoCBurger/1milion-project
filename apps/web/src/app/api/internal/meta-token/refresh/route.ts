@@ -7,8 +7,8 @@
 // after that window would find their Meta integration silently
 // disconnected.
 //
-// Auth: `x-mcp-service-token` header, constant-time comparison
-// against MCP_SERVICE_TOKEN. No user cookie involved.
+// Auth: `x-internal-api-token` header, constant-time comparison
+// against INTERNAL_API_TOKEN. No user cookie involved.
 //
 // Behaviour:
 //   * Input: { organization_ids: string[] } (max 50 per call)
@@ -22,7 +22,7 @@ import { exchangeForLongLivedToken } from "@/lib/meta-oauth";
 const FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID;
 const FACEBOOK_APP_SECRET = process.env.FACEBOOK_APP_SECRET;
 const TOKEN_ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY;
-const MCP_SERVICE_TOKEN = process.env.MCP_SERVICE_TOKEN;
+const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
 const MAX_BATCH = 50;
 
 interface ItemResult {
@@ -46,8 +46,8 @@ export async function POST(request: Request) {
     !FACEBOOK_APP_ID ||
     !FACEBOOK_APP_SECRET ||
     !TOKEN_ENCRYPTION_KEY ||
-    !MCP_SERVICE_TOKEN ||
-    MCP_SERVICE_TOKEN.length < 32
+    !INTERNAL_API_TOKEN ||
+    INTERNAL_API_TOKEN.length < 32
   ) {
     return Response.json(
       { error: "Service not configured" },
@@ -55,8 +55,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const provided = request.headers.get("x-mcp-service-token");
-  if (!provided || !timingSafeEqual(provided, MCP_SERVICE_TOKEN)) {
+  const provided = request.headers.get("x-internal-api-token");
+  if (!provided || !timingSafeEqual(provided, INTERNAL_API_TOKEN)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

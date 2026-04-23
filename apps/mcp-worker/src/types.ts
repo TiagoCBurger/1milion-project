@@ -16,7 +16,7 @@ export interface Env {
   R2_PUBLIC_URL: string;
   OAUTH_SIGNING_SECRET: string;
   /** Shared secret with the web app for MCP-originated upload calls. */
-  MCP_SERVICE_TOKEN?: string;
+  INTERNAL_API_TOKEN?: string;
 
   // Config vars
   MCP_SERVER_URL: string;

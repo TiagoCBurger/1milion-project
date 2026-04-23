@@ -127,7 +127,7 @@ function setupAdmin(leaseRow: any) {
 
 describe("POST /finalize-upload", () => {
   beforeEach(() => {
-    delete process.env.MCP_SERVICE_TOKEN;
+    delete process.env.INTERNAL_API_TOKEN;
     r2Bytes.clear();
     setupOwnerSession();
   });

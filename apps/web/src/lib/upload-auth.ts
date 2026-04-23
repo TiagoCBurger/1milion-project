@@ -4,7 +4,7 @@
 // Two paths:
 //   * Browser: cookie session → must be owner/admin of the org
 //   * MCP worker: X-MCP-Service-Token header (constant-time
-//     compared against MCP_SERVICE_TOKEN env). Carries no user id.
+//     compared against INTERNAL_API_TOKEN env). Carries no user id.
 //
 // MCP path requires the worker to vouch for org/project access
 // itself before forwarding — the web route trusts the token but
@@ -31,8 +31,8 @@ export async function resolveUploadAuth(
   supabase: SupabaseClient,
   organizationId: string,
 ): Promise<UploadAuth | { error: string; status: number }> {
-  const serviceToken = request.headers.get("x-mcp-service-token");
-  const expected = process.env.MCP_SERVICE_TOKEN;
+  const serviceToken = request.headers.get("x-internal-api-token");
+  const expected = process.env.INTERNAL_API_TOKEN;
 
   if (serviceToken && expected && expected.length >= 32) {
     if (!timingSafeEqual(serviceToken, expected)) {

@@ -12,18 +12,18 @@ function makeRequest(headers: Record<string, string> = {}): Request {
 describe("resolveUploadAuth", () => {
   let originalToken: string | undefined;
   beforeEach(() => {
-    originalToken = process.env.MCP_SERVICE_TOKEN;
+    originalToken = process.env.INTERNAL_API_TOKEN;
   });
   afterEach(() => {
-    if (originalToken === undefined) delete process.env.MCP_SERVICE_TOKEN;
-    else process.env.MCP_SERVICE_TOKEN = originalToken;
+    if (originalToken === undefined) delete process.env.INTERNAL_API_TOKEN;
+    else process.env.INTERNAL_API_TOKEN = originalToken;
     vi.restoreAllMocks();
   });
 
   it("rejects mismatched service token", async () => {
-    process.env.MCP_SERVICE_TOKEN = VALID_TOKEN;
+    process.env.INTERNAL_API_TOKEN = VALID_TOKEN;
     const supabase = createMockSupabase();
-    const req = makeRequest({ "x-mcp-service-token": "y".repeat(64) });
+    const req = makeRequest({ "x-internal-api-token": "y".repeat(64) });
     const out = await resolveUploadAuth(req, supabase as any, ORG_ID);
     expect("error" in out).toBe(true);
     if ("error" in out) {
@@ -32,9 +32,9 @@ describe("resolveUploadAuth", () => {
   });
 
   it("accepts matching service token and returns mcp source with null userId", async () => {
-    process.env.MCP_SERVICE_TOKEN = VALID_TOKEN;
+    process.env.INTERNAL_API_TOKEN = VALID_TOKEN;
     const supabase = createMockSupabase();
-    const req = makeRequest({ "x-mcp-service-token": VALID_TOKEN });
+    const req = makeRequest({ "x-internal-api-token": VALID_TOKEN });
     const out = await resolveUploadAuth(req, supabase as any, ORG_ID);
     expect("error" in out).toBe(false);
     if (!("error" in out)) {
@@ -44,9 +44,9 @@ describe("resolveUploadAuth", () => {
   });
 
   it("rejects token shorter than 32 chars (refuses weak secrets)", async () => {
-    process.env.MCP_SERVICE_TOKEN = "tooshort";
+    process.env.INTERNAL_API_TOKEN = "tooshort";
     const supabase = createMockSupabase();
-    const req = makeRequest({ "x-mcp-service-token": "tooshort" });
+    const req = makeRequest({ "x-internal-api-token": "tooshort" });
     const out = await resolveUploadAuth(req, supabase as any, ORG_ID);
     // Falls through to cookie path (which has no user) → 401
     expect("error" in out).toBe(true);
@@ -54,7 +54,7 @@ describe("resolveUploadAuth", () => {
   });
 
   it("accepts cookie session when user is owner/admin", async () => {
-    delete process.env.MCP_SERVICE_TOKEN;
+    delete process.env.INTERNAL_API_TOKEN;
     const supabase = createMockSupabase();
     const user = mockUser();
     supabase.auth.getUser.mockResolvedValue({ data: { user }, error: null });
@@ -72,7 +72,7 @@ describe("resolveUploadAuth", () => {
   });
 
   it("rejects cookie session without membership", async () => {
-    delete process.env.MCP_SERVICE_TOKEN;
+    delete process.env.INTERNAL_API_TOKEN;
     const supabase = createMockSupabase();
     supabase.auth.getUser.mockResolvedValue({
       data: { user: mockUser() },
@@ -86,7 +86,7 @@ describe("resolveUploadAuth", () => {
   });
 
   it("rejects when no auth at all", async () => {
-    delete process.env.MCP_SERVICE_TOKEN;
+    delete process.env.INTERNAL_API_TOKEN;
     const supabase = createMockSupabase();
     supabase.auth.getUser.mockResolvedValue({ data: { user: null }, error: null });
     const req = makeRequest();

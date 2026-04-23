@@ -4,7 +4,7 @@
 // transit through the LLM.
 //
 // These tools forward to the web app's upload endpoints with a
-// shared MCP_SERVICE_TOKEN so all sanitization/audit/Meta-call
+// shared INTERNAL_API_TOKEN so all sanitization/audit/Meta-call
 // logic stays in one place. The MCP host client uploads bytes
 // directly to R2 via the presigned URL between the two calls.
 // ============================================================
@@ -43,7 +43,7 @@ async function forwardToWeb(
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-mcp-service-token": opts.serviceToken,
+      "x-internal-api-token": opts.serviceToken,
     },
     body: JSON.stringify(opts.body),
   });
@@ -60,7 +60,7 @@ function configError(): ReturnType<typeof textResult> {
   return textResult(
     {
       error:
-        "creative_upload tools require WEB_APP_URL and MCP_SERVICE_TOKEN to be configured on the MCP worker.",
+        "creative_upload tools require WEB_APP_URL and INTERNAL_API_TOKEN to be configured on the MCP worker.",
     },
     true,
   );
@@ -127,7 +127,7 @@ export function registerCreativeUploadTools(ctx: ToolContext): void {
       }
 
       const webBase = env.WEB_APP_URL?.trim();
-      const serviceToken = env.MCP_SERVICE_TOKEN?.trim();
+      const serviceToken = env.INTERNAL_API_TOKEN?.trim();
       if (!webBase || !serviceToken) return configError();
 
       const { status, body } = await forwardToWeb({
@@ -185,7 +185,7 @@ export function registerCreativeUploadTools(ctx: ToolContext): void {
       }
 
       const webBase = env.WEB_APP_URL?.trim();
-      const serviceToken = env.MCP_SERVICE_TOKEN?.trim();
+      const serviceToken = env.INTERNAL_API_TOKEN?.trim();
       if (!webBase || !serviceToken) return configError();
 
       const { status, body } = await forwardToWeb({
@@ -238,7 +238,7 @@ export function registerCreativeUploadTools(ctx: ToolContext): void {
       // finalize someone else's lease via guessed UUIDs.
 
       const webBase = env.WEB_APP_URL?.trim();
-      const serviceToken = env.MCP_SERVICE_TOKEN?.trim();
+      const serviceToken = env.INTERNAL_API_TOKEN?.trim();
       if (!webBase || !serviceToken) return configError();
 
       const body: Record<string, unknown> = { lease_id: args.lease_id };

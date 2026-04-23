@@ -157,16 +157,16 @@ async function refreshTokensViaWeb(
 ): Promise<number> {
   if (organizationIds.length === 0) return 0;
   const webBase = env.WEB_APP_URL?.replace(/\/$/, "");
-  const serviceToken = env.MCP_SERVICE_TOKEN;
+  const serviceToken = env.INTERNAL_API_TOKEN;
   if (!webBase || !serviceToken) {
-    throw new Error("WEB_APP_URL or MCP_SERVICE_TOKEN not configured");
+    throw new Error("WEB_APP_URL or INTERNAL_API_TOKEN not configured");
   }
 
   const res = await fetch(`${webBase}/api/internal/meta-token/refresh`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-mcp-service-token": serviceToken,
+      "x-internal-api-token": serviceToken,
     },
     body: JSON.stringify({ organization_ids: organizationIds }),
   });
