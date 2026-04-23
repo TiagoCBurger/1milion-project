@@ -7,7 +7,11 @@ import { getCachedSite, setCachedSite } from "./cache";
 // instead. Lookup misses on the colo fall through to Supabase and refill both
 // layers.
 
-const SHARED_CACHE_TTL_SECONDS = 300;
+// 60 s keeps enforcement of billing status responsive without hammering
+// Supabase on every pixel hit. Migration 042 folded subscription checks into
+// `get_site_by_public_key`, so a cancellation now invalidates sites at the
+// DB layer within one cache generation.
+const SHARED_CACHE_TTL_SECONDS = 60;
 const SITE_CACHE_HOST = "https://vibefly-site-cache.internal";
 
 async function readSharedCache(publicKey: string): Promise<SiteConfig | null | undefined> {

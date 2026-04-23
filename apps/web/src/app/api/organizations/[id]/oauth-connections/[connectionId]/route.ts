@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { recordAudit, extractRequestMeta } from "@/lib/audit";
+import { diffObjects } from "@vibefly/audit";
 
 /**
  * PATCH /api/organizations/[id]/oauth-connections/[connectionId]
@@ -87,6 +89,13 @@ export async function PATCH(
     return Response.json({ error: "Nothing to update" }, { status: 400 });
   }
 
+  const { data: before } = await supabase
+    .from("oauth_connections")
+    .select("id, allowed_projects, is_active")
+    .eq("id", connectionId)
+    .eq("organization_id", organizationId)
+    .single();
+
   const { data, error } = await supabase
     .from("oauth_connections")
     .update(update)
@@ -99,6 +108,17 @@ export async function PATCH(
     return Response.json({ error: "Connection not found" }, { status: 404 });
   }
 
+  await recordAudit({
+    orgId: organizationId,
+    actor: { type: "user", userId: user.id },
+    action: "oauth_connection.update",
+    resource: { type: "oauth_connection", id: connectionId },
+    before,
+    after: data,
+    diff: diffObjects(before, data),
+    request: extractRequestMeta(request),
+  });
+
   return Response.json(data);
 }
 
@@ -107,7 +127,7 @@ export async function PATCH(
  * Revokes a connection (sets is_active = false).
  */
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string; connectionId: string }> }
 ) {
   const { id: organizationId, connectionId } = await params;
@@ -132,6 +152,13 @@ export async function DELETE(
     return Response.json({ error: "Not authorized" }, { status: 403 });
   }
 
+  const { data: before } = await supabase
+    .from("oauth_connections")
+    .select("id, client_id, allowed_projects, is_active")
+    .eq("id", connectionId)
+    .eq("organization_id", organizationId)
+    .single();
+
   const { error } = await supabase
     .from("oauth_connections")
     .update({ is_active: false })
@@ -141,6 +168,15 @@ export async function DELETE(
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
+
+  await recordAudit({
+    orgId: organizationId,
+    actor: { type: "user", userId: user.id },
+    action: "oauth_connection.revoke",
+    resource: { type: "oauth_connection", id: connectionId },
+    before,
+    request: extractRequestMeta(request),
+  });
 
   return Response.json({ success: true });
 }

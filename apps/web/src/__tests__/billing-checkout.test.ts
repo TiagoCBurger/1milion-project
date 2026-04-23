@@ -26,11 +26,13 @@ vi.mock("@/lib/supabase/admin", () => ({
 const mockCreateCustomer = vi.fn();
 const mockCreateSubscriptionCheckout = vi.fn();
 const mockGetProductId = vi.fn();
+const mockCancelSubscription = vi.fn();
 
 vi.mock("@/lib/abacatepay", () => ({
   createCustomer: (...args: unknown[]) => mockCreateCustomer(...args),
   createSubscriptionCheckout: (...args: unknown[]) => mockCreateSubscriptionCheckout(...args),
   getProductId: (...args: unknown[]) => mockGetProductId(...args),
+  cancelSubscription: (...args: unknown[]) => mockCancelSubscription(...args),
 }));
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -214,18 +216,77 @@ describe("POST /api/billing/cancel", () => {
     expect(res.status).toBe(403);
   });
 
-  it("cancels subscription successfully", async () => {
+  it("cancels subscription successfully and keeps access until period end", async () => {
     setupAuth(mockUser());
 
     const memberChain = mockQueryChain({ data: { role: "owner" }, error: null });
     mockFrom.mockReturnValue(memberChain);
 
-    const adminChain = mockQueryChain({ data: null, error: null });
-    mockAdminFrom.mockReturnValue(adminChain);
+    // First admin call: SELECT current subscription state.
+    const selectChain = mockQueryChain({
+      data: {
+        tier: "pro",
+        abacatepay_subscription_id: "subs_abc",
+        current_period_end: "2099-12-31T23:59:59Z",
+      },
+      error: null,
+    });
+    // Second admin call: UPDATE to set pending_tier='free'.
+    const updateChain = mockQueryChain({ data: null, error: null });
+    let call = 0;
+    mockAdminFrom.mockImplementation(() => (call++ === 0 ? selectChain : updateChain));
+
+    mockCancelSubscription.mockResolvedValue({ id: "subs_abc", status: "CANCELLED" });
 
     const res = await handler.POST(jsonRequest({ organization_id: "ws-1" }));
     const { status, body } = await parseJsonResponse(res);
     expect(status).toBe(200);
     expect(body.success).toBe(true);
+    // AbacatePay must be called so no further charges happen.
+    expect(mockCancelSubscription).toHaveBeenCalledWith("subs_abc");
+    // User keeps access until the already-paid period ends.
+    expect(body.access_until).toBe("2099-12-31T23:59:59Z");
+  });
+
+  it("still schedules local cancellation when AbacatePay API errors out", async () => {
+    setupAuth(mockUser());
+
+    mockFrom.mockReturnValue(mockQueryChain({ data: { role: "owner" }, error: null }));
+
+    const selectChain = mockQueryChain({
+      data: {
+        tier: "pro",
+        abacatepay_subscription_id: "subs_abc",
+        current_period_end: "2099-12-31T23:59:59Z",
+      },
+      error: null,
+    });
+    const updateChain = mockQueryChain({ data: null, error: null });
+    let call = 0;
+    mockAdminFrom.mockImplementation(() => (call++ === 0 ? selectChain : updateChain));
+
+    mockCancelSubscription.mockRejectedValue(new Error("network"));
+
+    const res = await handler.POST(jsonRequest({ organization_id: "ws-1" }));
+    expect(res.status).toBe(200);
+    // Local DB update must still have happened so the reconcile cron
+    // eventually catches it.
+    expect(updateChain.update).toHaveBeenCalled();
+  });
+
+  it("refuses to cancel a free-tier subscription", async () => {
+    setupAuth(mockUser());
+
+    mockFrom.mockReturnValue(mockQueryChain({ data: { role: "owner" }, error: null }));
+
+    mockAdminFrom.mockReturnValue(
+      mockQueryChain({
+        data: { tier: "free", abacatepay_subscription_id: null, current_period_end: null },
+        error: null,
+      }),
+    );
+
+    const res = await handler.POST(jsonRequest({ organization_id: "ws-1" }));
+    expect(res.status).toBe(400);
   });
 });

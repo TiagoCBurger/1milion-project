@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { recordAudit, extractRequestMeta } from "@/lib/audit";
+import { diffObjects } from "@vibefly/audit";
 
 type Ctx = { params: Promise<{ id: string; projectId: string }> };
 
@@ -86,6 +88,13 @@ export async function PATCH(request: Request, { params }: Ctx) {
     is_default?: boolean;
   };
 
+  const { data: before } = await supabase
+    .from("projects")
+    .select("id, name, slug, description, is_default")
+    .eq("id", projectId)
+    .eq("organization_id", organizationId)
+    .single();
+
   if (body.is_default === true) {
     const { error } = await supabase.rpc("set_default_project", {
       p_project_id: projectId,
@@ -118,6 +127,17 @@ export async function PATCH(request: Request, { params }: Ctx) {
     .eq("organization_id", organizationId)
     .single();
 
+  await recordAudit({
+    orgId: organizationId,
+    actor: { type: "user", userId: user.id },
+    action: "project.update",
+    resource: { type: "project", id: projectId, projectId },
+    before,
+    after: project,
+    diff: diffObjects(before, project),
+    request: extractRequestMeta(request),
+  });
+
   return Response.json(project);
 }
 
@@ -147,11 +167,28 @@ export async function DELETE(request: Request, { params }: Ctx) {
     .single();
   if (!membership) return Response.json({ error: "Not authorized" }, { status: 403 });
 
+  const { data: before } = await supabase
+    .from("projects")
+    .select("id, name, slug, is_default")
+    .eq("id", projectId)
+    .eq("organization_id", organizationId)
+    .single();
+
   const { error } = await supabase.rpc("delete_project", {
     p_project_id: projectId,
     p_reassign_to: reassignTo,
   });
   if (error) return Response.json({ error: error.message }, { status: 400 });
+
+  await recordAudit({
+    orgId: organizationId,
+    actor: { type: "user", userId: user.id },
+    action: "project.delete",
+    resource: { type: "project", id: projectId, projectId },
+    before,
+    after: { reassigned_to: reassignTo },
+    request: extractRequestMeta(request),
+  });
 
   return Response.json({ success: true });
 }

@@ -18,16 +18,21 @@ function getWebhookSecret(): string {
 
 // NOTE on webhook authentication:
 //
-// AbacatePay publishes a fixed HMAC "public key" in their docs — the same
-// string for every merchant — so the HMAC X-Webhook-Signature cannot prove
-// authenticity (anyone with internet access can compute it). The real gate
-// is the per-merchant `webhookSecret` query-string parameter that the route
-// compares against ABACATEPAY_WEBHOOK_SECRET.
+// Today this module HMACs the body against a fixed `ABACATEPAY_PUBLIC_KEY`
+// that AbacatePay historically published in their docs. That constant is
+// the same for every merchant, so on its own the HMAC check cannot prove
+// authenticity — it's only a body-integrity check. The real gate is the
+// per-merchant `webhookSecret` query-string parameter compared against
+// ABACATEPAY_WEBHOOK_SECRET.
 //
-// We still verify the HMAC because it acts as a body-integrity check and
-// matches what the docs recommend, but `verifyWebhookSignature` is NOT a
-// sufficient gate on its own — the query secret check MUST run first and
-// MUST be timing-safe.
+// IMPORTANT divergence vs. the official TS skill
+// (github.com/abacatepay/skills, examples/ts/webhook.ts): the skill HMACs
+// with the per-merchant WEBHOOK_SECRET, not the shared public key. If
+// AbacatePay has migrated their webhook signing to the per-merchant secret
+// (which they may or may not have), this verification still succeeds only
+// by luck of the query-secret gate. Before switching we need to re-verify
+// against a real dev-mode webhook. Track this TODO before promoting to
+// heavier reliance on HMAC.
 const ABACATEPAY_PUBLIC_KEY =
   "t9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9";
 
@@ -157,6 +162,26 @@ export async function createSubscriptionCheckout(
   return abacateRequest<AbacatePayCheckout>("POST", "/subscriptions/create", body);
 }
 
+export interface AbacatePaySubscription {
+  id: string;
+  status: "PENDING" | "ACTIVE" | "CANCELLED" | "EXPIRED" | "FAILED";
+  createdAt: string;
+  updatedAt: string;
+  canceledAt: string | null;
+}
+
+/**
+ * Cancels an AbacatePay subscription immediately (no more charges will be
+ * attempted). The customer's *local* access should remain intact until the
+ * end of the already-paid period — that policy is enforced in the webhook /
+ * downgrade-at-period-end logic, not here.
+ */
+export async function cancelSubscription(subscriptionId: string): Promise<AbacatePaySubscription> {
+  return abacateRequest<AbacatePaySubscription>("POST", "/subscriptions/cancel", {
+    id: subscriptionId,
+  });
+}
+
 // ── Product ID mapping ───────────────────────────────────────
 
 type PaidTier = "pro" | "max";
@@ -177,6 +202,24 @@ export function getProductId(tier: PaidTier, cycle: BillingCycle): string {
 }
 
 // ── Webhook verification ─────────────────────────────────────
+
+/**
+ * Replay protection. AbacatePay's TS skill (github.com/abacatepay/skills
+ * examples/ts/webhook.ts) rejects requests whose `x-webhook-timestamp`
+ * header is more than 5 minutes off. The header is not documented in the
+ * OpenAPI spec and may be absent on older payloads, so we only enforce
+ * when it's present. Accepting missing-header preserves backwards compat.
+ */
+export function verifyWebhookTimestamp(
+  header: string | null,
+  skewSeconds = 300,
+): boolean {
+  if (!header) return true;
+  const ts = Number.parseInt(header, 10);
+  if (!Number.isFinite(ts)) return false;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return Math.abs(nowSeconds - ts) <= skewSeconds;
+}
 
 /**
  * Verifies the webhook query string secret using a timing-safe comparison.

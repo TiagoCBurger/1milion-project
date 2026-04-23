@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight, Check, Copy, Link2, LogOut } from "lucide-react";
+import { ChevronRight, Link2, LogOut, AlertCircle } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { IntegrationsTopNav } from "@/components/dashboard/integrations-top-nav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { MetaWorkspaceAdAccounts } from "./meta-workspace-ad-accounts";
+import { MetaOnboarding } from "./meta-onboarding";
 
 export default function MetaIntegrationPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -26,13 +28,13 @@ export default function MetaIntegrationPage() {
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
   const [manualSuccess, setManualSuccess] = useState<{
     meta_user_name: string;
     meta_business_name: string;
     expires_at: string | null;
     api_key?: string;
   } | null>(null);
+  const [pendingSetup, setPendingSetup] = useState(0);
 
   const oauthSuccess = searchParams.get("success") === "true";
   const oauthName = searchParams.get("name");
@@ -75,6 +77,14 @@ export default function MetaIntegrationPage() {
         .eq("organization_id", ws.id)
         .maybeSingle();
       setMetaConnected(metaTok?.is_valid === true);
+      if (metaTok?.is_valid) {
+        const { count } = await supabase
+          .from("ad_accounts")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", ws.id)
+          .eq("is_enabled", false);
+        setPendingSetup(count ?? 0);
+      }
       setConnectionLoaded(true);
     }
     loadWorkspace();
@@ -150,15 +160,16 @@ export default function MetaIntegrationPage() {
     }
   }
 
-  async function copyToClipboard(text: string) {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   const successData = oauthSuccess
     ? { meta_user_name: oauthName || "—", api_key: oauthApiKey || undefined }
     : manualSuccess;
+
+  function handleOnboardingComplete() {
+    setManualSuccess(null);
+    if (oauthSuccess) {
+      router.replace(`/dashboard/${slug}/integrations/meta`);
+    }
+  }
 
   if (!successData && !connectionLoaded) {
     return (
@@ -179,7 +190,7 @@ export default function MetaIntegrationPage() {
     );
   }
 
-  if (successData) {
+  if (successData && organizationId) {
     return (
       <>
         <PageHeader
@@ -191,69 +202,18 @@ export default function MetaIntegrationPage() {
           ]}
         />
         <IntegrationsTopNav slug={slug} active="meta" />
-        <div className="mx-auto max-w-xl p-6">
-          <Card className="bg-emerald-50/60">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
-                  <Check className="h-5 w-5 text-emerald-600" />
-                </div>
-                <CardTitle className="text-emerald-800">Conectado com sucesso</CardTitle>
-              </div>
-              <CardDescription className="text-emerald-700">
-                Usuário: {successData.meta_user_name}
-                {"meta_business_name" in successData && (
-                  <> · BM: {(successData as typeof manualSuccess)?.meta_business_name}</>
-                )}
-              </CardDescription>
-            </CardHeader>
-            {successData.api_key && (
-              <CardContent>
-                <div className="rounded-lg bg-white p-4">
-                  <div className="mb-1 flex items-center justify-between">
-                    <p className="text-xs font-medium text-muted-foreground">
-                      Sua chave de API (guarde em local seguro, exibida só uma vez):
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => copyToClipboard(successData.api_key!)}
-                      className="h-7 px-2"
-                    >
-                      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                    </Button>
-                  </div>
-                  <code className="block select-all break-all font-mono text-sm">
-                    {successData.api_key}
-                  </code>
-                </div>
-                <Button onClick={() => router.push(`/dashboard/${slug}`)} className="mt-4 w-full">
-                  Ir para a organização
-                </Button>
-              </CardContent>
-            )}
-            {!successData.api_key && (
-              <CardContent>
-                <Button onClick={() => router.push(`/dashboard/${slug}`)} className="w-full">
-                  Ir para a organização
-                </Button>
-              </CardContent>
-            )}
-            {canManageMeta && (
-              <CardContent className="border-t pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  disabled={disconnecting}
-                  onClick={handleDisconnect}
-                >
-                  <LogOut className="h-4 w-4" />
-                  {disconnecting ? "Desconectando…" : "Desconectar Facebook"}
-                </Button>
-              </CardContent>
-            )}
-          </Card>
+        <div className="mx-auto max-w-2xl p-6">
+          <h1 className="mb-1 text-2xl font-semibold tracking-tight">Configure sua integração</h1>
+          <p className="mb-6 text-muted-foreground">
+            Escolha quais contas de anúncio ficarão ativas e em quais projetos.
+          </p>
+          <MetaOnboarding
+            organizationId={organizationId}
+            slug={slug}
+            metaUserName={successData.meta_user_name}
+            apiKey={successData.api_key}
+            onComplete={handleOnboardingComplete}
+          />
         </div>
       </>
     );
@@ -281,6 +241,28 @@ export default function MetaIntegrationPage() {
             <div className="mb-6 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
               {oauthError ? errorMessages[oauthError] || "Ocorreu um erro. Tente novamente." : error}
             </div>
+          )}
+          {pendingSetup > 0 && canManageMeta && (
+            <Card className="mb-6 border-amber-200 bg-amber-50/60">
+              <CardContent className="flex items-center gap-3 p-4">
+                <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
+                <div className="flex-1 text-sm">
+                  <p className="font-medium text-amber-900">
+                    {pendingSetup} conta{pendingSetup === 1 ? "" : "s"} pendente{pendingSetup === 1 ? "" : "s"} de configuração
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    Ative abaixo ou{" "}
+                    <Link
+                      href={`/dashboard/${slug}/projects`}
+                      className="underline underline-offset-2"
+                    >
+                      atribua a projetos
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           )}
           <Card>
             <CardHeader>

@@ -1,5 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { cancelSubscription } from "@/lib/abacatepay";
+import { recordAudit, extractRequestMeta } from "@/lib/audit";
+
+// Cancellation is an "end-of-period" downgrade: we stop future billing at
+// AbacatePay immediately, but the customer keeps paid access until
+// `current_period_end` (what they already paid for). The webhook handler
+// and the janitor cron coordinate the actual tier=free flip at that moment.
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -33,8 +40,40 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  // Schedule downgrade to free at end of current period
-  // (don't cancel immediately — user keeps access until period ends)
+  const { data: sub, error: loadErr } = await admin
+    .from("subscriptions")
+    .select("tier, abacatepay_subscription_id, current_period_end")
+    .eq("organization_id", organization_id)
+    .single();
+
+  if (loadErr || !sub) {
+    return Response.json({ error: "Subscription not found" }, { status: 404 });
+  }
+  if (sub.tier === "free") {
+    return Response.json(
+      { error: "Already on the free plan" },
+      { status: 400 },
+    );
+  }
+
+  // Stop future billing at AbacatePay. Best-effort: if the API call fails
+  // (network, already cancelled on their side), we still record the local
+  // intent so the reconcile cron catches it.
+  if (sub.abacatepay_subscription_id) {
+    try {
+      await cancelSubscription(sub.abacatepay_subscription_id);
+    } catch (err) {
+      console.error(
+        "[billing-cancel] AbacatePay cancel failed, proceeding with local schedule:",
+        err,
+      );
+    }
+  }
+
+  // Schedule downgrade for end of current period. Tier + status stay as-is
+  // (user keeps paid access). The `subscription.cancelled` webhook arriving
+  // from AbacatePay will NOT flip tier to free while current_period_end is
+  // in the future — see route handler for that logic.
   const { error } = await admin
     .from("subscriptions")
     .update({
@@ -46,11 +85,26 @@ export async function POST(request: Request) {
     .neq("tier", "free");
 
   if (error) {
-    return Response.json({ error: "Failed to schedule cancellation" }, { status: 500 });
+    return Response.json(
+      { error: "Failed to schedule cancellation" },
+      { status: 500 },
+    );
   }
+
+  await recordAudit({
+    orgId: organization_id,
+    actor: { type: "user", userId: user.id },
+    action: "billing.cancel_scheduled",
+    resource: { type: "subscription", id: organization_id },
+    before: { tier: sub.tier, pending_tier: null },
+    after: { tier: sub.tier, pending_tier: "free" },
+    request: extractRequestMeta(request),
+  });
 
   return Response.json({
     success: true,
-    message: "Your plan will be downgraded to Free at the end of the current billing period.",
+    access_until: sub.current_period_end,
+    message:
+      "Assinatura cancelada. Seu acesso continua liberado até o fim do período já pago.",
   });
 }

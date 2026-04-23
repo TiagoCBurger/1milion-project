@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { recordAudit, extractRequestMeta } from "@/lib/audit";
+import { diffObjects } from "@vibefly/audit";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -54,6 +56,12 @@ export async function PATCH(request: Request, { params }: Ctx) {
     return Response.json({ error: "Nothing to update" }, { status: 400 });
   }
 
+  const { data: before } = await supabase
+    .from("organizations")
+    .select("id, name, slug")
+    .eq("id", id)
+    .single();
+
   const { data, error } = await supabase
     .from("organizations")
     .update(update)
@@ -71,6 +79,17 @@ export async function PATCH(request: Request, { params }: Ctx) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
+  await recordAudit({
+    orgId: id,
+    actor: { type: "user", userId: user.id },
+    action: "organization.update",
+    resource: { type: "organization", id },
+    before,
+    after: data,
+    diff: diffObjects(before, data),
+    request: extractRequestMeta(request),
+  });
+
   return Response.json(data);
 }
 
@@ -79,7 +98,7 @@ export async function PATCH(request: Request, { params }: Ctx) {
  * Deletes the organization. Owners only. Cascade removes memberships,
  * projects, subscriptions, meta_tokens, ad_accounts, etc.
  */
-export async function DELETE(_request: Request, { params }: Ctx) {
+export async function DELETE(request: Request, { params }: Ctx) {
   const { id } = await params;
   const supabase = await createClient();
 
@@ -102,10 +121,25 @@ export async function DELETE(_request: Request, { params }: Ctx) {
     );
   }
 
+  const { data: before } = await supabase
+    .from("organizations")
+    .select("id, name, slug")
+    .eq("id", id)
+    .single();
+
   const { error } = await supabase.from("organizations").delete().eq("id", id);
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
+
+  await recordAudit({
+    orgId: id,
+    actor: { type: "user", userId: user.id },
+    action: "organization.delete",
+    resource: { type: "organization", id },
+    before,
+    request: extractRequestMeta(request),
+  });
 
   return Response.json({ success: true });
 }

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { BillingCycle, SubscriptionTier } from "@vibefly/shared";
+import { recordAudit, extractRequestMeta } from "@/lib/audit";
 
 const TIER_ORDER: Record<string, number> = {
   free: 0,
@@ -105,6 +106,23 @@ export async function POST(request: Request) {
     })
     .eq("id", subscription.id);
 
+  await recordAudit({
+    orgId: organization_id,
+    actor: { type: "user", userId: user.id },
+    action: "billing.change_plan_scheduled",
+    resource: { type: "subscription", id: subscription.id },
+    before: {
+      tier: subscription.tier,
+      billing_cycle: subscription.billing_cycle,
+    },
+    after: {
+      pending_tier: tier,
+      pending_billing_cycle: tier === "free" ? null : cycle,
+      change_type: changeType,
+    },
+    request: extractRequestMeta(request),
+  });
+
   return Response.json({
     success: true,
     change_type: changeType,
@@ -159,6 +177,14 @@ export async function DELETE(request: Request) {
       updated_at: new Date().toISOString(),
     })
     .eq("organization_id", organizationId);
+
+  await recordAudit({
+    orgId: organizationId,
+    actor: { type: "user", userId: user.id },
+    action: "billing.change_plan_cancelled",
+    resource: { type: "subscription", id: organizationId },
+    request: extractRequestMeta(request),
+  });
 
   return Response.json({ success: true });
 }

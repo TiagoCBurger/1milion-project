@@ -4,21 +4,25 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockVerifyWebhookSignature = vi.fn();
 const mockVerifyWebhookQuerySecret = vi.fn();
+const mockVerifyWebhookTimestamp = vi.fn().mockReturnValue(true);
 const mockParseWebhookPayload = vi.fn();
 
 vi.mock("@/lib/abacatepay", () => ({
   verifyWebhookSignature: (...args: unknown[]) => mockVerifyWebhookSignature(...args),
   verifyWebhookQuerySecret: (...args: unknown[]) => mockVerifyWebhookQuerySecret(...args),
+  verifyWebhookTimestamp: (...args: unknown[]) => mockVerifyWebhookTimestamp(...args),
   parseWebhookPayload: (...args: unknown[]) => mockParseWebhookPayload(...args),
 }));
 
 // ── Mock Supabase admin ─────────────────────────────────────
 
 const mockAdminFrom = vi.fn();
+const mockAdminRpc = vi.fn().mockResolvedValue({ data: null, error: null });
 
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: vi.fn(() => ({
     from: mockAdminFrom,
+    rpc: mockAdminRpc,
   })),
 }));
 
@@ -99,6 +103,8 @@ describe("POST /api/billing/webhook", () => {
     vi.clearAllMocks();
     handler = await import("@/app/api/billing/webhook/route");
     mockVerifyWebhookQuerySecret.mockReturnValue(true);
+    mockVerifyWebhookTimestamp.mockReturnValue(true);
+    mockAdminRpc.mockResolvedValue({ data: null, error: null });
   });
 
   it("returns 401 for invalid query secret", async () => {
@@ -112,6 +118,17 @@ describe("POST /api/billing/webhook", () => {
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error).toBe("Invalid webhook secret");
+  });
+
+  it("returns 401 for expired x-webhook-timestamp header", async () => {
+    mockVerifyWebhookTimestamp.mockReturnValue(false);
+
+    const res = await handler.POST(
+      makeWebhookRequest('{"id":"evt_1","event":"test","data":{}}'),
+    );
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe("Invalid or expired timestamp");
   });
 
   it("returns 401 for invalid HMAC signature", async () => {
@@ -306,7 +323,7 @@ describe("POST /api/billing/webhook", () => {
     );
   });
 
-  it("handles subscription.cancelled — downgrades to free", async () => {
+  it("subscription.cancelled keeps paid access until current_period_end", async () => {
     mockVerifyWebhookSignature.mockResolvedValue(true);
     mockParseWebhookPayload.mockReturnValue(
       makeV2Payload("evt_cancel", "subscription.cancelled")
@@ -314,9 +331,16 @@ describe("POST /api/billing/webhook", () => {
 
     const idempotencyCheck = mockAdminQueryChain({ data: null, error: null });
     const insertChain = mockAdminQueryChain({ data: null, error: null });
-    // subscriptions SELECT — no pending change
+    // Subscription still within its paid period — user must keep access.
     const pendingCheck = mockAdminQueryChain({
-      data: { id: "sub-1", tier: "pro", pending_tier: null, pending_billing_cycle: null },
+      data: {
+        id: "sub-1",
+        tier: "pro",
+        pending_tier: null,
+        pending_billing_cycle: null,
+        status: "active",
+        current_period_end: "2099-12-31T23:59:59Z",
+      },
       error: null,
     });
     const updateChain = mockAdminQueryChain({ data: null, error: null });
@@ -334,13 +358,53 @@ describe("POST /api/billing/webhook", () => {
     const body = await res.json();
     expect(body.ok).toBe(true);
 
-    // Should downgrade to free with free limits
+    // Tier stays paid — only the intent is recorded. Reconcile cron
+    // handles the flip to free when the paid period actually ends.
+    const updateArg = updateChain.update.mock.calls[0]?.[0] ?? {};
+    expect(updateArg.pending_tier).toBe("free");
+    expect(updateArg.abacatepay_subscription_id).toBeNull();
+    expect(updateArg.tier).toBeUndefined(); // tier MUST NOT be touched now
+    expect(updateArg.status).toBeUndefined(); // status stays active
+  });
+
+  it("subscription.cancelled downgrades immediately if period already ended", async () => {
+    mockVerifyWebhookSignature.mockResolvedValue(true);
+    mockParseWebhookPayload.mockReturnValue(
+      makeV2Payload("evt_cancel_expired", "subscription.cancelled")
+    );
+
+    const idempotencyCheck = mockAdminQueryChain({ data: null, error: null });
+    const insertChain = mockAdminQueryChain({ data: null, error: null });
+    // Period already elapsed → immediate downgrade path.
+    const pendingCheck = mockAdminQueryChain({
+      data: {
+        id: "sub-1",
+        tier: "pro",
+        pending_tier: null,
+        pending_billing_cycle: null,
+        status: "active",
+        current_period_end: "2020-01-01T00:00:00Z",
+      },
+      error: null,
+    });
+    const updateChain = mockAdminQueryChain({ data: null, error: null });
+
+    let callCount = 0;
+    mockAdminFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return idempotencyCheck;
+      if (callCount === 2) return insertChain;
+      if (callCount === 3) return pendingCheck;
+      return updateChain;
+    });
+
+    const res = await handler.POST(makeWebhookRequest('{"id":"evt_cancel_expired"}'));
+    expect(res.status).toBe(200);
+
     expect(updateChain.update).toHaveBeenCalledWith(
       expect.objectContaining({
         tier: "free",
-        status: "active",
         requests_per_hour: 0,
-        requests_per_day: 0,
         max_mcp_connections: 0,
       })
     );
@@ -354,9 +418,17 @@ describe("POST /api/billing/webhook", () => {
 
     const idempotencyCheck = mockAdminQueryChain({ data: null, error: null });
     const insertChain = mockAdminQueryChain({ data: null, error: null });
-    // subscriptions SELECT — has pending downgrade to free
+    // User had a pending_tier='free' + period already in the past,
+    // so the immediate downgrade branch runs.
     const pendingCheck = mockAdminQueryChain({
-      data: { id: "sub-1", tier: "max", pending_tier: "free", pending_billing_cycle: null },
+      data: {
+        id: "sub-1",
+        tier: "max",
+        pending_tier: "free",
+        pending_billing_cycle: null,
+        status: "active",
+        current_period_end: "2020-01-01T00:00:00Z",
+      },
       error: null,
     });
     const updateChain = mockAdminQueryChain({ data: null, error: null });

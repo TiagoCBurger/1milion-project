@@ -8,12 +8,15 @@ export interface BillingFailedEmailProps {
   userName: string;
   tierName: string;
   billingUrl?: string;
+  /** Deadline after which access is downgraded to free. Locale-formatted string. */
+  gracePeriodEnd?: string;
 }
 
 export function BillingFailedEmail({
   userName = "Usu\u00e1rio",
   tierName = "Pro",
   billingUrl = "https://app.vibefly.app/dashboard/billing",
+  gracePeriodEnd,
 }: BillingFailedEmailProps) {
   return (
     <Layout preview="Problema no pagamento do VibeFly">
@@ -27,6 +30,13 @@ export function BillingFailedEmail({
         bloqueio do banco. Atualize seus dados de pagamento para manter seu
         plano ativo.
       </Paragraph>
+      {gracePeriodEnd ? (
+        <Paragraph>
+          Seu acesso {tierName} continua liberado at&eacute; {gracePeriodEnd}.
+          Depois dessa data a conta volta automaticamente para o plano
+          gratuito.
+        </Paragraph>
+      ) : null}
       <Button href={billingUrl}>Atualizar pagamento</Button>
       <Paragraph muted>
         Se o problema persistir, responda este email que a gente resolve junto.

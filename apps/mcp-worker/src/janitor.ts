@@ -146,6 +146,11 @@ async function fetchExpiringOrgIds(env: Env): Promise<string[]> {
     .filter((v): v is string => v !== null);
 }
 
+// Billing-related cleanups (detect_overdue, reconcile_expired, dunning
+// email) were moved into Supabase-native cron in migration 046. They now
+// run inside Postgres (pg_cron) + a Supabase Edge Function (billing-dunning).
+// See supabase/migrations/046_pg_cron_billing.sql.
+
 async function refreshTokensViaWeb(
   env: Env,
   organizationIds: string[],

@@ -90,7 +90,17 @@ export function MetaWorkspaceAdAccounts({
   }
 
   if (rows.length === 0) {
-    return null;
+    return (
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="text-base">Contas de anúncio nesta organização</CardTitle>
+          <CardDescription>
+            Nenhuma conta sincronizada. Desconecte e reconecte o Facebook se você esperava ver contas
+            aqui — ou confirme que sua conta tem acesso a algum Business Manager com contas de anúncio.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
   }
 
   return (

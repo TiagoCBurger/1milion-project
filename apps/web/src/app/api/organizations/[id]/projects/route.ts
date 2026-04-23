@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { fetchOrganizationProjects } from "@/lib/projects";
+import { recordAudit, extractRequestMeta } from "@/lib/audit";
 
 /**
  * GET /api/organizations/[id]/projects
@@ -107,6 +108,15 @@ export async function POST(
     }
     return Response.json({ error: error.message }, { status: 500 });
   }
+
+  await recordAudit({
+    orgId: organizationId,
+    actor: { type: "user", userId: user.id },
+    action: "project.create",
+    resource: { type: "project", id: data.id, projectId: data.id },
+    after: data,
+    request: extractRequestMeta(request),
+  });
 
   return Response.json(data, { status: 201 });
 }

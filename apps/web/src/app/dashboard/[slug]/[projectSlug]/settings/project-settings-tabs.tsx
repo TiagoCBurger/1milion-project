@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AdAccountToggle } from "@/app/dashboard/[slug]/ad-account-toggle";
 
 type Project = {
   id: string;
@@ -102,12 +103,14 @@ export function ProjectSettingsTabs(props: {
             primary: a.name,
             secondary: a.meta_account_id,
             projectId: a.project_id,
+            isEnabled: a.is_enabled,
           }))}
           elsewhere={accountsElsewhere.map((a) => ({
             id: a.id,
             primary: a.name,
             secondary: a.meta_account_id,
             projectId: a.project_id,
+            isEnabled: a.is_enabled,
           }))}
           projects={projects}
         />
@@ -267,13 +270,21 @@ function GeneralForm({
   );
 }
 
+type ResourceItem = {
+  id: string;
+  primary: string;
+  secondary: string;
+  projectId: string;
+  isEnabled?: boolean;
+};
+
 function ResourceSection(props: {
   title: string;
   organizationId: string;
   projectId: string;
   kind: "ad_accounts" | "sites";
-  here: { id: string; primary: string; secondary: string; projectId: string }[];
-  elsewhere: { id: string; primary: string; secondary: string; projectId: string }[];
+  here: ResourceItem[];
+  elsewhere: ResourceItem[];
   projects: ProjectRef[];
 }) {
   const { title, organizationId, projectId, kind, here, elsewhere, projects } = props;
@@ -326,20 +337,29 @@ function ResourceSection(props: {
               {here.map((r) => (
                 <li
                   key={r.id}
-                  className="flex items-center justify-between py-2"
+                  className="flex items-center justify-between gap-3 py-2"
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">{r.primary}</p>
                     <p className="text-xs text-muted-foreground font-mono truncate">
                       {r.secondary}
                     </p>
                   </div>
-                  <MoveControl
-                    currentProjectId={projectId}
-                    projects={projects}
-                    disabled={pending}
-                    onMove={(target) => startTransition(() => move([r.id], target))}
-                  />
+                  <div className="flex items-center gap-3">
+                    {kind === "ad_accounts" && r.isEnabled !== undefined ? (
+                      <AdAccountToggle
+                        organizationId={organizationId}
+                        accountId={r.id}
+                        enabled={r.isEnabled}
+                      />
+                    ) : null}
+                    <MoveControl
+                      currentProjectId={projectId}
+                      projects={projects}
+                      disabled={pending}
+                      onMove={(target) => startTransition(() => move([r.id], target))}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
@@ -366,10 +386,17 @@ function ResourceSection(props: {
                 return (
                   <li
                     key={r.id}
-                    className="flex items-center justify-between py-2"
+                    className="flex items-center justify-between gap-3 py-2"
                   >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{r.primary}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">
+                        {r.primary}
+                        {kind === "ad_accounts" && r.isEnabled === false ? (
+                          <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+                            inativa
+                          </span>
+                        ) : null}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate">
                         {r.secondary}
                         {currentProject ? ` · em ${currentProject.name}` : ""}

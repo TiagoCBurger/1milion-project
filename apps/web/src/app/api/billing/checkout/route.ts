@@ -6,6 +6,7 @@ import {
   getProductId,
 } from "@/lib/abacatepay";
 import type { BillingCycle } from "@vibefly/shared";
+import { recordAudit, extractRequestMeta } from "@/lib/audit";
 
 const VALID_TIERS = ["pro", "max"] as const;
 const VALID_CYCLES: BillingCycle[] = ["monthly"];
@@ -106,6 +107,15 @@ export async function POST(request: Request) {
     completionUrl: `${origin}/dashboard/${slug}/billing/success`,
     externalId: organization_id,
     metadata: { organization_id, tier, cycle },
+  });
+
+  await recordAudit({
+    orgId: organization_id,
+    actor: { type: "user", userId: user.id },
+    action: "billing.checkout_created",
+    resource: { type: "subscription", id: subscription.id },
+    after: { tier, cycle, checkout_id: (checkout as any).id ?? null },
+    request: extractRequestMeta(request),
   });
 
   return Response.json({ checkout_url: checkout.url });

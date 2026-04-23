@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   verifyWebhookSignature,
   verifyWebhookQuerySecret,
+  verifyWebhookTimestamp,
   parseWebhookPayload,
 } from "@/lib/abacatepay";
 import { TIER_LIMITS } from "@vibefly/shared";
@@ -13,6 +14,7 @@ import {
   PlanCancelingEmail,
   EMAIL_TAGS,
 } from "@vibefly/email";
+import { recordAudit, extractRequestMeta } from "@/lib/audit";
 
 export async function POST(request: Request) {
   // Verify query string secret
@@ -20,6 +22,15 @@ export async function POST(request: Request) {
   const querySecret = url.searchParams.get("webhookSecret");
   if (!verifyWebhookQuerySecret(querySecret)) {
     return Response.json({ error: "Invalid webhook secret" }, { status: 401 });
+  }
+
+  // Replay protection: only enforce if AbacatePay sent the timestamp header.
+  const timestampHeader = request.headers.get("x-webhook-timestamp");
+  if (!verifyWebhookTimestamp(timestampHeader)) {
+    return Response.json(
+      { error: "Invalid or expired timestamp" },
+      { status: 401 },
+    );
   }
 
   const rawBody = await request.text();
@@ -70,10 +81,16 @@ export async function POST(request: Request) {
   // Load current subscription to check for pending changes
   const { data: currentSub } = await admin
     .from("subscriptions")
-    .select("id, tier, pending_tier, pending_billing_cycle")
+    .select("id, tier, pending_tier, pending_billing_cycle, status, current_period_end")
     .eq("organization_id", organizationId)
     .single();
 
+  // AbacatePay v2 emits a fixed enum of events (see their OpenAPI spec). The
+  // only subscription lifecycle events are: subscription.completed, .renewed,
+  // .cancelled, .trial_started. There is NO dedicated "payment failed" event
+  // — if a card fails at renewal, AbacatePay retries internally and, on final
+  // failure, emits subscription.cancelled directly. Overdue detection (no
+  // renewal arrived in time) is handled by the janitor cron, not here.
   switch (event) {
     case "subscription.completed": {
       const tier = (metadata?.tier ?? "pro") as SubscriptionTier;
@@ -96,6 +113,10 @@ export async function POST(request: Request) {
           // Clear any pending changes since this is a fresh subscription
           pending_tier: null,
           pending_billing_cycle: null,
+          // Any prior dunning state is resolved by a fresh checkout.
+          grace_period_end: null,
+          payment_failed_at: null,
+          payment_failure_count: 0,
           updated_at: new Date().toISOString(),
         })
         .eq("organization_id", organizationId);
@@ -134,12 +155,17 @@ export async function POST(request: Request) {
         // Apply pending plan change at renewal
         await applyPendingChange(admin, organizationId, currentSub);
       } else {
-        // No pending change — just update the period
+        // No pending change — update the period and clear any dunning flags
+        // the janitor may have set while we were waiting for this event.
         await admin
           .from("subscriptions")
           .update({
             status: "active",
             current_period_end: data.subscription?.updatedAt ?? null,
+            grace_period_end: null,
+            payment_failed_at: null,
+            payment_failure_count: 0,
+            dunning_notified_at: null,
             updated_at: new Date().toISOString(),
           })
           .eq("organization_id", organizationId);
@@ -147,12 +173,60 @@ export async function POST(request: Request) {
       break;
     }
 
+    case "subscription.trial_started": {
+      // AbacatePay emits this when a trial period starts. We don't run
+      // trials yet, but record the event so we notice if/when it fires.
+      console.log(
+        "[billing-webhook] trial_started for org:",
+        organizationId,
+        "subscription:",
+        subscriptionId,
+      );
+      break;
+    }
+
     case "subscription.cancelled": {
-      if (currentSub?.pending_tier) {
-        // Subscription cancelled with pending change — apply it
+      // AbacatePay's /v2/subscriptions/cancel emits this event as soon as the
+      // cancellation is recorded on their side — which may happen long before
+      // the paid period ends. Market standard (Stripe/Paddle) is to keep the
+      // customer on their paid tier until `current_period_end` and only then
+      // flip to free. We enforce that here:
+      //
+      //   (a) period still active → record the intent (pending_tier=free,
+      //       clear abacatepay_subscription_id so no retry attempts can
+      //       revive billing) and leave tier/status untouched. The janitor's
+      //       detect_overdue step will flip the tier once the period expires.
+      //
+      //   (b) period already elapsed (or missing) → downgrade now.
+      const periodStillActive =
+        currentSub?.current_period_end != null &&
+        new Date(currentSub.current_period_end).getTime() > Date.now();
+
+      if (currentSub?.pending_tier && currentSub.pending_tier !== "free") {
+        // User had scheduled a paid→paid switch; cancellation wins. Fall
+        // through to the immediate downgrade path: they explicitly dropped
+        // the subscription, so honor it even if the tier change was pending.
         await applyPendingChange(admin, organizationId, currentSub);
+      } else if (periodStillActive) {
+        // (a) Keep access live until current_period_end. The cron picks up
+        // and downgrades at that time.
+        await admin
+          .from("subscriptions")
+          .update({
+            pending_tier: "free",
+            pending_billing_cycle: null,
+            abacatepay_subscription_id: null,
+            // Dunning state may have been set if the webhook arrived late;
+            // a voluntary cancel supersedes dunning flags.
+            grace_period_end: null,
+            payment_failed_at: null,
+            payment_failure_count: 0,
+            dunning_notified_at: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("organization_id", organizationId);
       } else {
-        // No pending change — downgrade to free
+        // (b) Period already over — downgrade immediately.
         const freeLimits = TIER_LIMITS.free;
         await admin
           .from("subscriptions")
@@ -169,19 +243,37 @@ export async function POST(request: Request) {
             max_ad_accounts: freeLimits.max_ad_accounts,
             pending_tier: null,
             pending_billing_cycle: null,
+            grace_period_end: null,
+            payment_failed_at: null,
+            payment_failure_count: 0,
+            dunning_notified_at: null,
             updated_at: new Date().toISOString(),
           })
           .eq("organization_id", organizationId);
+
+        {
+          const { error: reconcileErr } = await admin.rpc(
+            "reconcile_ad_account_plan_limits",
+            { p_organization_id: organizationId },
+          );
+          if (reconcileErr) {
+            console.error("[billing-webhook] reconcile:", reconcileErr);
+          }
+        }
       }
 
-      // Send plan canceling email
+      // Email confirming cancellation + end-of-access date.
       const cancelOwnerEmail = data.customer?.email;
       const cancelOwnerName = data.customer?.name;
       if (cancelOwnerEmail) {
-        const canceledTier = currentSub?.pending_tier ?? "pro";
-        const tierLabel = canceledTier.charAt(0).toUpperCase() + canceledTier.slice(1);
-        const endDate = data.subscription?.canceledAt
-          ? new Date(data.subscription.canceledAt).toLocaleDateString("pt-BR")
+        const canceledTier = currentSub?.tier ?? "pro";
+        const tierLabel =
+          canceledTier.charAt(0).toUpperCase() + canceledTier.slice(1);
+        // Prefer the local current_period_end (what the user actually paid
+        // for) over AbacatePay's canceledAt (the API call timestamp).
+        const accessEnd = currentSub?.current_period_end ?? data.subscription?.canceledAt;
+        const endDate = accessEnd
+          ? new Date(accessEnd).toLocaleDateString("pt-BR")
           : "em breve";
 
         sendTransactionalEmail({
@@ -202,6 +294,34 @@ export async function POST(request: Request) {
     default:
       console.log("[billing-webhook] Unhandled event:", event);
   }
+
+  // Snapshot post-mutation state for audit.
+  const { data: afterSub } = await admin
+    .from("subscriptions")
+    .select("tier, status, billing_cycle, current_period_end, pending_tier")
+    .eq("organization_id", organizationId)
+    .single();
+
+  await recordAudit({
+    orgId: organizationId,
+    actor: {
+      type: "webhook",
+      identifier: `abacatepay:${eventId}`,
+    },
+    action: `billing.webhook.${event}`,
+    resource: { type: "subscription", id: subscriptionId ?? organizationId },
+    before: currentSub
+      ? {
+          tier: currentSub.tier,
+          status: currentSub.status,
+          pending_tier: currentSub.pending_tier,
+          pending_billing_cycle: currentSub.pending_billing_cycle,
+          current_period_end: currentSub.current_period_end,
+        }
+      : null,
+    after: afterSub ?? null,
+    request: extractRequestMeta(request),
+  });
 
   return Response.json({ ok: true });
 }
@@ -228,7 +348,7 @@ async function applyPendingChange(
       .from("subscriptions")
       .update({
         tier: "free",
-        status: "active",
+        status: "canceled",
         billing_cycle: null,
         current_period_end: null,
         abacatepay_subscription_id: null,
@@ -239,9 +359,22 @@ async function applyPendingChange(
         max_ad_accounts: freeLimits.max_ad_accounts,
         pending_tier: null,
         pending_billing_cycle: null,
+        grace_period_end: null,
+        payment_failed_at: null,
+        payment_failure_count: 0,
         updated_at: new Date().toISOString(),
       })
       .eq("organization_id", organizationId);
+
+    {
+      const { error: reconcileErr } = await admin.rpc(
+        "reconcile_ad_account_plan_limits",
+        { p_organization_id: organizationId },
+      );
+      if (reconcileErr) {
+        console.error("[billing-webhook] reconcile:", reconcileErr);
+      }
+    }
   } else {
     // Change to different paid tier — update limits, mark as needing new checkout
     const limits = TIER_LIMITS[newTier];

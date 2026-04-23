@@ -5,6 +5,7 @@ import { validateApiKey, getMetaToken, verifyOAuthAccessToken, type AuthResult }
 import { checkRateLimit } from "./rate-limit";
 import { logUsage } from "./usage";
 import { registerAllTools } from "./tools";
+import { wrapServerWithAudit } from "./audit";
 import { routeOAuth } from "./oauth/router";
 import { runJanitor } from "./janitor";
 import type { Env, OrganizationContext } from "./types";
@@ -246,8 +247,14 @@ function buildServer(
     return server;
   }
 
+  const auditedServer = wrapServerWithAudit(server, {
+    env,
+    organizationId: workspace.organizationId,
+    apiKeyId: workspace.apiKeyId,
+  });
+
   registerAllTools({
-    server,
+    server: auditedServer,
     token: metaToken,
     tier: workspace.tier,
     env,

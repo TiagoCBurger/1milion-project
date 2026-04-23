@@ -3,7 +3,12 @@ import type { StoredAccessToken } from "./oauth/types";
 import { sha256Hex } from "./oauth/utils";
 import { fetchOrganizationProjects } from "./project-ad-accounts";
 
-const API_KEY_CACHE_TTL = 300; // 5 minutes
+// Cache API-key validation results for 60 s. Subscription enforcement lives
+// in the `validate_api_key` RPC (migration 042): any lapsed subscription is
+// collapsed to `tier='free'` at the DB layer, so this cache only extends that
+// decision by 60 s after a webhook/cron flip — an acceptable cancellation UX
+// window that also absorbs the bulk of the Supabase load.
+const API_KEY_CACHE_TTL = 60;
 
 export type AuthResult =
   | { ok: true; workspace: OrganizationContext }
@@ -77,6 +82,7 @@ export async function validateApiKey(
   }
 
   const row = rows[0];
+
   const ctxBase: Omit<OrganizationContext, "availableProjects" | "allowedProjectIds"> = {
     organizationId: row.organization_id,
     apiKeyId: row.api_key_id,
