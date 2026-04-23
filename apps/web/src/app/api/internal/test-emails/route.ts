@@ -3,14 +3,23 @@
 //
 // Fires off every transactional template with mock props so the
 // recipient can preview the email in their inbox. Intended for
-// manual QA — auth'd with the same INTERNAL_API_TOKEN used by
-// the other internal endpoints.
+// manual QA.
+//
+// Access controls (defence in depth):
+//   1. `INTERNAL_API_TOKEN` header (shared with other internal routes).
+//   2. Disabled in production unless env `ENABLE_TEST_EMAILS=true`.
+//      Returns 404 otherwise so scanners don't learn the route exists.
+//   3. Recipient must be @vibefly.app OR listed in
+//      `TEST_EMAIL_ALLOWLIST` (comma-separated env var).
 //
 // Usage:
 //   curl -X POST https://vibefly.app/api/internal/test-emails \
 //     -H "x-internal-api-token: $TOKEN" \
 //     -H "Content-Type: application/json" \
-//     -d '{"to":"ticburger@gmail.com"}'
+//     -d '{"to":"me@vibefly.app"}'
+//
+//   # Only a subset:
+//   curl ... -d '{"to":"me@vibefly.app","only":["welcome","billing-receipt"]}'
 // ============================================================
 
 import {
@@ -27,6 +36,25 @@ import {
 } from "@vibefly/email";
 
 const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
+
+// Defence-in-depth on top of the token: restrict both the environment
+// this runs in AND which addresses it can email. Even if the token leaks
+// the blast radius is limited to preview/dev and to a small allowlist.
+const PROD_OVERRIDE = process.env.ENABLE_TEST_EMAILS === "true";
+// @vibefly.app addresses are always allowed. Add extras (comma-separated)
+// via env `TEST_EMAIL_ALLOWLIST=ticburger@gmail.com,foo@bar.com`.
+const ALWAYS_ALLOWED_DOMAIN = "@vibefly.app";
+const EXTRA_ALLOWLIST = (process.env.TEST_EMAIL_ALLOWLIST ?? "")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
+  .filter((s) => s.length > 0);
+
+function isRecipientAllowed(email: string): boolean {
+  const normalized = email.toLowerCase();
+  if (normalized.endsWith(ALWAYS_ALLOWED_DOMAIN)) return true;
+  if (EXTRA_ALLOWLIST.includes(normalized)) return true;
+  return false;
+}
 
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -193,6 +221,12 @@ const DISPATCHERS: Array<{
 ];
 
 export async function POST(request: Request) {
+  // Production gate: disabled unless explicitly opted-in. Returns 404 to
+  // hide the endpoint's existence from scanners.
+  if (process.env.NODE_ENV === "production" && !PROD_OVERRIDE) {
+    return new Response("Not found", { status: 404 });
+  }
+
   if (!INTERNAL_API_TOKEN || INTERNAL_API_TOKEN.length < 32) {
     return Response.json({ error: "Service not configured" }, { status: 503 });
   }
@@ -214,6 +248,15 @@ export async function POST(request: Request) {
       : null;
   if (!to || !to.includes("@")) {
     return Response.json({ error: "Missing or invalid 'to' field" }, { status: 400 });
+  }
+  if (!isRecipientAllowed(to)) {
+    return Response.json(
+      {
+        error:
+          "Recipient not in allowlist. Use an @vibefly.app address or set TEST_EMAIL_ALLOWLIST.",
+      },
+      { status: 403 },
+    );
   }
 
   // Optional filter: { only: ["welcome","billing-receipt", ...] }.
