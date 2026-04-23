@@ -9,6 +9,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter, DialogTrigger,
 } from "@/components/ui/dialog";
+import { useRequirePlan } from "@/hooks/use-require-plan";
+import { UpgradePaywallDialog } from "@/components/billing/upgrade-paywall-dialog";
 
 const ALLOWED_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_BYTES = 30 * 1024 * 1024;
@@ -67,6 +69,7 @@ export function UploadImageDialog({
   const [preview, setPreview] = useState<string | null>(null);
   const [fileName, setFileName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const { allowed, paywallOpen, setPaywallOpen } = useRequirePlan("pro");
 
   const loading = phase !== "idle" && phase !== "done";
 
@@ -196,9 +199,19 @@ export function UploadImageDialog({
   };
 
   return (
+    <>
+      <UpgradePaywallDialog
+        open={paywallOpen}
+        onOpenChange={setPaywallOpen}
+        reason="Suba imagens para seus anúncios direto do dashboard."
+      />
     <Dialog
       open={open}
       onOpenChange={(v) => {
+        if (v && !allowed) {
+          setPaywallOpen(true);
+          return;
+        }
         setOpen(v);
         if (!v) reset();
       }}
@@ -289,5 +302,6 @@ export function UploadImageDialog({
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

@@ -12,6 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { MetaWorkspaceAdAccounts } from "./meta-workspace-ad-accounts";
 import { MetaOnboarding } from "./meta-onboarding";
+import { PlanGate } from "@/components/billing/plan-gate";
+
+const META_GATE_REASON = "Conecte sua conta Meta nos planos Pro ou Max.";
 
 export default function MetaIntegrationPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -173,7 +176,7 @@ export default function MetaIntegrationPage() {
 
   if (!successData && !connectionLoaded) {
     return (
-      <>
+      <PlanGate reason={META_GATE_REASON}>
         <PageHeader
           breadcrumbs={[
             { label: "Organizações", href: "/dashboard" },
@@ -186,13 +189,13 @@ export default function MetaIntegrationPage() {
         <div className="mx-auto max-w-xl p-6">
           <p className="text-sm text-muted-foreground">Carregando…</p>
         </div>
-      </>
+      </PlanGate>
     );
   }
 
   if (successData && organizationId) {
     return (
-      <>
+      <PlanGate reason={META_GATE_REASON}>
         <PageHeader
           breadcrumbs={[
             { label: "Organizações", href: "/dashboard" },
@@ -215,13 +218,13 @@ export default function MetaIntegrationPage() {
             onComplete={handleOnboardingComplete}
           />
         </div>
-      </>
+      </PlanGate>
     );
   }
 
   if (metaConnected && connectionLoaded) {
     return (
-      <>
+      <PlanGate reason={META_GATE_REASON}>
         <PageHeader
           breadcrumbs={[
             { label: "Organizações", href: "/dashboard" },
@@ -304,12 +307,12 @@ export default function MetaIntegrationPage() {
             />
           ) : null}
         </div>
-      </>
+      </PlanGate>
     );
   }
 
   return (
-    <>
+    <PlanGate reason={META_GATE_REASON}>
       <PageHeader
         breadcrumbs={[
           { label: "Organizações", href: "/dashboard" },
@@ -394,6 +397,6 @@ export default function MetaIntegrationPage() {
           </Card>
         )}
       </div>
-    </>
+    </PlanGate>
   );
 }

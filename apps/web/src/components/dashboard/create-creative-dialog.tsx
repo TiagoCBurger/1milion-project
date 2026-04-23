@@ -9,11 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
-  DialogDescription, DialogFooter, DialogTrigger,
+  DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { useRequirePlan } from "@/hooks/use-require-plan";
+import { UpgradePaywallDialog } from "@/components/billing/upgrade-paywall-dialog";
 
 const CTA_TYPES = [
   { value: "LEARN_MORE", label: "Learn More" },
@@ -48,6 +50,7 @@ export function CreateCreativeDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<string | null>(null);
+  const { guard, paywallOpen, setPaywallOpen } = useRequirePlan("pro");
 
   const [selectedImageHash, setSelectedImageHash] = useState("");
   const [creativeName, setCreativeName] = useState("");
@@ -113,13 +116,17 @@ export function CreateCreativeDialog({
   const availableImages = images ?? [];
 
   return (
+    <>
+      <Button size="sm" onClick={guard(() => setOpen(true))}>
+        <Plus className="mr-1.5 h-4 w-4" />
+        New Creative
+      </Button>
+      <UpgradePaywallDialog
+        open={paywallOpen}
+        onOpenChange={setPaywallOpen}
+        reason="Monte criativos e reutilize em várias campanhas."
+      />
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="mr-1.5 h-4 w-4" />
-          New Creative
-        </Button>
-      </DialogTrigger>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Ad Creative</DialogTitle>
@@ -276,5 +283,6 @@ export function CreateCreativeDialog({
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

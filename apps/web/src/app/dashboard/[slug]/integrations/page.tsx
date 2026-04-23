@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Cable, LineChart, Megaphone, Sparkles, ChevronRight } from "lucide-react";
 import { SuggestIntegrationButton } from "./integration-request-form";
+import { PlanGate } from "@/components/billing/plan-gate";
 
 export default async function IntegrationsHubPage({
   params,
@@ -44,7 +45,7 @@ export default async function IntegrationsHubPage({
   const metaConnected = !!metaTok;
 
   return (
-    <>
+    <PlanGate reason="Conecte Meta, Google e ferramentas de IA ao desbloquear um plano pago.">
       <PageHeader
         breadcrumbs={[
           { label: "Organizações", href: "/dashboard" },
@@ -161,6 +162,6 @@ export default async function IntegrationsHubPage({
           </Card>
         </section>
       </div>
-    </>
+    </PlanGate>
   );
 }

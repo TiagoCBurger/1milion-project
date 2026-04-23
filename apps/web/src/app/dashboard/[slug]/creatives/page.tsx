@@ -11,6 +11,7 @@ import { Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { CreativesClient } from "@/components/dashboard/creatives-client";
+import { PlanGate } from "@/components/billing/plan-gate";
 
 export default async function CreativesPage({
   params,
@@ -39,7 +40,7 @@ export default async function CreativesPage({
 
   if (!token || accounts.length === 0) {
     return (
-      <>
+      <PlanGate reason="Monte criativos e reutilize em várias campanhas.">
         <PageHeader breadcrumbs={[
           { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
@@ -59,7 +60,7 @@ export default async function CreativesPage({
             </Button>
           </EmptyState>
         </div>
-      </>
+      </PlanGate>
     );
   }
 
@@ -85,7 +86,7 @@ export default async function CreativesPage({
   }));
 
   return (
-    <>
+    <PlanGate reason="Monte criativos e reutilize em várias campanhas.">
       <PageHeader breadcrumbs={[
         { label: "Organizações", href: "/dashboard" },
         { label: slug, href: `/dashboard/${slug}` },
@@ -108,9 +109,8 @@ export default async function CreativesPage({
           accountId={selectedAccount}
           pages={pageOptions}
           initialImages={images ?? []}
-          canWrite={workspace.enable_meta_mutations}
         />
       </div>
-    </>
+    </PlanGate>
   );
 }

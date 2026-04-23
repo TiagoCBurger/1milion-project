@@ -16,6 +16,7 @@ import { FileText, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { CreateAdDialog } from "@/components/dashboard/create-ad-dialog";
+import { PlanGate } from "@/components/billing/plan-gate";
 
 const statusVariant = (s: string) => {
   switch (s) {
@@ -52,7 +53,7 @@ export default async function AdsPage({
 
   if (!token || accounts.length === 0) {
     return (
-      <>
+      <PlanGate reason="Publique anúncios direto do dashboard.">
         <PageHeader breadcrumbs={[
           { label: "Organizações", href: "/dashboard" },
           { label: slug, href: `/dashboard/${slug}` },
@@ -72,7 +73,7 @@ export default async function AdsPage({
             </Button>
           </EmptyState>
         </div>
-      </>
+      </PlanGate>
     );
   }
 
@@ -119,7 +120,7 @@ export default async function AdsPage({
   }));
 
   return (
-    <>
+    <PlanGate reason="Publique anúncios direto do dashboard.">
       <PageHeader breadcrumbs={[
         { label: "Organizações", href: "/dashboard" },
         { label: slug, href: `/dashboard/${slug}` },
@@ -135,9 +136,7 @@ export default async function AdsPage({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {workspace.enable_meta_mutations && (
-              <CreateAdDialog organizationId={workspace.id} accountId={selectedAccount} adSets={adsetOptions} creatives={creativeOptions} pages={pageOptions} images={images ?? []} />
-            )}
+            <CreateAdDialog organizationId={workspace.id} accountId={selectedAccount} adSets={adsetOptions} creatives={creativeOptions} pages={pageOptions} images={images ?? []} />
             <AccountSelector accounts={accounts} current={selectedAccount} />
           </div>
         </div>
@@ -201,6 +200,6 @@ export default async function AdsPage({
           />
         ) : null}
       </div>
-    </>
+    </PlanGate>
   );
 }

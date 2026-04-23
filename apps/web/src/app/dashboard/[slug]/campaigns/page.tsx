@@ -21,6 +21,7 @@ import { Megaphone, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CreateCampaignDialog } from "@/components/dashboard/create-campaign-dialog";
 import { CampaignToggle } from "@/components/dashboard/campaign-toggle";
+import { PlanGate } from "@/components/billing/plan-gate";
 import { TimeRangeSelector } from "../insights/time-range-selector";
 
 function makeCurrencyFormatter(currency: string | null | undefined) {
@@ -102,7 +103,7 @@ export default async function CampaignsPage({
 
   if (!token || accounts.length === 0) {
     return (
-      <>
+      <PlanGate reason="Crie campanhas de Meta Ads sem limite direto do dashboard.">
         <PageHeader
           breadcrumbs={[
             { label: "Organizações", href: "/dashboard" },
@@ -132,7 +133,7 @@ export default async function CampaignsPage({
             </Button>
           </EmptyState>
         </div>
-      </>
+      </PlanGate>
     );
   }
 
@@ -158,7 +159,7 @@ export default async function CampaignsPage({
   }
 
   return (
-    <>
+    <PlanGate reason="Crie campanhas de Meta Ads sem limite direto do dashboard.">
       <PageHeader
         breadcrumbs={[
           { label: "Organizações", href: "/dashboard" },
@@ -178,9 +179,7 @@ export default async function CampaignsPage({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {workspace.enable_meta_mutations && (
-              <CreateCampaignDialog organizationId={workspace.id} accountId={selectedAccount} />
-            )}
+            <CreateCampaignDialog organizationId={workspace.id} accountId={selectedAccount} />
             <TimeRangeSelector current={selectedRange} />
             <AccountSelector accounts={accounts} current={selectedAccount} />
           </div>
@@ -306,6 +305,6 @@ export default async function CampaignsPage({
           />
         ) : null}
       </div>
-    </>
+    </PlanGate>
   );
 }

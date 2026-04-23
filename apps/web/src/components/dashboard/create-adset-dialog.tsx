@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
-  DialogDescription, DialogFooter, DialogTrigger,
+  DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { useRequirePlan } from "@/hooks/use-require-plan";
+import { UpgradePaywallDialog } from "@/components/billing/upgrade-paywall-dialog";
 
 const OPTIMIZATION_GOALS = [
   { value: "LINK_CLICKS", label: "Link Clicks" },
@@ -40,6 +42,7 @@ export function CreateAdSetDialog({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { guard, paywallOpen, setPaywallOpen } = useRequirePlan("pro");
 
   const [name, setName] = useState("");
   const [campaignId, setCampaignId] = useState(campaigns[0]?.id ?? "");
@@ -114,13 +117,17 @@ export function CreateAdSetDialog({
   }
 
   return (
+    <>
+      <Button size="sm" onClick={guard(() => setOpen(true))}>
+        <Plus className="mr-1.5 h-4 w-4" />
+        New Ad Set
+      </Button>
+      <UpgradePaywallDialog
+        open={paywallOpen}
+        onOpenChange={setPaywallOpen}
+        reason="Segmente audiências com ad sets ilimitados."
+      />
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="mr-1.5 h-4 w-4" />
-          New Ad Set
-        </Button>
-      </DialogTrigger>
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Create Ad Set</DialogTitle>
@@ -248,5 +255,6 @@ export function CreateAdSetDialog({
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

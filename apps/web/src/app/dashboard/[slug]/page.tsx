@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Cable, Link2, Building2, DollarSign, BarChart3 } from "lucide-react";
+import { PlanGate } from "@/components/billing/plan-gate";
 
 const PERIOD_LABELS: Record<string, string> = {
   last_7d: "Últimos 7 dias",
@@ -182,7 +183,7 @@ export default async function WorkspacePage({
   campaignQuery.set("account_id", selectedAccount);
 
   return (
-    <>
+    <PlanGate reason="Acompanhe métricas e gerencie campanhas direto do dashboard.">
       <PageHeader
         breadcrumbs={[
           { label: "Organizações", href: "/dashboard" },
@@ -383,6 +384,6 @@ export default async function WorkspacePage({
           </>
         ) : null}
       </div>
-    </>
+    </PlanGate>
   );
 }

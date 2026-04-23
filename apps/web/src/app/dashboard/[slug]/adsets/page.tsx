@@ -15,6 +15,7 @@ import { Layers, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { CreateAdSetDialog } from "@/components/dashboard/create-adset-dialog";
+import { PlanGate } from "@/components/billing/plan-gate";
 
 const statusVariant = (s: string) => {
   switch (s) {
@@ -88,7 +89,7 @@ export default async function AdSetsPage({
   }));
 
   return (
-    <>
+    <PlanGate reason="Segmente audiências com ad sets ilimitados.">
       <PageHeader breadcrumbs={[
         { label: "Organizações", href: "/dashboard" },
         { label: slug, href: `/dashboard/${slug}` },
@@ -104,9 +105,7 @@ export default async function AdSetsPage({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {workspace.enable_meta_mutations && (
-              <CreateAdSetDialog organizationId={workspace.id} accountId={selectedAccount} campaigns={campaignOptions} />
-            )}
+            <CreateAdSetDialog organizationId={workspace.id} accountId={selectedAccount} campaigns={campaignOptions} />
             <AccountSelector accounts={accounts} current={selectedAccount} />
           </div>
         </div>
@@ -183,6 +182,6 @@ export default async function AdSetsPage({
           />
         ) : null}
       </div>
-    </>
+    </PlanGate>
   );
 }

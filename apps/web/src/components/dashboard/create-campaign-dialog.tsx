@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
-  DialogDescription, DialogFooter, DialogTrigger,
+  DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { useRequirePlan } from "@/hooks/use-require-plan";
+import { UpgradePaywallDialog } from "@/components/billing/upgrade-paywall-dialog";
 
 const OBJECTIVES = [
   { value: "OUTCOME_TRAFFIC", label: "Traffic" },
@@ -42,6 +44,7 @@ export function CreateCampaignDialog({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { guard, paywallOpen, setPaywallOpen } = useRequirePlan("pro");
 
   const [name, setName] = useState("");
   const [objective, setObjective] = useState("OUTCOME_TRAFFIC");
@@ -84,13 +87,17 @@ export function CreateCampaignDialog({
   }
 
   return (
+    <>
+      <Button size="sm" onClick={guard(() => setOpen(true))}>
+        <Plus className="mr-1.5 h-4 w-4" />
+        New Campaign
+      </Button>
+      <UpgradePaywallDialog
+        open={paywallOpen}
+        onOpenChange={setPaywallOpen}
+        reason="Crie campanhas de Meta Ads sem limite direto do dashboard."
+      />
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="mr-1.5 h-4 w-4" />
-          New Campaign
-        </Button>
-      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create Campaign</DialogTitle>
@@ -164,5 +171,6 @@ export function CreateCampaignDialog({
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

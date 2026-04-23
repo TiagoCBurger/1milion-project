@@ -6,6 +6,7 @@ import { IntegrationsTopNav } from "@/components/dashboard/integrations-top-nav"
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { Button } from "@/components/ui/button";
 import { LineChart } from "lucide-react";
+import { PlanGate } from "@/components/billing/plan-gate";
 
 export default async function GoogleIntegrationPage({
   params,
@@ -28,7 +29,7 @@ export default async function GoogleIntegrationPage({
   if (!workspace) notFound();
 
   return (
-    <>
+    <PlanGate reason="Conecte Google Ads quando disponível — desbloqueie já com um plano pago.">
       <PageHeader
         breadcrumbs={[
           { label: "Organizações", href: "/dashboard" },
@@ -50,6 +51,6 @@ export default async function GoogleIntegrationPage({
           </Button>
         </EmptyState>
       </div>
-    </>
+    </PlanGate>
   );
 }

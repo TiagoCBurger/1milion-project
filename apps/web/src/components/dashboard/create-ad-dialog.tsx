@@ -9,11 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
-  DialogDescription, DialogFooter, DialogTrigger,
+  DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { useRequirePlan } from "@/hooks/use-require-plan";
+import { UpgradePaywallDialog } from "@/components/billing/upgrade-paywall-dialog";
 
 const CTA_TYPES = [
   { value: "LEARN_MORE", label: "Learn More" },
@@ -50,6 +52,7 @@ export function CreateAdDialog({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { guard, paywallOpen, setPaywallOpen } = useRequirePlan("pro");
 
   // Ad fields
   const [name, setName] = useState("");
@@ -185,13 +188,17 @@ export function CreateAdDialog({
   }
 
   return (
+    <>
+      <Button size="sm" onClick={guard(() => setOpen(true))}>
+        <Plus className="mr-1.5 h-4 w-4" />
+        New Ad
+      </Button>
+      <UpgradePaywallDialog
+        open={paywallOpen}
+        onOpenChange={setPaywallOpen}
+        reason="Publique anúncios direto do dashboard."
+      />
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="mr-1.5 h-4 w-4" />
-          New Ad
-        </Button>
-      </DialogTrigger>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Ad</DialogTitle>
@@ -431,5 +438,6 @@ export function CreateAdDialog({
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

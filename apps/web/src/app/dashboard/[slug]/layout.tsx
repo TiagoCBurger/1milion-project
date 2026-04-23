@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { fetchSidebarOrganizations } from "@/lib/organizations";
 import { getAuthedUser, getSupabase } from "@/lib/auth-context";
+import { PlanProvider } from "@/hooks/use-plan";
 
 export default async function WorkspaceLayout({
   children,
@@ -37,7 +38,9 @@ export default async function WorkspaceLayout({
       </aside>
       {/* Main content with left offset */}
       <main className="flex-1 md:ml-64 min-h-screen flex flex-col">
-        {children}
+        <PlanProvider organizationId={currentWorkspace.id}>
+          {children}
+        </PlanProvider>
       </main>
     </div>
   );

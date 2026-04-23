@@ -9,6 +9,7 @@ import { Cable, FolderKanban } from "lucide-react";
 import { ConnectionManager } from "./connection-manager";
 import { ConnectionsTabs } from "./connections-tabs";
 import { McpSetupGuide } from "./mcp-setup-guide";
+import { PlanGate } from "@/components/billing/plan-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -146,7 +147,7 @@ export default async function ConnectionsPage({
   );
 
   return (
-    <>
+    <PlanGate reason="Conecte Claude, Cursor e outras IAs via MCP nos planos pagos.">
       <PageHeader breadcrumbs={[
         { label: "Organizações", href: "/dashboard" },
         { label: workspace.name, href: `/dashboard/${slug}` },
@@ -165,6 +166,6 @@ export default async function ConnectionsPage({
           </ConnectionsTabs>
         </Suspense>
       </div>
-    </>
+    </PlanGate>
   );
 }

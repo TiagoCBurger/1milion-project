@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CreateCreativeDialog } from "@/components/dashboard/create-creative-dialog";
+import { useRequirePlan } from "@/hooks/use-require-plan";
+import { UpgradePaywallDialog } from "@/components/billing/upgrade-paywall-dialog";
 
 interface AdImage {
   id: string;
@@ -22,18 +24,17 @@ export function CreativesClient({
   accountId,
   pages,
   initialImages,
-  canWrite = false,
 }: {
   organizationId: string;
   accountId: string;
   pages: { id: string; name: string }[];
   initialImages: AdImage[];
-  canWrite?: boolean;
 }) {
   const [images, setImages] = useState<AdImage[]>(initialImages);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const { guard, paywallOpen, setPaywallOpen } = useRequirePlan("pro");
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -88,39 +89,42 @@ export function CreativesClient({
 
   return (
     <div className="space-y-6">
+      <UpgradePaywallDialog
+        open={paywallOpen}
+        onOpenChange={setPaywallOpen}
+        reason="Suba imagens para seus anúncios direto do dashboard."
+      />
       {/* Upload + Create actions */}
-      {canWrite && (
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-            ) : (
-              <Upload className="mr-1.5 h-4 w-4" />
-            )}
-            {uploading ? "Uploading..." : "Upload Image"}
-          </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={handleUpload}
-            className="hidden"
-          />
-
-          {pages.length > 0 && (
-            <CreateCreativeDialog
-              organizationId={organizationId}
-              accountId={accountId}
-              pages={pages}
-              images={images}
-            />
+      <div className="flex items-center gap-3">
+        <Button
+          variant="outline"
+          onClick={guard(() => fileRef.current?.click())}
+          disabled={uploading}
+        >
+          {uploading ? (
+            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+          ) : (
+            <Upload className="mr-1.5 h-4 w-4" />
           )}
-        </div>
-      )}
+          {uploading ? "Uploading..." : "Upload Image"}
+        </Button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handleUpload}
+          className="hidden"
+        />
+
+        {pages.length > 0 && (
+          <CreateCreativeDialog
+            organizationId={organizationId}
+            accountId={accountId}
+            pages={pages}
+            images={images}
+          />
+        )}
+      </div>
 
       {error && (
         <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
