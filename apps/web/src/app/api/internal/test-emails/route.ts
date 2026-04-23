@@ -216,8 +216,21 @@ export async function POST(request: Request) {
     return Response.json({ error: "Missing or invalid 'to' field" }, { status: 400 });
   }
 
+  // Optional filter: { only: ["welcome","billing-receipt", ...] }.
+  // Useful for re-sending just the ones that failed on the previous run.
+  const onlyRaw = (body as { only?: unknown })?.only;
+  const onlyFilter: Set<string> | null =
+    Array.isArray(onlyRaw) && onlyRaw.every((x) => typeof x === "string")
+      ? new Set(onlyRaw as string[])
+      : null;
+
+  const dispatchers = onlyFilter
+    ? DISPATCHERS.filter((d) => onlyFilter.has(d.name))
+    : DISPATCHERS;
+
   const results: Array<{ name: string; ok: boolean; id?: string; error?: string }> = [];
-  for (const disp of DISPATCHERS) {
+  for (let i = 0; i < dispatchers.length; i++) {
+    const disp = dispatchers[i];
     try {
       const { id } = await disp.run(to);
       results.push({ name: disp.name, ok: true, id });
@@ -228,14 +241,18 @@ export async function POST(request: Request) {
         error: err instanceof Error ? err.message : String(err),
       });
     }
+    // Resend caps at 5 req/s. 250 ms between sends keeps us comfortably below.
+    if (i < dispatchers.length - 1) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
   }
 
   const sent = results.filter((r) => r.ok).length;
   return Response.json({
     to,
-    total: DISPATCHERS.length,
+    total: dispatchers.length,
     sent,
-    failures: DISPATCHERS.length - sent,
+    failures: dispatchers.length - sent,
     results,
   });
 }
