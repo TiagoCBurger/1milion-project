@@ -207,6 +207,19 @@ export async function metaApiGet(
   }
 }
 
+// ── Meta ID validation ────────────────────────────────────────
+
+const CAMPAIGN_ID_REGEX = /^\d+$/;
+const ACCOUNT_ID_REGEX = /^(act_)?\d+$/;
+
+export function validateMetaId(id: string, type: "campaign" | "account" | "adset" | "ad" | "creative"): string {
+  const regex = type === "account" ? ACCOUNT_ID_REGEX : CAMPAIGN_ID_REGEX;
+  if (!regex.test(id)) {
+    throw new Error(`Invalid Meta ${type} ID format: ${id}`);
+  }
+  return id;
+}
+
 // ── Meta Graph API POST ───────────────────────────────────────
 
 export async function metaApiPost(

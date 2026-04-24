@@ -1,14 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { useRouter } from "next/navigation";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordRequirements } from "@/components/ui/password-requirements";
+import { friendlyAuthError } from "@/lib/auth-errors";
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -16,29 +20,56 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
   const router = useRouter();
-  const supabase = createClient();
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { display_name: name },
-        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/dashboard`,
-      },
+    const res = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, name, captchaToken }),
     });
 
-    if (error) {
-      setError(error.message);
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(res.status === 429 ? data.error : friendlyAuthError(data.error ?? "Unknown error"));
+      turnstileRef.current?.reset();
+      setCaptchaToken("");
       setLoading(false);
     } else {
-      router.push("/dashboard");
+      setEmailSent(true);
     }
+  }
+
+  if (emailSent) {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-4 bg-background">
+        <Card className="w-full max-w-sm">
+          <CardHeader className="text-center">
+            <BrandLogo href="/" className="mb-2 justify-center" />
+            <CardTitle className="text-xl">Check your email</CardTitle>
+            <CardDescription>
+              We sent a confirmation link to <strong>{email}</strong>. Click the link to activate your account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-sm text-muted-foreground">
+              Already confirmed?{" "}
+              <Link href="/login" className="text-primary hover:underline">
+                Sign in
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
+      </main>
+    );
   }
 
   return (
@@ -86,10 +117,27 @@ export default function SignupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={8}
+                minLength={12}
               />
+              <PasswordRequirements password={password} />
             </div>
-            <Button type="submit" disabled={loading} className="w-full">
+            {TURNSTILE_SITE_KEY && (
+              <div className="flex justify-center">
+                <Turnstile
+                  ref={turnstileRef}
+                  siteKey={TURNSTILE_SITE_KEY}
+                  onSuccess={setCaptchaToken}
+                  onExpire={() => setCaptchaToken("")}
+                  onError={() => setCaptchaToken("")}
+                  options={{ theme: "auto" }}
+                />
+              </div>
+            )}
+            <Button
+              type="submit"
+              disabled={loading || (!!TURNSTILE_SITE_KEY && !captchaToken)}
+              className="w-full"
+            >
               {loading ? "Creating account..." : "Create Account"}
             </Button>
           </form>

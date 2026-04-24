@@ -29,8 +29,8 @@ import {
   EMAIL_TAGS,
 } from "@vibefly/email";
 import { recordAudit, extractRequestMeta } from "@/lib/audit";
+import { validateInternalRequest } from "@/lib/internal-api-auth";
 
-const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
 const MAX_BATCH = 50;
 const REMIND_AFTER_HOURS = 24;
 
@@ -41,24 +41,9 @@ interface ItemResult {
   skipped?: "no_candidate" | "already_notified";
 }
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i++) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return mismatch === 0;
-}
-
 export async function POST(request: Request) {
-  if (!INTERNAL_API_TOKEN || INTERNAL_API_TOKEN.length < 32) {
-    return Response.json({ error: "Service not configured" }, { status: 503 });
-  }
-
-  const provided = request.headers.get("x-internal-api-token");
-  if (!provided || !timingSafeEqual(provided, INTERNAL_API_TOKEN)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const rejection = validateInternalRequest(request);
+  if (rejection) return rejection;
 
   let body: unknown;
   try {

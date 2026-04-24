@@ -5,6 +5,7 @@ import {
   ensureActPrefix,
   getMetaGraphError,
   metaUserFacingError,
+  validateMetaId,
 } from "@/lib/meta-api";
 import { assertOrganizationCanWrite } from "@/lib/organization-write-guard";
 
@@ -45,6 +46,13 @@ export async function POST(
       { error: "account_id, name, and adset_id are required" },
       { status: 400 }
     );
+  }
+
+  try {
+    validateMetaId(account_id, "account");
+    validateMetaId(adset_id, "adset");
+  } catch {
+    return Response.json({ error: "Invalid account or adset ID" }, { status: 400 });
   }
 
   const token = await getDecryptedToken(organizationId);

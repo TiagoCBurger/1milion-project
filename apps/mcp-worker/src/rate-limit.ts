@@ -14,6 +14,28 @@ const FALLBACK_WINDOW_MS = 60_000;
 const fallbackBuckets = new Map<string, { resetAt: number; count: number }>();
 const FALLBACK_MAX_ENTRIES = 5_000;
 
+// IP-based rate limit for OAuth endpoints (pre-authentication, no workspace available).
+// 30 req/min per IP — enough for legitimate MCP client OAuth flows.
+const OAUTH_RL_PER_MIN = 30;
+const oauthBuckets = new Map<string, { resetAt: number; count: number }>();
+
+export function checkOAuthIpRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = oauthBuckets.get(ip);
+
+  if (!entry || entry.resetAt <= now) {
+    if (oauthBuckets.size >= FALLBACK_MAX_ENTRIES) {
+      const oldest = oauthBuckets.keys().next().value;
+      if (oldest) oauthBuckets.delete(oldest);
+    }
+    oauthBuckets.set(ip, { resetAt: now + FALLBACK_WINDOW_MS, count: 1 });
+    return false;
+  }
+
+  entry.count += 1;
+  return entry.count > OAUTH_RL_PER_MIN;
+}
+
 function fallbackCheck(organizationId: string, perMinute: number): RateLimitResult {
   // perMinute=0 means "unlimited" for the plan (enterprise contracts). Keep
   // the plan semantics even in fallback mode — no arbitrary ceiling.

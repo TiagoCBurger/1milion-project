@@ -3,6 +3,25 @@ import type { StoredClient } from "./types";
 import { generateToken, jsonResponse, oauthError } from "./utils";
 import { saveClient } from "./clients";
 
+// Only allow redirect URIs pointing to our own domain or localhost (for Claude Code CLI)
+const ALLOWED_REDIRECT_HOSTS = new Set([
+  "vibefly.app",
+  "app.vibefly.app",
+  "localhost",
+  "127.0.0.1",
+]);
+
+function isAllowedRedirectUri(uri: string): boolean {
+  try {
+    const url = new URL(uri);
+    const isLocalhost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    if (isLocalhost) return true;
+    return url.protocol === "https:" && ALLOWED_REDIRECT_HOSTS.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * POST /register — Dynamic Client Registration (RFC 7591).
  * Claude Code calls this to register itself before starting the OAuth flow.
@@ -31,6 +50,14 @@ export async function handleRegister(
     return oauthError(
       "invalid_client_metadata",
       "redirect_uris must be a non-empty array of strings"
+    );
+  }
+
+  const invalidUri = (redirectUris as string[]).find((u) => !isAllowedRedirectUri(u));
+  if (invalidUri) {
+    return oauthError(
+      "invalid_redirect_uri",
+      "redirect_uri must point to vibefly.app or localhost"
     );
   }
 

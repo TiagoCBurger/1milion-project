@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 import { validateApiKey, getMetaToken, verifyOAuthAccessToken, type AuthResult } from "./auth";
-import { checkRateLimit } from "./rate-limit";
+import { checkRateLimit, checkOAuthIpRateLimit } from "./rate-limit";
 import { logUsage } from "./usage";
 import { registerAllTools } from "./tools";
 import { wrapServerWithAudit } from "./audit";
@@ -72,14 +72,36 @@ async function handleFetch(
     // CORS preflight
     // -------------------------------------------------------
     if (request.method === "OPTIONS") {
-      return handleCors();
+      return handleCors(request, url);
     }
 
     // -------------------------------------------------------
     // OAuth endpoints (/.well-known/*, /authorize, /token, etc.)
+    // Rate-limit by IP before routing — OAuth runs before authentication
+    // so the org-based limiter is not available here.
     // -------------------------------------------------------
+    const OAUTH_RATE_LIMITED_PATHS = new Set(["/authorize", "/token", "/register", "/revoke"]);
+    if (OAUTH_RATE_LIMITED_PATHS.has(url.pathname)) {
+      const ip =
+        request.headers.get("CF-Connecting-IP") ??
+        request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ??
+        "unknown";
+      if (checkOAuthIpRateLimit(ip)) {
+        return new Response(
+          JSON.stringify({ error: "rate_limit", error_description: "Too many requests" }),
+          {
+            status: 429,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": "*",
+              "Retry-After": "60",
+            },
+          }
+        );
+      }
+    }
     const oauthResponse = await routeOAuth(request, url, env);
-    if (oauthResponse) return oauthResponse;
+    if (oauthResponse) return withOAuthCors(request, url, oauthResponse);
 
     // -------------------------------------------------------
     // Only handle POST /mcp (stateless HTTP transport)
@@ -292,11 +314,37 @@ async function authenticateRequest(
   return { ok: false, error: "no_credentials" };
 }
 
-function handleCors(): Response {
+// OAuth mutation endpoints restrict CORS to prevent cross-origin abuse.
+// Read-only/navigation paths keep * since they're non-sensitive GETs.
+const ALLOWED_OAUTH_ORIGINS = new Set([
+  "https://vibefly.app",
+  "https://app.vibefly.app",
+]);
+const OAUTH_CORS_RESTRICTED = new Set(["/register", "/token", "/revoke"]);
+
+function resolveOrigin(request: Request, path: string): string {
+  if (!OAUTH_CORS_RESTRICTED.has(path)) return "*";
+  const origin = request.headers.get("Origin");
+  return origin && ALLOWED_OAUTH_ORIGINS.has(origin) ? origin : "null";
+}
+
+function withOAuthCors(request: Request, url: URL, response: Response): Response {
+  if (!OAUTH_CORS_RESTRICTED.has(url.pathname)) return response;
+  const origin = request.headers.get("Origin");
+  const modified = new Response(response.body, response);
+  if (origin && ALLOWED_OAUTH_ORIGINS.has(origin)) {
+    modified.headers.set("Access-Control-Allow-Origin", origin);
+  } else {
+    modified.headers.delete("Access-Control-Allow-Origin");
+  }
+  return modified;
+}
+
+function handleCors(request: Request, url: URL): Response {
   return new Response(null, {
     status: 204,
     headers: {
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": resolveOrigin(request, url.pathname),
       "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
       "Access-Control-Allow-Headers":
         "Content-Type, Authorization, Accept, Mcp-Session-Id",

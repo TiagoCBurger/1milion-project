@@ -20,7 +20,7 @@ function ConfirmContent() {
     const tokenHash = searchParams.get("token_hash");
     const type = searchParams.get("type");
     const next = searchParams.get("next") ?? "/dashboard";
-    const destination = next.startsWith("/") ? next : "/dashboard";
+    const destination = next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
 
     // Middleware already exchanged the code successfully
     if (confirmed === "true") {
@@ -58,7 +58,7 @@ function ConfirmContent() {
           return;
         }
         console.error("[auth/confirm] exchangeCodeForSession error:", error);
-        setErrorMessage(error.message || "O link de confirmação expirou ou já foi utilizado.");
+        setErrorMessage("O link de confirmação expirou ou já foi utilizado.");
         setStatus("error");
         return;
       }

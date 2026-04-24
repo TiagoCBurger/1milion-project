@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getDecryptedToken, metaApiPost, metaUserFacingError } from "@/lib/meta-api";
+import { getDecryptedToken, metaApiPost, metaUserFacingError, validateMetaId } from "@/lib/meta-api";
 import { assertOrganizationCanWrite } from "@/lib/organization-write-guard";
 
 export async function PATCH(
@@ -36,13 +36,20 @@ export async function PATCH(
     return Response.json({ error: "No Meta account connected" }, { status: 403 });
   }
 
+  let safeCampaignId: string;
+  try {
+    safeCampaignId = validateMetaId(campaignId, "campaign");
+  } catch {
+    return Response.json({ error: "Invalid campaign ID" }, { status: 400 });
+  }
+
   const body = await request.json();
   const metaParams: Record<string, unknown> = {};
   if (body.status) metaParams.status = body.status;
   if (body.name) metaParams.name = body.name;
   if (body.daily_budget) metaParams.daily_budget = String(body.daily_budget);
 
-  const result = await metaApiPost(campaignId, token, metaParams);
+  const result = await metaApiPost(safeCampaignId, token, metaParams);
 
   const errMsg = metaUserFacingError(result);
   if (errMsg) {

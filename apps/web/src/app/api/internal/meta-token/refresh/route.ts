@@ -18,11 +18,11 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { exchangeForLongLivedToken } from "@/lib/meta-oauth";
+import { validateInternalRequest } from "@/lib/internal-api-auth";
 
 const FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID;
 const FACEBOOK_APP_SECRET = process.env.FACEBOOK_APP_SECRET;
 const TOKEN_ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY;
-const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
 const MAX_BATCH = 50;
 
 interface ItemResult {
@@ -32,32 +32,12 @@ interface ItemResult {
   new_expires_at?: string;
 }
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i++) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return mismatch === 0;
-}
-
 export async function POST(request: Request) {
-  if (
-    !FACEBOOK_APP_ID ||
-    !FACEBOOK_APP_SECRET ||
-    !TOKEN_ENCRYPTION_KEY ||
-    !INTERNAL_API_TOKEN ||
-    INTERNAL_API_TOKEN.length < 32
-  ) {
-    return Response.json(
-      { error: "Service not configured" },
-      { status: 503 },
-    );
-  }
+  const rejection = validateInternalRequest(request);
+  if (rejection) return rejection;
 
-  const provided = request.headers.get("x-internal-api-token");
-  if (!provided || !timingSafeEqual(provided, INTERNAL_API_TOKEN)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (!FACEBOOK_APP_ID || !FACEBOOK_APP_SECRET || !TOKEN_ENCRYPTION_KEY) {
+    return Response.json({ error: "Service not configured" }, { status: 503 });
   }
 
   let body: unknown;

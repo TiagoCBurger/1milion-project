@@ -5,6 +5,7 @@ import {
   ensureActPrefix,
   getMetaGraphError,
   metaUserFacingError,
+  validateMetaId,
 } from "@/lib/meta-api";
 import { assertOrganizationCanWrite } from "@/lib/organization-write-guard";
 
@@ -47,6 +48,12 @@ export async function POST(
 
   if (!account_id) {
     return Response.json({ error: "account_id is required" }, { status: 400 });
+  }
+
+  try {
+    validateMetaId(account_id, "account");
+  } catch {
+    return Response.json({ error: "Invalid account ID" }, { status: 400 });
   }
 
   if (!page_id) {
