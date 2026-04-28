@@ -17,6 +17,7 @@ import {
   Plus,
   Settings,
   SlidersHorizontal,
+  BarChart3,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -118,6 +119,12 @@ export function AppSidebar({ workspaces, currentWorkspace, currentProjectSlug, u
             `/dashboard/${slug}/insights`,
             `/dashboard/${slug}/pages`,
           ],
+        },
+        {
+          title: "Analytics",
+          url: `/dashboard/${slug}/analytics`,
+          icon: BarChart3,
+          activePathPrefix: `/dashboard/${slug}/analytics`,
         },
       ]
     : []
