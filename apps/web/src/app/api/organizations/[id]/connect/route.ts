@@ -76,6 +76,18 @@ export async function POST(
         .eq("id", organizationId);
     }
 
+    // Sync all BMs and their ad accounts (service-role only RPC)
+    if (inspection.businessManagers.length > 0) {
+      const { error: syncError } = await admin.rpc("sync_business_managers", {
+        p_organization_id: organizationId,
+        p_business_managers: inspection.businessManagers,
+      });
+      if (syncError) {
+        console.error("connect sync_business_managers error:", syncError);
+        return Response.json({ error: "sync_failed" }, { status: 500 });
+      }
+    }
+
     // Auto-generate API key if none exists
     let apiKey: string | undefined;
     const { data: existingKeys } = await supabase

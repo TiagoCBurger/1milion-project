@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight, Link2, LogOut, AlertCircle } from "lucide-react";
+import { ChevronRight, Link2, LogOut, AlertCircle, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { IntegrationsTopNav } from "@/components/dashboard/integrations-top-nav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -27,6 +27,8 @@ export default function MetaIntegrationPage() {
   const [canManageMeta, setCanManageMeta] = useState(false);
   const [connectionLoaded, setConnectionLoaded] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [resyncing, setResyncing] = useState(false);
+  const [resyncMessage, setResyncMessage] = useState<string | null>(null);
   const [showManual, setShowManual] = useState(false);
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
@@ -99,6 +101,8 @@ export default function MetaIntegrationPage() {
     unauthorized: "É preciso estar logado para conectar a conta.",
     store_failed: "Não foi possível salvar o token. Tente novamente.",
     exchange_failed: "Falha ao concluir a conexão com o Facebook. Tente novamente.",
+    sync_failed: "Conexão criada, mas não foi possível importar suas contas de anúncio. Use \"Re-sincronizar\" abaixo.",
+    forbidden: "Você não tem permissão para conectar esta organização.",
   };
 
   async function handleManualConnect(e: React.FormEvent) {
@@ -131,6 +135,52 @@ export default function MetaIntegrationPage() {
   function handleFacebookConnect() {
     if (!organizationId) return;
     window.location.href = `/api/auth/facebook?organization_id=${organizationId}&slug=${slug}`;
+  }
+
+  async function handleResync() {
+    if (!organizationId || !canManageMeta) return;
+    setResyncing(true);
+    setError("");
+    setResyncMessage(null);
+    try {
+      const res = await fetch(`/api/organizations/${organizationId}/resync-meta`, {
+        method: "POST",
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        ad_account_count?: number;
+        business_manager_count?: number;
+      };
+      if (!res.ok) {
+        setError(
+          data.error === "no_valid_token"
+            ? "Token Meta inválido ou expirado. Reconecte sua conta Facebook."
+            : data.error === "sync_failed"
+              ? "Não foi possível importar as contas. Tente novamente."
+              : data.error || "Falha ao re-sincronizar"
+        );
+        return;
+      }
+      if (data.error === "no_business_managers") {
+        setResyncMessage(
+          "Nenhum Business Manager encontrado nesse token. Verifique no business.facebook.com se sua conta tem acesso."
+        );
+        return;
+      }
+      setResyncMessage(
+        `Sincronizado: ${data.ad_account_count ?? 0} conta${data.ad_account_count === 1 ? "" : "s"} de anúncio em ${data.business_manager_count ?? 0} BM${data.business_manager_count === 1 ? "" : "s"}.`
+      );
+      const { count } = await supabase
+        .from("ad_accounts")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("is_enabled", false);
+      setPendingSetup(count ?? 0);
+    } catch {
+      setError("Erro de rede");
+    } finally {
+      setResyncing(false);
+    }
   }
 
   async function handleDisconnect() {
@@ -282,16 +332,33 @@ export default function MetaIntegrationPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {canManageMeta ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  disabled={disconnecting}
-                  onClick={handleDisconnect}
-                >
-                  <LogOut className="h-4 w-4" />
-                  {disconnecting ? "Desconectando…" : "Desconectar Facebook"}
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2"
+                    disabled={resyncing}
+                    onClick={handleResync}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${resyncing ? "animate-spin" : ""}`} />
+                    {resyncing ? "Re-sincronizando…" : "Re-sincronizar contas Meta"}
+                  </Button>
+                  {resyncMessage && (
+                    <p className="rounded-md bg-emerald-50 p-2 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                      {resyncMessage}
+                    </p>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    disabled={disconnecting}
+                    onClick={handleDisconnect}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    {disconnecting ? "Desconectando…" : "Desconectar Facebook"}
+                  </Button>
+                </>
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Somente proprietários ou administradores podem desconectar a conta Facebook.

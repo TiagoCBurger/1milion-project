@@ -141,6 +141,7 @@ export async function GET(request: NextRequest) {
       );
       if (syncError) {
         console.error("sync BMs error:", syncError);
+        return redirectError(slug, "sync_failed");
       }
     }
 
